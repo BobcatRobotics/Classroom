@@ -4,6 +4,15 @@ resource "google_compute_disk" "data" {
   zone = var.zone
   size = var.data_disk_size_gb
 
+  # Pin Hyperdisk performance to the free baseline (3000 IOPS / 140 MiB/s).
+  # Anything above baseline is billed even while the VM is stopped; the GCP
+  # defaults (~3300/215 for this size) were silently incurring IOPS+throughput
+  # charges on an idle box. Baseline is plenty for classroom Gradle/Docker IO.
+  # Bump these up if the IDE feels sluggish (note: Hyperdisk allows a perf
+  # change only once every 4 hours).
+  provisioned_iops       = var.data_disk_provisioned_iops
+  provisioned_throughput = var.data_disk_provisioned_throughput
+
   # Survives VM recreation. cloud-init detects existing ext4 and skips mkfs.
   lifecycle {
     prevent_destroy = true

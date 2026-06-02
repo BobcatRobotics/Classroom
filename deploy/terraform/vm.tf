@@ -27,6 +27,11 @@ resource "google_compute_instance" "coderunner" {
       image = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
       size  = var.boot_disk_size_gb
       type  = var.boot_disk_type
+      # Pin Hyperdisk performance to the free baseline (3000 IOPS / 140 MiB/s) —
+      # the GCP defaults bill for over-baseline IOPS+throughput even while the
+      # VM is stopped. See disk.tf for the rationale.
+      provisioned_iops       = var.boot_disk_provisioned_iops
+      provisioned_throughput = var.boot_disk_provisioned_throughput
     }
   }
 

@@ -97,6 +97,34 @@ variable "boot_disk_size_gb" {
   default     = 50
 }
 
+# Hyperdisk Balanced bills for provisioned IOPS/throughput above the free
+# baseline (3000 IOPS / 140 MiB/s) regardless of whether the VM is running.
+# Default these to the baseline so an idle/on-demand box incurs only capacity
+# cost. Raise per-disk if you need more sustained IO (4-hour change cooldown).
+variable "data_disk_provisioned_iops" {
+  description = "Provisioned IOPS for the data disk. 3000 is the free Hyperdisk Balanced baseline."
+  type        = number
+  default     = 3000
+}
+
+variable "data_disk_provisioned_throughput" {
+  description = "Provisioned throughput (MiB/s) for the data disk. 140 is the free Hyperdisk Balanced baseline."
+  type        = number
+  default     = 140
+}
+
+variable "boot_disk_provisioned_iops" {
+  description = "Provisioned IOPS for the boot disk. 3000 is the free Hyperdisk Balanced baseline."
+  type        = number
+  default     = 3000
+}
+
+variable "boot_disk_provisioned_throughput" {
+  description = "Provisioned throughput (MiB/s) for the boot disk. 140 is the free Hyperdisk Balanced baseline."
+  type        = number
+  default     = 140
+}
+
 variable "instance_label" {
   description = "Value emitted as the Prometheus `instance` label on all metrics scraped from this VM. Useful to distinguish prod vs staging in Grafana once you have multiple deployments."
   type        = string
