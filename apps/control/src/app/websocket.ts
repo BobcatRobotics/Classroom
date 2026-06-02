@@ -2,17 +2,18 @@ import {
 	gamepadClientMessageSchema,
 	type ImportServerMessage,
 	importRequestSchema,
+	lessonLoadRequestSchema,
 	runClientMessageSchema,
 	type WorkspaceId,
 } from "@frc-coderunner/contracts";
+import { type CatalogSource, RemoteCatalogSource } from "../catalog";
 import type { GamepadLease, GamepadSessions } from "../gamepad";
 import type { HalSimBridge } from "../halsim";
 import {
+	ImportError,
 	type ImportManager,
 	parseGitHubUrl,
 	RateLimitError,
-	validateBranch,
-	validateSubdir,
 } from "../imports";
 import { getLogger } from "../logging";
 import type { Nt4AutoChooserBridge } from "../nt4-auto";
@@ -30,6 +31,7 @@ export type WebSocketHandlerContext = {
 	nt4Auto: Nt4AutoChooserBridge;
 	gamepad: GamepadSessions;
 	imports: ImportManager;
+	catalogSource: CatalogSource;
 };
 
 function socketMessageText(message: string | ArrayBuffer | Uint8Array): string {
@@ -40,7 +42,17 @@ function socketMessageText(message: string | ArrayBuffer | Uint8Array): string {
 }
 
 export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
-	const { storage, runs, halsim, nt4Auto, gamepad, imports } = ctx;
+	const { storage, runs, halsim, nt4Auto, gamepad, imports, catalogSource } =
+		ctx;
+
+	// Stop the active run and disconnect all sim state before a destructive
+	// project swap (D12).
+	const stopActiveRun = (workspaceId: WorkspaceId): void => {
+		runs.stopWorkspace(workspaceId);
+		halsim.disconnect(workspaceId);
+		nt4Auto.disconnect(workspaceId);
+		gamepad.reset(workspaceId);
+	};
 
 	const resolveGamepadLease = (
 		workspaceId: WorkspaceId,
@@ -147,8 +159,8 @@ export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
 				openProxyUpstream(ws, "HALSim", ws.data.protocols);
 				return;
 			}
-			if (ws.data.kind === "import") {
-				// Import WS is open; client sends an import request message to start
+			if (ws.data.kind === "import" || ws.data.kind === "lesson-load") {
+				// WS is open; the client sends a request message to start the load.
 				return;
 			}
 			if (ws.data.kind === "gamepad") {
@@ -212,31 +224,35 @@ export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
 			}
 
 			if (ws.data.kind === "import") {
+				const { workspace, userId } = ws.data;
 				try {
 					const parsed = importRequestSchema.parse(
 						JSON.parse(socketMessageText(message)),
 					);
-					const { cloneUrl, branch, subdir } = parseGitHubUrl(
-						parsed.url,
-						parsed.branch,
-						parsed.subdir,
-					);
-					validateBranch(branch);
-					if (subdir) validateSubdir(subdir);
+					const { cloneUrl } = parseGitHubUrl(parsed.url);
 					const send = (msg: ImportServerMessage) => {
 						try {
 							ws.send(JSON.stringify(msg));
 						} catch {}
 					};
+					// Stop the active run before wiping project files (D12).
+					stopActiveRun(workspace.id);
 					void imports
 						.run({
-							workspace: ws.data.workspace,
-							userId: ws.data.userId,
+							source: "github",
+							workspace,
+							userId,
 							cloneUrl,
-							branch,
-							subdir,
-							backup: parsed.backup ?? true,
 							send,
+						})
+						.catch((error) => {
+							const detail =
+								error instanceof Error ? error.message : "Import failed.";
+							log.warn("import request failed before start", {
+								workspaceId: workspace.id,
+								err: error instanceof Error ? error : new Error(detail),
+							});
+							send({ type: "error", message: detail });
 						})
 						.finally(() => {
 							try {
@@ -246,7 +262,7 @@ export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
 				} catch (error) {
 					if (error instanceof RateLimitError) {
 						log.warn("import rate limited", {
-							workspaceId: ws.data.workspace.id,
+							workspaceId: workspace.id,
 							err: error,
 						});
 						ws.send(JSON.stringify({ type: "error", message: error.message }));
@@ -256,12 +272,65 @@ export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
 					const detail =
 						error instanceof Error ? error.message : "Invalid import request.";
 					log.warn("invalid import request", {
-						workspaceId: ws.data.workspace.id,
+						workspaceId: workspace.id,
 						err: error instanceof Error ? error : new Error(detail),
 					});
 					ws.send(JSON.stringify({ type: "error", message: detail }));
 					ws.close(1000, "Invalid request.");
 				}
+				return;
+			}
+
+			if (ws.data.kind === "lesson-load") {
+				const { workspace, userId } = ws.data;
+				const send = (msg: ImportServerMessage) => {
+					try {
+						ws.send(JSON.stringify(msg));
+					} catch {}
+				};
+				void (async () => {
+					try {
+						const parsed = lessonLoadRequestSchema.parse(
+							JSON.parse(socketMessageText(message)),
+						);
+						const module = await catalogSource.resolveModule(parsed.moduleId);
+						const remote =
+							catalogSource instanceof RemoteCatalogSource
+								? {
+										cloneUrl: catalogSource.cloneUrl,
+										branch: catalogSource.branchName,
+									}
+								: null;
+						// Stop the active run before wiping project files (D12).
+						stopActiveRun(workspace.id);
+						await imports.run({
+							source: "catalog",
+							workspace,
+							userId,
+							moduleId: module.id,
+							subdir: module.subdir,
+							kind: module.kind,
+							remote,
+							send,
+						});
+					} catch (error) {
+						const detail =
+							error instanceof ImportError
+								? error.message
+								: error instanceof Error
+									? error.message
+									: "Invalid lesson load request.";
+						log.warn("invalid lesson load request", {
+							workspaceId: workspace.id,
+							err: error instanceof Error ? error : new Error(detail),
+						});
+						send({ type: "error", message: detail });
+					} finally {
+						try {
+							ws.close(1000, "Lesson load finished.");
+						} catch {}
+					}
+				})();
 				return;
 			}
 
@@ -310,8 +379,8 @@ export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
 				return;
 			}
 
-			if (ws.data.kind === "import") {
-				// Import WS closed — job will finish/fail on its own
+			if (ws.data.kind === "import" || ws.data.kind === "lesson-load") {
+				// WS closed — job will finish/fail on its own
 				return;
 			}
 

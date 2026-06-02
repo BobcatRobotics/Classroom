@@ -60,7 +60,13 @@ describe("routing and shell APIs", () => {
 					displayName: "alice",
 					avatarUrl: "https://example.test/avatar/alice.png",
 				},
-				workspace: { slug: "alice" },
+				// A fresh workspace starts empty (no first-login seed) with no module.
+				workspace: {
+					slug: "alice",
+					currentModule: null,
+					currentModuleKind: null,
+					projectEmpty: true,
+				},
 			});
 
 			const heartbeat = await app.fetch(

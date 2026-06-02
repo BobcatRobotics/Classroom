@@ -7,7 +7,12 @@ import {
 	gamepadClientMessageSchema,
 	gamepadServerMessageSchema,
 	gamepadStateSchema,
+	importRequestSchema,
+	importResponseSchema,
 	isWorkspaceSlug,
+	lessonCatalogResponseSchema,
+	lessonCatalogSchema,
+	lessonLoadRequestSchema,
 	runClientMessageSchema,
 	runServerMessageSchema,
 	simRunCommandRequestSchema,
@@ -140,6 +145,114 @@ describe("simulation API schemas", () => {
 			run: { status: "running" },
 			driverStation: { mode: "teleop" },
 		});
+	});
+});
+
+describe("lesson catalog schemas", () => {
+	test("parses a well-formed manifest", () => {
+		expect(
+			lessonCatalogSchema.parse({
+				schemaVersion: 1,
+				modules: [
+					{
+						id: "hello-name",
+						title: "Hello, Name",
+						description: "Variables and stdin.",
+						subdir: "modules/hello-name",
+						kind: "plain-java",
+						order: 10,
+					},
+				],
+			}),
+		).toMatchObject({ modules: [{ id: "hello-name", kind: "plain-java" }] });
+	});
+
+	test("rejects an unknown module kind", () => {
+		expect(
+			lessonCatalogSchema.safeParse({
+				schemaVersion: 1,
+				modules: [
+					{
+						id: "x",
+						title: "X",
+						description: "",
+						subdir: "modules/x",
+						kind: "console",
+						order: 10,
+					},
+				],
+			}).success,
+		).toBe(false);
+	});
+
+	test("rejects unsafe module subdir values", () => {
+		for (const subdir of [
+			"../escape",
+			"/modules/hello-name",
+			"modules/../escape",
+			"modules/hello name",
+			"modules/hello;rm",
+			"modules/$HOME",
+		]) {
+			expect(
+				lessonCatalogSchema.safeParse({
+					schemaVersion: 1,
+					modules: [
+						{
+							id: "x",
+							title: "X",
+							description: "",
+							subdir,
+							kind: "plain-java",
+							order: 10,
+						},
+					],
+				}).success,
+			).toBe(false);
+		}
+	});
+
+	test("lessonCatalogResponseSchema requires ok:true and modules", () => {
+		expect(
+			lessonCatalogResponseSchema.parse({
+				ok: true,
+				modules: [],
+				error: null,
+			}),
+		).toMatchObject({ ok: true, modules: [] });
+		expect(
+			lessonCatalogResponseSchema.safeParse({ ok: false, modules: [] }).success,
+		).toBe(false);
+	});
+
+	test("lessonLoadRequestSchema requires a non-empty moduleId", () => {
+		expect(lessonLoadRequestSchema.parse({ moduleId: "hello-name" })).toEqual({
+			moduleId: "hello-name",
+		});
+		expect(lessonLoadRequestSchema.safeParse({ moduleId: "" }).success).toBe(
+			false,
+		);
+	});
+});
+
+describe("importRequestSchema", () => {
+	test("accepts a bare url and ignores legacy branch/subdir fields", () => {
+		expect(
+			importRequestSchema.parse({ url: "https://github.com/owner/repo" }),
+		).toEqual({ url: "https://github.com/owner/repo" });
+	});
+
+	test("rejects an empty url", () => {
+		expect(importRequestSchema.safeParse({ url: "" }).success).toBe(false);
+	});
+
+	test("importResponseSchema matches the validation endpoint response", () => {
+		expect(
+			importResponseSchema.parse({
+				ok: true,
+				cloneUrl: "https://github.com/owner/repo.git",
+			}),
+		).toEqual({ ok: true, cloneUrl: "https://github.com/owner/repo.git" });
 	});
 });
 

@@ -1,7 +1,9 @@
+import { readdir } from "node:fs/promises";
 import {
 	autoChooserPatchSchema,
 	driverStationPatchSchema,
 	importRequestSchema,
+	lessonLoadRequestSchema,
 	type SimRunCommandResponse,
 	simRunCommandRequestSchema,
 	workspaceSlugSchema,
@@ -10,17 +12,10 @@ import {
 	requireWebSocketOrigin,
 	requireWorkspaceOwnership,
 } from "../auth/middleware";
+import type { CatalogSource } from "../catalog";
 import type { GamepadSessions } from "../gamepad";
 import type { HalSimBridge } from "../halsim";
-import {
-	ImportError,
-	listRecentImports,
-	parseGitHubUrl,
-	RateLimitError,
-	restoreImportBackup,
-	validateBranch,
-	validateSubdir,
-} from "../imports";
+import { ImportError, parseGitHubUrl, RateLimitError } from "../imports";
 import { getLogger } from "../logging";
 import type { Nt4AutoChooserBridge } from "../nt4-auto";
 import type { RunManager } from "../runs";
@@ -48,7 +43,12 @@ import {
 	simStatusResponse,
 	simStatusSnapshot,
 } from "./status";
-import type { BunUpgradeServer, HttpFetch, ImportSocketData } from "./types";
+import type {
+	BunUpgradeServer,
+	HttpFetch,
+	ImportSocketData,
+	LessonLoadSocketData,
+} from "./types";
 
 const log = getLogger("workspace");
 
@@ -59,6 +59,7 @@ export type WorkspaceRouteContext = {
 	halsim: HalSimBridge;
 	gamepad: GamepadSessions;
 	nt4Auto: Nt4AutoChooserBridge;
+	catalogSource: CatalogSource;
 	upstreamFetch: HttpFetch;
 };
 
@@ -80,6 +81,7 @@ export async function handleWorkspaceRoute(
 		halsim,
 		gamepad,
 		nt4Auto,
+		catalogSource,
 		upstreamFetch,
 	} = ctx;
 	const slug = workspaceMatch[1] ?? "";
@@ -266,7 +268,16 @@ export async function handleWorkspaceRoute(
 	}
 
 	if (suffix === "/api/session" && request.method === "GET") {
-		return jsonResponse(sessionResponse(auth, { demo: storage.config.demo }));
+		let projectEmpty = true;
+		try {
+			projectEmpty = (await readdir(auth.workspace.project_path)).length === 0;
+		} catch {
+			// Treat an unreadable/missing project dir as empty (first-login state).
+			projectEmpty = true;
+		}
+		return jsonResponse(
+			sessionResponse(auth, { demo: storage.config.demo, projectEmpty }),
+		);
 	}
 
 	if (suffix === "/api/containers/status" && request.method === "GET") {
@@ -450,20 +461,60 @@ export async function handleWorkspaceRoute(
 		});
 	}
 
+	// --- Lesson catalog endpoints ---
+	if (suffix === "/api/lessons" && request.method === "GET") {
+		const { modules, error } = await catalogSource.getManifest();
+		return jsonResponse({ ok: true, modules, error });
+	}
+
+	if (suffix === "/api/lessons/load" && request.method === "POST") {
+		try {
+			const parsed = lessonLoadRequestSchema.parse(await request.json());
+			// Resolve only — the actual load streams over WS.
+			await catalogSource.resolveModule(parsed.moduleId);
+			return jsonResponse({ ok: true });
+		} catch (error) {
+			if (error instanceof ImportError) {
+				return jsonResponse({ error: error.message }, { status: 404 });
+			}
+			const message =
+				error instanceof Error ? error.message : "Invalid lesson load request.";
+			return jsonResponse({ error: message }, { status: 400 });
+		}
+	}
+
+	if (suffix === "/ws/lesson-load" && request.method === "GET") {
+		if (
+			!server ||
+			request.headers.get("upgrade")?.toLowerCase() !== "websocket"
+		) {
+			return new Response("Expected WebSocket upgrade.", { status: 426 });
+		}
+		const originError = requireWebSocketOrigin(request, storage.config.baseUrl);
+		if (originError) {
+			return originError;
+		}
+		const upgraded = server.upgrade(request, {
+			data: {
+				kind: "lesson-load",
+				workspace: auth.workspace,
+				userId: auth.user.id,
+			} satisfies LessonLoadSocketData,
+		});
+		if (!upgraded) {
+			return new Response("WebSocket upgrade failed.", { status: 400 });
+		}
+		return undefined as unknown as Response;
+	}
+
 	// --- Import endpoints ---
 	if (suffix === "/api/project/import" && request.method === "POST") {
 		try {
 			const body = await request.json();
 			const parsed = importRequestSchema.parse(body);
-			const { cloneUrl, branch, subdir } = parseGitHubUrl(
-				parsed.url,
-				parsed.branch,
-				parsed.subdir,
-			);
-			validateBranch(branch);
-			if (subdir) validateSubdir(subdir);
+			const { cloneUrl } = parseGitHubUrl(parsed.url);
 			// Validate only — actual import runs via WS stream
-			return jsonResponse({ ok: true, cloneUrl, branch, subdir });
+			return jsonResponse({ ok: true, cloneUrl });
 		} catch (error) {
 			if (error instanceof ImportError) {
 				return jsonResponse({ error: error.message }, { status: 400 });
@@ -474,37 +525,6 @@ export async function handleWorkspaceRoute(
 			const message =
 				error instanceof Error ? error.message : "Invalid import request.";
 			return jsonResponse({ error: message }, { status: 400 });
-		}
-	}
-
-	if (suffix === "/api/project/recent-imports" && request.method === "GET") {
-		try {
-			const recentImports = await listRecentImports(auth.workspace);
-			return jsonResponse({ ok: true, imports: recentImports });
-		} catch (error) {
-			return apiErrorResponse(error, "Unable to list recent imports.");
-		}
-	}
-
-	if (suffix === "/api/project/restore" && request.method === "POST") {
-		try {
-			const body = (await request.json()) as { archiveFile?: string };
-			if (typeof body.archiveFile !== "string" || !body.archiveFile.trim()) {
-				return jsonResponse(
-					{ error: "Missing or empty 'archiveFile'." },
-					{ status: 400 },
-				);
-			}
-			await restoreImportBackup(auth.workspace, body.archiveFile);
-			return jsonResponse({
-				ok: true,
-				message: "Project restored from backup.",
-			});
-		} catch (error) {
-			if (error instanceof ImportError) {
-				return jsonResponse({ error: error.message }, { status: 400 });
-			}
-			return apiErrorResponse(error, "Restore failed.");
 		}
 	}
 

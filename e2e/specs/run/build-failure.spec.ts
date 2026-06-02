@@ -312,7 +312,7 @@ test("stale running status cleared on app restart", async ({
 	// Close the app abruptly — the DB row stays in "running" state (orphaned).
 	const {
 		dataDir,
-		templateDir,
+		catalogDir,
 		webDistDir,
 		advantageScopeDistDir,
 		sessionSecret,
@@ -325,7 +325,7 @@ test("stale running status cleared on app restart", async ({
 	const runtime2 = new MockWorkspaceRuntimeProvider();
 	const app2 = await createApp({
 		dataDir,
-		templateDir,
+		catalogDir,
 		webDistDir,
 		advantageScopeDistDir,
 		sessionSecret,

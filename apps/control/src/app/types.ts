@@ -97,6 +97,12 @@ export type ImportSocketData = {
 	userId: string;
 };
 
+export type LessonLoadSocketData = {
+	kind: "lesson-load";
+	workspace: AuthContext["workspace"];
+	userId: string;
+};
+
 export type GamepadSocketData = {
 	kind: "gamepad";
 	workspace: AuthContext["workspace"];
@@ -108,6 +114,7 @@ export type SocketData =
 	| VscodeSocketData
 	| HalSimSocketData
 	| ImportSocketData
+	| LessonLoadSocketData
 	| GamepadSocketData;
 
 export type AppSocket = {

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { type ControlAppOptions, createApp } from "../app";
 import {
 	cookieFrom,
+	createCatalogDir,
 	createFakeDocker,
-	createTemplate,
 	createWebDist,
 	login,
 	waitFor,
@@ -142,12 +142,12 @@ describe("code container orchestration", () => {
 
 	test("restarted control plane rediscovers a labeled code container", async () => {
 		const root = await mkdtemp(join(tmpdir(), "frc-v2-control-"));
-		const templateDir = await createTemplate(root);
+		const catalogDir = await createCatalogDir(root);
 		const webDistDir = await createWebDist(root);
 		const fakeDocker = createFakeDocker();
 		const config: ControlAppOptions = {
 			dataDir: join(root, "data"),
-			templateDir,
+			catalogDir,
 			webDistDir,
 			sessionSecret: "test-session-secret",
 			baseUrl: "http://localhost:4000",
@@ -217,6 +217,8 @@ describe("code container orchestration", () => {
 					"robot",
 					"Robot.java",
 				);
+				// The project starts empty (no first-login seed); create the dirs.
+				await mkdir(dirname(robotPath), { recursive: true });
 				await writeFile(robotPath, "package frc.robot;\n// sentinel\n", "utf8");
 
 				const firstStatus = await app.fetch(

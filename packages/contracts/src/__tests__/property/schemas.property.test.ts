@@ -15,8 +15,9 @@ import {
 	driverStationPatchSchema,
 	dsModeSchema,
 	gamepadStateSchema,
-	importBackupMetadataSchema,
 	importRequestSchema,
+	lessonCatalogSchema,
+	lessonModuleSchema,
 	runClientMessageSchema,
 	runServerMessageSchema,
 	workspaceSlugSchema,
@@ -199,26 +200,74 @@ describe("enum schemas", () => {
 	});
 });
 
-describe("importBackupMetadataSchema", () => {
-	test("P9 JSON round-trip", () => {
+describe("lessonModuleSchema / lessonCatalogSchema", () => {
+	test("P9 JSON round-trip of a well-formed catalog", () => {
 		fc.assert(
 			fc.property(
 				fc.record({
-					url: fc.string(),
-					branch: fc.string(),
-					subdir: fc.string(),
-					importedAt: fc.string(),
-					archiveFile: fc.string(),
+					schemaVersion: fc.integer({ min: 1, max: 10 }),
+					modules: fc.array(
+						fc.record({
+							id: fc.stringMatching(/^[a-z][a-z0-9-]{0,30}$/),
+							title: fc.stringMatching(/^.{1,40}$/),
+							description: fc.string(),
+							subdir: fc.stringMatching(/^modules\/[a-z][a-z0-9-]{0,30}$/),
+							kind: fc.constantFrom("plain-java", "robot"),
+							order: fc.integer({ min: 0, max: 1000 }),
+						}),
+						{ maxLength: 6 },
+					),
 				}),
 				(rec) => {
-					const parsed = importBackupMetadataSchema.parse(rec);
+					const parsed = lessonCatalogSchema.parse(rec);
 					const round = JSON.parse(JSON.stringify(parsed));
-					expect(importBackupMetadataSchema.safeParse(round).success).toBe(
-						true,
-					);
+					expect(lessonCatalogSchema.safeParse(round).success).toBe(true);
 				},
 			),
 			{ numRuns: NUM_RUNS },
 		);
+	});
+
+	test("P10 rejects an unknown module kind and empty id/subdir", () => {
+		expect(
+			lessonModuleSchema.safeParse({
+				id: "x",
+				title: "X",
+				description: "",
+				subdir: "modules/x",
+				kind: "console",
+				order: 10,
+			}).success,
+		).toBe(false);
+		expect(
+			lessonModuleSchema.safeParse({
+				id: "",
+				title: "X",
+				description: "",
+				subdir: "modules/x",
+				kind: "robot",
+				order: 10,
+			}).success,
+		).toBe(false);
+		for (const subdir of [
+			"",
+			"../escape",
+			"/absolute",
+			"modules/../escape",
+			"modules/hello name",
+			"modules/hello;rm",
+			"modules/$HOME",
+		]) {
+			expect(
+				lessonModuleSchema.safeParse({
+					id: "x",
+					title: "X",
+					description: "",
+					subdir,
+					kind: "robot",
+					order: 10,
+				}).success,
+			).toBe(false);
+		}
 	});
 });

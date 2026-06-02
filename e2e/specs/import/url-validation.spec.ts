@@ -21,7 +21,7 @@ for (const url of dangerous) {
 		const session = await loginAs(page, app, { name: "Alice" });
 		const resp = await app.fetch(
 			new Request(
-				`${app.storage.config.baseUrl}/u/${session.user.slug}/api/import`,
+				`${app.storage.config.baseUrl}/u/${session.user.slug}/api/project/import`,
 				{
 					method: "POST",
 					headers: {

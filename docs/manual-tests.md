@@ -1,6 +1,6 @@
 # CodeRunner V2 — Manual Acceptance Tests
 
-Use this checklist after the automated V2 checks pass. The goal is to verify the real classroom path: each student gets their own openvscode-server editor, project files persist, Run starts only that student's sim, and AdvantageScope Lite connects to that student's NT4 stream.
+Use this checklist after the automated V2 checks pass. The goal is to verify the real classroom path: each student chooses a lesson or imports a team repo, gets their own openvscode-server editor, project files persist, Run starts only that student's sim, and AdvantageScope Lite connects to that student's NT4 stream.
 
 ## Prerequisites
 
@@ -45,11 +45,14 @@ Open `http://<host-ip>:4000` from 2-3 browsers, browser profiles, or LAN machine
 
 ## Manual Tests
 
-### 1. Login And Isolation
+### 1. Login, Project Picker, And Isolation
 
 1. Log in as `alice` on one browser and `bob` on another.
 2. Confirm each browser redirects to `/u/<name>/`.
-3. In a terminal, get `alice` and `bob` workspace IDs from:
+3. Confirm the **Switch Project** picker opens automatically because the
+   workspace starts empty.
+4. Load the bundled `robot-starter` lesson for each user.
+5. In a terminal, get `alice` and `bob` workspace IDs from:
 
 ```bash
 curl http://localhost:4000/admin/status
@@ -57,7 +60,8 @@ curl http://localhost:4000/admin/status
 
 Success criteria:
 
-- Each browser shows the V2 shell with Run, Stop, console, openvscode editor, and AdvantageScope Lite.
+- Before a lesson is loaded, the workspace project directory exists but is empty.
+- After loading `robot-starter`, each browser shows the V2 shell with Run, Stop, console, openvscode editor, and AdvantageScope Lite.
 - `docker ps --filter label=frc-sim.role=code` shows one `coderunner-workspace-<workspaceId>` container per active user.
 - No browser can open another user's `/u/<slug>/` or `/u/<slug>/vscode/` route.
 
@@ -77,7 +81,7 @@ curl -X POST http://localhost:4000/admin/workspaces/<alice-workspace-id>/stop-co
 
 Success criteria:
 
-- The WPILib project tree is present.
+- The `robot-starter` WPILib project tree is present.
 - The edit survives browser refresh and container restart.
 - The editor reconnects through `/u/alice/vscode/`.
 

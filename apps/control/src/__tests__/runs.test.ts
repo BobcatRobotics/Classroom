@@ -7,8 +7,8 @@ import type { RunCommandFactory } from "../runs";
 import {
 	cookieFrom,
 	createAdvantageScopeDist,
+	createCatalogDir,
 	createFakeDocker,
-	createTemplate,
 	createWebDist,
 	login,
 	waitFor,
@@ -250,13 +250,13 @@ describe("run lifecycle and log streaming", () => {
 	test("control-plane startup marks persisted active runs as stopped", async () => {
 		const root = await mkdtemp(join(tmpdir(), "frc-v2-control-restart-"));
 		const fakeDocker = createFakeDocker();
-		const templateDir = await createTemplate(root);
+		const catalogDir = await createCatalogDir(root);
 		const webDistDir = await createWebDist(root);
 		const advantageScopeDistDir = await createAdvantageScopeDist(root);
 		const dataDir = join(root, "data");
 		const baseOptions: ControlAppOptions = {
 			dataDir,
-			templateDir,
+			catalogDir,
 			webDistDir,
 			advantageScopeDistDir,
 			sessionSecret: "test-session-secret",

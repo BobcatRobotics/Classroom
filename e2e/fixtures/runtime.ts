@@ -2,9 +2,22 @@
  * Helpers for seeding the MockWorkspaceRuntimeProvider exposed by the `app`
  * fixture. Centralizes the WorkspaceRuntime shape so specs don't repeat it.
  */
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { WorkspaceId } from "@frc-coderunner/contracts";
 import type { MockWorkspaceRuntimeProvider } from "../../apps/control/src/__tests__/helpers";
 import type { FakeHalsimHandle, FakeVscodeHandle } from "./types";
+
+/**
+ * Drop a minimal file into a workspace's project dir so the session reports
+ * `projectEmpty: false`. Workspaces now start empty (first-login seeding was
+ * removed), and an empty workspace auto-opens the Switch Project picker. Specs
+ * that drive the loaded-project shell call this to suppress that picker.
+ */
+export async function seedWorkspaceProject(projectPath: string): Promise<void> {
+	await mkdir(projectPath, { recursive: true });
+	await writeFile(join(projectPath, "build.gradle"), "// e2e seed\n", "utf8");
+}
 
 export function seedRuntimeRunning(opts: {
 	runtime: MockWorkspaceRuntimeProvider;

@@ -122,11 +122,11 @@ e2e/                                  NEW — root-level Playwright suite
       keyboard-focus.spec.ts
       auto-chooser-stale.spec.ts
     import/
+      url-validation.spec.ts
       github-import-happy.spec.ts
       import-size-limit.spec.ts
       import-rate-limit.spec.ts
       post-import-permissions.spec.ts
-      backup-restore.spec.ts
     admin/
       capacity-cap.spec.ts
       audit-log.spec.ts
@@ -164,7 +164,9 @@ The fixture exposes:
 - `auth: AuthTestUtils` — `(await app.auth.$context).test`.
 
 Wires:
-- `templateDir` → built from `templates/wpilib-java-command/` (or a minimal fixture template — same approach as `createTemplate()`).
+- `catalogDir` → built as a minimal bundled lesson catalog fixture (`modules.json`
+  plus `plain-java` and `robot` module directories). Workspaces start empty; tests
+  seed project files only when they need to suppress the first-login picker.
 - `webDistDir` → `apps/web/dist/` (built/rebuilt by `global-setup.ts`).
 - `advantageScopeDistDir` → existing `vendor/AdvantageScope/dist-lite/` or a fixture stub.
 - `runtimeProvider` → `MockWorkspaceRuntimeProvider` pre-seeded so `ensureWorkspaceRunning()` returns runtimes pointing at the fake-vscode and fake-halsim ports.
@@ -347,7 +349,7 @@ Each entry: file → test name → setup → steps → assertions → regression
 **T1.2 `OAuth callback creates workspace and routes to /u/<slug>/`** *(real auth path — does NOT use `loginAs`)*
 - Setup: fresh app; OAuth provider stubbed so `/api/auth/callback/<provider>` accepts a fabricated callback (or use Better Auth `test-utils`' provider-callback helper if available).
 - Steps: drive Better Auth's callback handler for a brand-new user `alice@allowed.test`; follow the redirect.
-- Assertions: redirects to `/u/alice/`; DB has user + workspace + session rows; `data/users/<id>/project/` contains template files; both `databaseHooks.user.create.before` (slug + allowlist) and the after-callback hook (`ensureWorkspace`) actually fired — confirmed by their visible side effects (slug column populated, project dir created), so the test fails if either hook is removed.
+- Assertions: redirects to `/u/alice/`; DB has user + workspace + session rows; `data/users/<id>/project/` exists and starts empty; both `databaseHooks.user.create.before` (slug + allowlist) and the after-callback hook (`ensureWorkspace`) actually fired — confirmed by their visible side effects (slug column populated, project dir created), so the test fails if either hook is removed.
 - Anchor: decision 014, `auth.ts:75-118`.
 
 **T1.3 `session survives page reload`**
@@ -409,9 +411,10 @@ Each entry: file → test name → setup → steps → assertions → regression
 
 ### workspace/open-workspace.spec.ts
 
-**T5.1 `first login seeds template files into project dir`**
-- Steps: login, open workspace, assert editor iframe loads, hit `/u/<slug>/api/files/...` (or check fs) for template files.
-- Anchor: `scripts/template-integrity.test.ts`, template seeding.
+**T5.1 `first login creates an empty project dir and reports projectEmpty`**
+- Steps: login, open workspace, assert the project dir exists and is empty, then
+  hit `/u/<slug>/api/session`.
+- Anchor: `scripts/catalog-integrity.test.ts`, `e2e/specs/workspace/open-workspace.spec.ts`.
 
 **T5.2 `Starting... state shown while runtime provisions`**
 - Setup: `MockWorkspaceRuntimeProvider` configured to delay `ensureWorkspaceRunning` by ~500ms.
@@ -588,9 +591,9 @@ A complementary Docker-tier check that a long-running `docker exec` is actually 
 - Assertions: no EACCES surfaces. (Real coverage is in Docker-tier T-D5.)
 - Anchor: commit `18ffcb0`.
 
-### import/backup-restore.spec.ts
+### admin/workspace-backup-restore.spec.ts
 
-**T29.1 `restore from backup overwrites project`**
+**T29.1 `operator restore from backup overwrites project`**
 - Steps: create workspace, create backup, modify file, restore backup.
 - Assertions: file content matches pre-modification snapshot; audit log entry.
 
@@ -789,9 +792,11 @@ bun run --cwd apps/web test --coverage # coverage report
 - **S4** DNS rebinding: re-validate the resolved IP at fetch time, not just at submit time.
 
 *Path traversal:*
-- **S5** Import target path: `..` segments in branch/subdir parameters must not escape the workspace project dir.
+- **S5** Import/catalog target paths: GitHub imports reject tree/subdir URL
+  forms; catalog manifest `subdir` values reject `..`, absolute paths, spaces,
+  and shell metacharacters before reaching runtime exec.
 - **S6** File API paths: any read/write rejects `..` segments, absolute paths, and symlinks pointing outside the project.
-- **S7** Backup/restore paths: restore-from-backup rejects paths outside `data/backups/`.
+- **S7** Operator backup/restore paths: restore-from-backup rejects paths outside `data/backups/`.
 - **S8** Slug → directory mapping: a maliciously crafted slug must not write outside `data/users/`.
 
 *Command injection:*

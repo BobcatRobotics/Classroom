@@ -82,6 +82,7 @@ merge_vscode_settings() {
       | ."gradle.autoDetect" //= "off"
       | ."java.import.gradle.jvmArguments" //= $gradleJvmargs
       | ."java.import.gradle.arguments" //= $gradleArgs
+      | (if $mode == "project" then . else ."workbench.startupEditor" //= "readme" end)
     ' "${settings_file}" > "${tmp_settings}"; then
     mv "${tmp_settings}" "${settings_file}"
   else
@@ -112,8 +113,6 @@ touch "${SIM_LOG_FILE}"
 # Validate mounted project (warn only — the editor should still start).
 if [[ ! -d /workspace/project ]]; then
   echo "WARNING: Mounted project directory /workspace/project does not exist."
-elif [[ ! -f /workspace/project/build.gradle || ! -f /workspace/project/gradlew ]]; then
-  echo "WARNING: Mounted project is missing build.gradle or gradlew."
 fi
 
 # Fix ownership for /config and /workspace (linuxserver convention).

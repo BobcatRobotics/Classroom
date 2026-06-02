@@ -5,6 +5,7 @@ import { DriverStation } from "@/components/DriverStation";
 import { EditorPane } from "@/components/EditorPane";
 import { IDELayout } from "@/components/IDELayout";
 import { ScopePane } from "@/components/ScopePane";
+import { SwitchProjectDialog } from "@/components/SwitchProjectDialog";
 import { Topbar } from "@/components/Topbar";
 import { useAutoChoosers } from "@/hooks/useAutoChoosers";
 import { useEditorReachability } from "@/hooks/useEditorReachability";
@@ -32,20 +33,38 @@ export function WorkspacePage() {
 		[slug],
 	);
 
-	const sessionState = useSession(workspaceSlug);
-	const { connection: runConnection, consoleLines } =
-		useRunChannel(workspaceSlug);
-	const simulation = useSimulationState(workspaceSlug);
-	const autoChoosers = useAutoChoosers(workspaceSlug);
+	// Bumped after a project swap so the session refetches and the editor iframe
+	// remounts (so VS Code reopens the new folder and fires the README preview).
+	const [reloadNonce, setReloadNonce] = useState(0);
+	const sessionState = useSession(workspaceSlug, reloadNonce);
+
+	const workspace =
+		sessionState.status === "ready" ? sessionState.session.workspace : null;
+	const currentModule = workspace?.currentModule ?? null;
+	const currentModuleKind = workspace?.currentModuleKind ?? null;
+	const projectEmpty = workspace?.projectEmpty ?? false;
+
+	// `plain-java` console lessons hide the sim chrome; everything else (robot
+	// lessons, empty workspace, team import) renders the full robot layout.
+	const isConsoleModule = currentModuleKind === "plain-java";
+	// Gate the sim data hooks themselves (not just rendering): they no-op on a
+	// null slug, so console mode stops the sim polls + idle HALSim/run sockets.
+	const simSlug = isConsoleModule ? null : workspaceSlug;
+
+	const [switchOpen, setSwitchOpen] = useState(false);
+
+	const { connection: runConnection, consoleLines } = useRunChannel(simSlug);
+	const simulation = useSimulationState(simSlug);
+	const autoChoosers = useAutoChoosers(simSlug);
 	const editorUrl = workspaceSlug
 		? `/u/${workspaceSlug}/vscode/?folder=/workspace/project`
 		: null;
 	const editorStatus = useEditorReachability(editorUrl);
 	const scopeFrameRef = useRef<HTMLIFrameElement>(null);
-	useScopeHandshake(workspaceSlug, scopeFrameRef);
+	useScopeHandshake(simSlug, scopeFrameRef);
 
 	const gamepad = useGamepad();
-	const channel = useGamepadChannel(workspaceSlug);
+	const channel = useGamepadChannel(simSlug);
 	const inputMode = useUIStore((state) => state.inputMode);
 	const setInputMode = useUIStore((state) => state.setInputMode);
 	const [keyboardCodes, setKeyboardCodes] = useState<ReadonlySet<string>>(
@@ -139,6 +158,23 @@ export function WorkspacePage() {
 		lastSelectedRef.current = gamepad.selectedIndex;
 	}, [inputMode, gamepad.selectedIndex, channel]);
 
+	// First login (D7): an empty workspace auto-opens the Switch Project surface
+	// so the student starts by picking a lesson. Fire once per empty state.
+	const autoOpenedRef = useRef(false);
+	useEffect(() => {
+		if (projectEmpty && !autoOpenedRef.current) {
+			autoOpenedRef.current = true;
+			setSwitchOpen(true);
+		}
+		if (!projectEmpty) {
+			autoOpenedRef.current = false;
+		}
+	}, [projectEmpty]);
+
+	const onSwapComplete = useCallback(() => {
+		setReloadNonce((n) => n + 1);
+	}, []);
+
 	const displayName =
 		sessionState.status === "ready"
 			? sessionState.session.user.displayName
@@ -167,11 +203,13 @@ export function WorkspacePage() {
 				email={email}
 				avatarUrl={avatarUrl}
 				isAdmin={isAdmin}
-				workspaceSlug={workspaceSlug}
+				onSwitchProject={() => setSwitchOpen(true)}
 			/>
 			<IDELayout
+				showSimPanels={!isConsoleModule}
 				editor={
 					<EditorPane
+						key={reloadNonce}
 						editorUrl={editorUrl}
 						editorStatus={editorStatus}
 						errorMessage={errorMessage}
@@ -209,6 +247,13 @@ export function WorkspacePage() {
 						onSelectAuto={autoChoosers.selectAuto}
 					/>
 				}
+			/>
+			<SwitchProjectDialog
+				open={switchOpen}
+				onOpenChange={setSwitchOpen}
+				workspaceSlug={workspaceSlug}
+				currentModule={currentModule}
+				onSwapComplete={onSwapComplete}
 			/>
 		</div>
 	);

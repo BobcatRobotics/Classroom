@@ -20,6 +20,7 @@ import { handleWorkspaceRoute } from "./app/workspace-routes";
 import { getDemoSessionResponseBody, seedDemoUser } from "./auth/demo";
 import { getSessionFromRequest, requireAdmin } from "./auth/middleware";
 import { getEnabledAuthProviders } from "./auth/providers";
+import { createCatalogSource } from "./catalog";
 import { LocalDockerRuntimeProvider } from "./containers";
 import { GamepadSessions } from "./gamepad";
 import { HalSimBridge } from "./halsim";
@@ -132,6 +133,7 @@ export async function createApp(
 	}
 
 	const imports = new ImportManager(storage, runtimeProvider);
+	const catalogSource = createCatalogSource(storage.config);
 	const idle = new IdleManager({
 		storage,
 		runtimeProvider,
@@ -155,6 +157,7 @@ export async function createApp(
 		halsim,
 		gamepad,
 		nt4Auto,
+		catalogSource,
 		upstreamFetch,
 	};
 
@@ -359,6 +362,7 @@ export async function createApp(
 		nt4Auto,
 		gamepad,
 		imports,
+		catalogSource,
 	});
 
 	return {

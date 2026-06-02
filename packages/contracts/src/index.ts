@@ -33,6 +33,8 @@ export const heartbeatRequestSchema = z.object({
 	closing: z.boolean().optional(),
 });
 
+export const lessonModuleKindSchema = z.enum(["plain-java", "robot"]);
+
 export const sessionResponseSchema = z.object({
 	user: z.object({
 		id: userIdSchema,
@@ -45,6 +47,9 @@ export const sessionResponseSchema = z.object({
 	workspace: z.object({
 		id: workspaceIdSchema,
 		slug: workspaceSlugSchema,
+		currentModule: z.string().nullable(),
+		currentModuleKind: lessonModuleKindSchema.nullable(),
+		projectEmpty: z.boolean(),
 	}),
 	demo: z.boolean().optional(),
 });
@@ -335,14 +340,11 @@ export type AdminActionResponse = z.infer<typeof adminActionResponseSchema>;
 
 export const importRequestSchema = z.object({
 	url: z.string().min(1, "URL is required."),
-	branch: z.string().optional(),
-	subdir: z.string().optional(),
-	backup: z.boolean().optional(),
 });
 
 export const importResponseSchema = z.object({
 	ok: z.literal(true),
-	importId: z.string().min(1),
+	cloneUrl: z.string().min(1),
 });
 
 export const importServerMessageSchema = z.discriminatedUnion("type", [
@@ -370,15 +372,48 @@ export const importServerMessageSchema = z.discriminatedUnion("type", [
 	}),
 ]);
 
-export const importBackupMetadataSchema = z.object({
-	url: z.string(),
-	branch: z.string(),
-	subdir: z.string(),
-	importedAt: z.string(),
-	archiveFile: z.string(),
-});
-
 export type ImportRequest = z.infer<typeof importRequestSchema>;
 export type ImportResponse = z.infer<typeof importResponseSchema>;
 export type ImportServerMessage = z.infer<typeof importServerMessageSchema>;
-export type ImportBackupMetadata = z.infer<typeof importBackupMetadataSchema>;
+
+// --- Lesson catalog schemas ---
+
+export const lessonModuleSubdirSchema = z
+	.string()
+	.min(1)
+	.max(200)
+	.regex(
+		/^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/,
+		"Subdir must be a relative path made of safe path segments.",
+	);
+
+export const lessonModuleSchema = z.object({
+	id: z.string().min(1),
+	title: z.string().min(1),
+	description: z.string(),
+	subdir: lessonModuleSubdirSchema,
+	kind: lessonModuleKindSchema,
+	order: z.number().int(),
+});
+
+export const lessonCatalogSchema = z.object({
+	schemaVersion: z.number().int(),
+	modules: z.array(lessonModuleSchema),
+});
+
+export const lessonCatalogResponseSchema = z.object({
+	ok: z.literal(true),
+	modules: z.array(lessonModuleSchema),
+	error: z.string().nullable().optional(),
+});
+
+export const lessonLoadRequestSchema = z.object({
+	moduleId: z.string().min(1),
+});
+
+export type LessonModuleKind = z.infer<typeof lessonModuleKindSchema>;
+export type LessonModuleSubdir = z.infer<typeof lessonModuleSubdirSchema>;
+export type LessonModule = z.infer<typeof lessonModuleSchema>;
+export type LessonCatalog = z.infer<typeof lessonCatalogSchema>;
+export type LessonCatalogResponse = z.infer<typeof lessonCatalogResponseSchema>;
+export type LessonLoadRequest = z.infer<typeof lessonLoadRequestSchema>;

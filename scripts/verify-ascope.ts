@@ -31,18 +31,15 @@ function assert(condition: unknown, message: string): asserts condition {
 	}
 }
 
-async function createTemplate(root: string): Promise<string> {
-	const templateDir = join(root, "template");
-	await mkdir(join(templateDir, "src", "main", "java", "frc", "robot"), {
-		recursive: true,
-	});
-	await writeFile(join(templateDir, "build.gradle"), "plugins {}\n", "utf8");
+async function createCatalogDir(root: string): Promise<string> {
+	const catalogDir = join(root, "catalog");
+	await mkdir(catalogDir, { recursive: true });
 	await writeFile(
-		join(templateDir, "src", "main", "java", "frc", "robot", "Robot.java"),
-		"package frc.robot;\n",
+		join(catalogDir, "modules.json"),
+		JSON.stringify({ schemaVersion: 1, modules: [] }),
 		"utf8",
 	);
-	return templateDir;
+	return catalogDir;
 }
 
 async function runGit(
@@ -141,7 +138,7 @@ async function verifyStagedBundle(): Promise<void> {
 
 async function verifyScopeServing(): Promise<void> {
 	const root = await mkdtemp(join(tmpdir(), "frc-ascope-"));
-	const templateDir = await createTemplate(root);
+	const catalogDir = await createCatalogDir(root);
 	const webDistDir = join(root, "web-dist");
 	await mkdir(webDistDir, { recursive: true });
 	await writeFile(
@@ -152,7 +149,7 @@ async function verifyScopeServing(): Promise<void> {
 
 	const app = await createApp({
 		dataDir: join(root, "data"),
-		templateDir,
+		catalogDir,
 		webDistDir,
 		advantageScopeDistDir: distDir,
 		containerAutoStart: false,

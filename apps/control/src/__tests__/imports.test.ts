@@ -1,26 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import type { ImportServerMessage } from "@frc-coderunner/contracts";
+import type {
+	ImportServerMessage,
+	WorkspaceId,
+} from "@frc-coderunner/contracts";
 import {
+	type CatalogLoadContext,
+	type GithubImportContext,
 	ImportManager,
 	ImportRateLimiter,
-	listRecentImports,
 	parseGitHubUrl,
 	RateLimitError,
-	restoreImportBackup,
-	validateBranch,
-	validateSubdir,
 } from "../imports";
+import type { WorkspaceRow } from "../storage";
 import {
 	cookieFrom,
 	createFakeDocker,
 	login,
+	MockWorkspaceRuntimeProvider,
 	withApp,
 	workspaceBySlug,
 } from "./helpers";
 
-// --- URL validation tests ---
+// --- URL validation tests (repo-root-only) ---
 
 describe("parseGitHubUrl", () => {
 	test("accepts simple GitHub HTTPS URL", () => {
@@ -28,8 +29,6 @@ describe("parseGitHubUrl", () => {
 		expect(result.cloneUrl).toBe(
 			"https://github.com/wpilibsuite/allwpilib.git",
 		);
-		expect(result.branch).toBe("main");
-		expect(result.subdir).toBe("");
 	});
 
 	test("accepts GitHub HTTPS URL with .git suffix", () => {
@@ -39,32 +38,14 @@ describe("parseGitHubUrl", () => {
 		expect(result.cloneUrl).toBe(
 			"https://github.com/wpilibsuite/allwpilib.git",
 		);
-		expect(result.branch).toBe("main");
-		expect(result.subdir).toBe("");
 	});
 
-	test("parses tree URL into clone URL + branch + subdir", () => {
-		const result = parseGitHubUrl(
-			"https://github.com/wpilibsuite/allwpilib/tree/main/wpilibjExamples",
-		);
-		expect(result.cloneUrl).toBe(
-			"https://github.com/wpilibsuite/allwpilib.git",
-		);
-		expect(result.branch).toBe("main");
-		expect(result.subdir).toBe("wpilibjExamples");
-	});
-
-	test("applies branch/subdir overrides on tree URL", () => {
-		const result = parseGitHubUrl(
-			"https://github.com/wpilibsuite/allwpilib/tree/main/some/path",
-			"develop",
-			"other/path",
-		);
-		expect(result.cloneUrl).toBe(
-			"https://github.com/wpilibsuite/allwpilib.git",
-		);
-		expect(result.branch).toBe("develop");
-		expect(result.subdir).toBe("other/path");
+	test("rejects tree URL (subdir imports removed)", () => {
+		expect(() =>
+			parseGitHubUrl(
+				"https://github.com/wpilibsuite/allwpilib/tree/main/wpilibjExamples",
+			),
+		).toThrow("Unsupported GitHub URL format");
 	});
 
 	test("rejects SSH URL", () => {
@@ -89,42 +70,10 @@ describe("parseGitHubUrl", () => {
 		);
 	});
 
-	test("rejects subdir with '..'", () => {
-		expect(() =>
-			parseGitHubUrl("https://github.com/owner/repo", undefined, "../escape"),
-		).toThrow("must not contain '..'");
-	});
-});
-
-describe("validateBranch", () => {
-	test("accepts valid branch names", () => {
-		expect(() => validateBranch("main")).not.toThrow();
-		expect(() => validateBranch("develop")).not.toThrow();
-		expect(() => validateBranch("feature/foo")).not.toThrow();
-		expect(() => validateBranch("v1.0")).not.toThrow();
-	});
-
-	test("rejects branch starting with -", () => {
-		expect(() => validateBranch("-evil")).toThrow("Invalid branch name");
-	});
-
-	test("rejects empty branch", () => {
-		expect(() => validateBranch("")).toThrow("Invalid branch name");
-	});
-});
-
-describe("validateSubdir", () => {
-	test("accepts valid subdirectories", () => {
-		expect(() => validateSubdir("src/main")).not.toThrow();
-		expect(() => validateSubdir("")).not.toThrow();
-	});
-
-	test("rejects subdir starting with /", () => {
-		expect(() => validateSubdir("/absolute")).toThrow("relative path");
-	});
-
-	test("rejects subdir with ..", () => {
-		expect(() => validateSubdir("foo/../bar")).toThrow("must not contain '..'");
+	test("rejects extra path segments (URL confusion)", () => {
+		expect(() => parseGitHubUrl("https://github.com/foo/bar/extra")).toThrow(
+			"Unsupported GitHub URL format",
+		);
 	});
 });
 
@@ -234,35 +183,32 @@ describe("import endpoint", () => {
 			{ dockerRunner: docker.runner },
 		);
 	});
-
-	test("GET /api/project/recent-imports returns empty list initially", async () => {
-		const docker = createFakeDocker();
-		await withApp(
-			async (app) => {
-				const resp = await login(app, "alice");
-				const cookie = cookieFrom(resp);
-
-				const result = await app.fetch(
-					new Request("http://localhost/u/alice/api/project/recent-imports", {
-						headers: { cookie },
-					}),
-				);
-				expect(result.status).toBe(200);
-				const body = (await result.json()) as {
-					ok: boolean;
-					imports: unknown[];
-				};
-				expect(body.ok).toBe(true);
-				expect(body.imports).toEqual([]);
-			},
-			{ dockerRunner: docker.runner },
-		);
-	});
 });
 
 // --- Import manager unit tests ---
 
-describe("ImportManager", () => {
+function runningRuntime(workspaceId: WorkspaceId) {
+	return {
+		workspaceId,
+		state: "running",
+		runtimeName: "fake",
+		image: "coderunner-workspace",
+		ports: { nt4: 1, vscode: 2, halsim: 3 },
+		endpoints: {
+			vscode: {
+				httpBaseUrl: "http://x",
+				wsBaseUrl: "ws://x",
+				basePath: "/",
+			},
+			nt4: { httpUrl: "http://n", wsUrl: "ws://n" },
+			halsim: { wsUrl: "ws://h" },
+		},
+		lastUsedAt: null,
+		error: null,
+	} as never;
+}
+
+describe("ImportManager — github import", () => {
 	test("rejects concurrent imports for same workspace", async () => {
 		const docker = createFakeDocker();
 		await withApp(
@@ -274,111 +220,278 @@ describe("ImportManager", () => {
 				const messages: ImportServerMessage[] = [];
 				const send = (msg: ImportServerMessage) => messages.push(msg);
 
-				// First import will fail because clone can't actually work in tests,
-				// but it should set the active flag
 				const firstPromise = manager.run({
+					source: "github",
 					workspace,
 					userId: "test-user",
 					cloneUrl: "https://github.com/owner/repo.git",
-					branch: "main",
-					subdir: "",
-					backup: false,
 					send,
 				});
 
-				// While first is "running", second should throw
 				expect(manager.isImporting(workspace.id)).toBe(true);
+				await expect(
+					manager.run({
+						source: "github",
+						workspace,
+						userId: "test-user",
+						cloneUrl: "https://github.com/owner/other.git",
+						send,
+					}),
+				).rejects.toThrow("already in progress");
 
-				await firstPromise; // Let it fail/complete
+				await firstPromise;
 
 				expect(manager.isImporting(workspace.id)).toBe(false);
 			},
 			{ dockerRunner: docker.runner },
 		);
 	});
-});
 
-// --- Backup/restore tests ---
+	test("clone is all-branches --depth 1 and keeps .git", async () => {
+		await withApp(async (app) => {
+			await login(app, "alice");
+			const workspace = app.storage.db
+				.query("SELECT * FROM workspaces WHERE slug = ?")
+				.get("alice") as WorkspaceRow;
 
-describe("listRecentImports", () => {
-	test("returns metadata files sorted newest first", async () => {
-		const docker = createFakeDocker();
-		await withApp(
-			async (app) => {
-				await login(app, "alice");
-				const workspace = workspaceBySlug(app, "alice");
+			const mock = new MockWorkspaceRuntimeProvider([
+				runningRuntime(workspace.id),
+			]);
+			const manager = new ImportManager(app.storage, mock);
+			const ctx: GithubImportContext = {
+				source: "github",
+				workspace,
+				userId: workspace.user_id,
+				cloneUrl: "https://github.com/owner/repo.git",
+				send: () => {},
+			};
+			await manager.run(ctx);
 
-				// Create fake backup metadata
-				const backupsDir = join(workspace.project_path, "..", "backups");
-				await mkdir(backupsDir, { recursive: true });
+			const cloneCall = mock.execCalls.find(
+				(c) => c.command[0] === "git" && c.command[1] === "clone",
+			);
+			expect(cloneCall).toBeTruthy();
+			expect(cloneCall!.command).toContain("--no-single-branch");
+			expect(cloneCall!.command).toContain("--depth");
+			expect(cloneCall!.command).toContain("1");
+			// No --branch (all branches), no --filter, no --sparse for a team import.
+			expect(cloneCall!.command).not.toContain("--branch");
+			expect(cloneCall!.command).not.toContain("--sparse");
 
-				await writeFile(
-					join(backupsDir, "import-2026-01-01-120000.json"),
-					JSON.stringify({
-						url: "https://github.com/owner/repo1.git",
-						branch: "main",
-						subdir: "",
-						importedAt: "2026-01-01T12:00:00.000Z",
-						archiveFile: "import-2026-01-01-120000.tar.gz",
-					}),
-					"utf8",
-				);
-				await writeFile(
-					join(backupsDir, "import-2026-02-01-120000.json"),
-					JSON.stringify({
-						url: "https://github.com/owner/repo2.git",
-						branch: "develop",
-						subdir: "sub",
-						importedAt: "2026-02-01T12:00:00.000Z",
-						archiveFile: "import-2026-02-01-120000.tar.gz",
-					}),
-					"utf8",
-				);
+			// Never strips .git from the imported project (keeps origin for push).
+			const strippedGit = mock.execCalls.find(
+				(c) =>
+					c.command[0] === "rm" &&
+					c.command.some((a) => a === "/workspace/project/.git"),
+			);
+			expect(strippedGit).toBeUndefined();
+		});
+	});
 
-				const recent = await listRecentImports(workspace);
-				expect(recent.length).toBe(2);
-				expect(recent[0]?.url).toContain("repo2");
-				expect(recent[1]?.url).toContain("repo1");
-			},
-			{ dockerRunner: docker.runner },
-		);
+	test("github import clears current_module and editor workspace cache", async () => {
+		await withApp(async (app) => {
+			await login(app, "alice");
+			const workspace = app.storage.db
+				.query("SELECT * FROM workspaces WHERE slug = ?")
+				.get("alice") as WorkspaceRow;
+			// Pretend a lesson was previously loaded.
+			app.storage.setCurrentModule(workspace.id, "hello-name", "plain-java");
+
+			const mock = new MockWorkspaceRuntimeProvider([
+				runningRuntime(workspace.id),
+			]);
+			const manager = new ImportManager(app.storage, mock);
+			await manager.run({
+				source: "github",
+				workspace,
+				userId: workspace.user_id,
+				cloneUrl: "https://github.com/owner/repo.git",
+				send: () => {},
+			});
+
+			const refreshed = app.storage.findWorkspaceById(workspace.id);
+			expect(refreshed?.current_module).toBeNull();
+			expect(refreshed?.current_module_kind).toBeNull();
+
+			const clearedCache = mock.execCalls.find(
+				(c) =>
+					c.command[0] === "rm" &&
+					c.command.some((a) => a === "/config/data/User/workspaceStorage"),
+			);
+			expect(clearedCache).toBeTruthy();
+		});
 	});
 });
 
-describe("restoreImportBackup", () => {
-	test("rejects path traversal in archive file name", async () => {
-		const docker = createFakeDocker();
-		await withApp(
-			async (app) => {
-				await login(app, "alice");
-				const workspace = workspaceBySlug(app, "alice");
+describe("ImportManager — bundled catalog load", () => {
+	test("copies bundled module, drops .git, records module + kind, no rate limit", async () => {
+		await withApp(async (app) => {
+			await login(app, "alice");
+			const workspace = app.storage.db
+				.query("SELECT * FROM workspaces WHERE slug = ?")
+				.get("alice") as WorkspaceRow;
 
-				await expect(
-					restoreImportBackup(workspace, "../../../etc/passwd"),
-				).rejects.toThrow("Invalid backup file name");
-				await expect(
-					restoreImportBackup(workspace, "foo/bar.tar.gz"),
-				).rejects.toThrow("Invalid backup file name");
-			},
-			{ dockerRunner: docker.runner },
-		);
+			const mock = new MockWorkspaceRuntimeProvider([
+				runningRuntime(workspace.id),
+			]);
+			const manager = new ImportManager(app.storage, mock);
+			const messages: ImportServerMessage[] = [];
+			const ctx: CatalogLoadContext = {
+				source: "catalog",
+				workspace,
+				userId: workspace.user_id,
+				moduleId: "robot-starter",
+				subdir: "modules/robot-starter",
+				kind: "robot",
+				remote: null,
+				send: (m) => messages.push(m),
+			};
+			await manager.run(ctx);
+
+			// No git clone for a bundled load.
+			const cloneCall = mock.execCalls.find(
+				(c) => c.command[0] === "git" && c.command[1] === "clone",
+			);
+			expect(cloneCall).toBeUndefined();
+
+			// Copies from the in-image catalog path.
+			const copyCall = mock.execCalls.find(
+				(c) =>
+					c.command[0] === "bash" &&
+					(c.command[2] ?? "").includes(
+						"cp -a /opt/frc-catalog/modules/robot-starter/.",
+					),
+			);
+			expect(copyCall).toBeTruthy();
+
+			// Drops .git (gitless lessons).
+			const dropGit = mock.execCalls.find(
+				(c) =>
+					c.command[0] === "rm" &&
+					c.command.some((a) => a === "/workspace/project/.git"),
+			);
+			expect(dropGit).toBeTruthy();
+
+			// Records the module + kind.
+			const refreshed = app.storage.findWorkspaceById(workspace.id);
+			expect(refreshed?.current_module).toBe("robot-starter");
+			expect(refreshed?.current_module_kind).toBe("robot");
+
+			const done = messages.find((m) => m.type === "done");
+			expect(done).toMatchObject({ type: "done", success: true });
+		});
 	});
 
-	test("rejects missing backup file", async () => {
-		const docker = createFakeDocker();
-		await withApp(
-			async (app) => {
-				await login(app, "alice");
-				const workspace = workspaceBySlug(app, "alice");
+	test("catalog load is not rate-limited (students switch lessons freely)", async () => {
+		await withApp(async (app) => {
+			await login(app, "alice");
+			const workspace = app.storage.db
+				.query("SELECT * FROM workspaces WHERE slug = ?")
+				.get("alice") as WorkspaceRow;
 
-				const backupsDir = join(workspace.project_path, "..", "backups");
-				await mkdir(backupsDir, { recursive: true });
+			const mock = new MockWorkspaceRuntimeProvider([
+				runningRuntime(workspace.id),
+			]);
+			const manager = new ImportManager(app.storage, mock);
 
-				await expect(
-					restoreImportBackup(workspace, "nonexistent.tar.gz"),
-				).rejects.toThrow("Backup file not found");
-			},
-			{ dockerRunner: docker.runner },
-		);
+			// Run more than the 6/hour cap — none should be rate-limited.
+			for (let i = 0; i < 8; i++) {
+				const messages: ImportServerMessage[] = [];
+				await manager.run({
+					source: "catalog",
+					workspace,
+					userId: workspace.user_id,
+					moduleId: "hello-name",
+					subdir: "modules/hello-name",
+					kind: "plain-java",
+					remote: null,
+					send: (m) => messages.push(m),
+				});
+				const done = messages.find((m) => m.type === "done");
+				expect(done).toMatchObject({ success: true });
+			}
+		});
+	});
+
+	test("rejects unsafe catalog subdirs before executing runtime commands", async () => {
+		await withApp(async (app) => {
+			await login(app, "alice");
+			const workspace = app.storage.db
+				.query("SELECT * FROM workspaces WHERE slug = ?")
+				.get("alice") as WorkspaceRow;
+
+			const mock = new MockWorkspaceRuntimeProvider([
+				runningRuntime(workspace.id),
+			]);
+			const manager = new ImportManager(app.storage, mock);
+			const messages: ImportServerMessage[] = [];
+
+			await manager.run({
+				source: "catalog",
+				workspace,
+				userId: workspace.user_id,
+				moduleId: "bad",
+				subdir: "modules/bad;rm -rf /",
+				kind: "plain-java",
+				remote: null,
+				send: (m) => messages.push(m),
+			});
+
+			expect(mock.execCalls).toEqual([]);
+			expect(messages).toContainEqual(
+				expect.objectContaining({
+					type: "done",
+					success: false,
+					message: "Invalid lesson module subdir.",
+				}),
+			);
+		});
+	});
+});
+
+describe("ImportManager — remote catalog load", () => {
+	test("uses a sparse shallow clone + sparse-checkout set", async () => {
+		await withApp(async (app) => {
+			await login(app, "alice");
+			const workspace = app.storage.db
+				.query("SELECT * FROM workspaces WHERE slug = ?")
+				.get("alice") as WorkspaceRow;
+
+			const mock = new MockWorkspaceRuntimeProvider([
+				runningRuntime(workspace.id),
+			]);
+			const manager = new ImportManager(app.storage, mock);
+			await manager.run({
+				source: "catalog",
+				workspace,
+				userId: workspace.user_id,
+				moduleId: "closest-distance",
+				subdir: "modules/closest-distance",
+				kind: "robot",
+				remote: {
+					cloneUrl: "https://github.com/owner/lessons.git",
+					branch: "main",
+				},
+				send: () => {},
+			});
+
+			const cloneCall = mock.execCalls.find(
+				(c) => c.command[0] === "git" && c.command[1] === "clone",
+			);
+			expect(cloneCall).toBeTruthy();
+			expect(cloneCall!.command).toContain("--depth");
+			expect(cloneCall!.command).toContain("--filter=blob:none");
+			expect(cloneCall!.command).toContain("--sparse");
+			expect(cloneCall!.command).toContain("--branch");
+
+			const sparseCall = mock.execCalls.find(
+				(c) =>
+					c.command[0] === "git" &&
+					c.command.includes("sparse-checkout") &&
+					c.command.includes("set"),
+			);
+			expect(sparseCall).toBeTruthy();
+			expect(sparseCall!.command).toContain("modules/closest-distance");
+		});
 	});
 });

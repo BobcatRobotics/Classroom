@@ -16,7 +16,7 @@ This runbook covers deploying and operating CodeRunner V2 on a classroom machine
 8. [Monitoring](#8-monitoring)
 9. [Common Failures and Recovery](#9-common-failures-and-recovery)
 10. [Host Sizing](#10-host-sizing)
-11. [Project Import](#11-project-import)
+11. [Lessons and Project Import](#11-lessons-and-project-import)
 12. [Container Concurrency Cap](#12-container-concurrency-cap)
 13. [Audit Log](#13-audit-log)
 14. [Cloudflare Pages (optional offline screen)](#14-cloudflare-pages-optional-offline-screen)
@@ -164,10 +164,12 @@ Students connect to `http://<host-ip>:4000/` in their browsers.
 ### What happens on first student login
 
 1. Student enters a classroom name on the login page.
-2. A user, workspace, and project directory are created.
-3. The WPILib Java command-based template is copied into their workspace.
-4. A signed session cookie is set.
-5. The browser redirects to `/u/<workspaceSlug>/`.
+2. A user, workspace, and **empty** project directory are created (first-login
+   template seeding was removed — see [§11](#11-lessons-and-project-import)).
+3. A signed session cookie is set.
+4. The browser redirects to `/u/<workspaceSlug>/`.
+5. Because the workspace is empty, the web shell auto-opens the **Switch
+   Project** picker so the student starts by loading a lesson.
 6. A code container (merged sim + editor) is started in the background.
 
 ### Verify the app is running
@@ -231,7 +233,9 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 | `PORT` | `4000` | HTTP/WS listen port |
 | `FRC_DATA_DIR` | `data` | Runtime data root |
 | `FRC_DB_PATH` | `data/app.db` | SQLite database path |
-| `FRC_TEMPLATE_DIR` | `templates/wpilib-java-command` | Starter project template |
+| `LESSONS_CATALOG_REPO` | *(unset → bundled catalog)* | Remote lessons repo (`owner/repo` or `https://github.com/owner/repo`). Unset uses the zero-config bundled `catalog/`. See [§11](#11-lessons-and-project-import). |
+| `LESSONS_CATALOG_BRANCH` | `main` | Branch of the remote lessons repo (remote source only) |
+| `LESSONS_CATALOG_DIR` | `catalog` | Path to the bundled catalog (host-side manifest reads; baked into the image at `/opt/frc-catalog`) |
 | `FRC_MIGRATIONS_DIR` | auto-detected | Database migrations directory |
 | `FRC_WEB_DIST_DIR` | `apps/web/dist` | Built web shell assets |
 | `FRC_ASCOPE_DIST_DIR` | `dist/advantagescope` | Built AdvantageScope Lite assets |
@@ -769,50 +773,65 @@ CODE_MEMORY_LIMIT=3072m
 
 ---
 
-## 11. Project Import
+## 11. Lessons and Project Import
 
-Students can import public GitHub repositories from the topbar menu → **Import from GitHub**.
+The topbar **Switch Project** button opens one surface with two ways to fill a
+workspace: **Lessons** (a catalog of self-contained starting projects) and
+**Import from GitHub** (a public team repo for build season). Both are
+"switch project" operations — they discard the current workspace and replace
+`/workspace/project`, behind a single discard confirmation. There are **no
+per-import backups**; for team work, git is the safety net (students commit/push
+early). Design: [`Lessons-Design.md`](../Lessons-Design.md) and
+[decision 029](decisions/029-lessons-and-modules.md).
+
+### Lessons catalog
+
+Two interchangeable sources behind one interface:
+
+- **Bundled (default, zero-config):** when `LESSONS_CATALOG_REPO` is unset, the
+  manifest and modules come from the in-repo `catalog/` (baked into the code
+  image at `/opt/frc-catalog`). Ships a small demo set (`hello-name` +
+  `robot-starter`). Works offline.
+- **Remote (production):** set `LESSONS_CATALOG_REPO` (`owner/repo` or full
+  `https://github.com/...`) and optionally `LESSONS_CATALOG_BRANCH` (default
+  `main`). The manifest is fetched over HTTPS with a ~60s in-memory cache and a
+  last-good fallback; a module load does a **sparse shallow clone** of just that
+  module's subdir. Editing lessons is a commit to the lessons repo — no image
+  rebuild, no redeploy.
+
+A module's `kind` (`plain-java` | `robot`) is captured on the workspace row at
+load time. `plain-java` modules run from the editor's Run button (the web shell
+hides the Driver Station / AdvantageScope panels); `robot` modules use the
+normal HALSim sim path. **Reset this lesson** re-loads the current module (latest
+from the catalog). Lessons are gitless.
+
+### Team GitHub import (build season)
+
+A public repo **root** URL only (no branch/subdir controls). The clone is
+`git clone --no-single-branch --depth 1` — every remote branch as `origin/*`, no
+history — and the real `.git`/`origin` is **kept** so students can push from the
+VS Code terminal after authenticating (PAT credential helper, or switch the
+remote to SSH). There is no server-side git credential.
 
 ### Endpoints
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/u/{slug}/api/project/import` | Validate an import URL (returns parsed clone URL, branch, subdir) |
-| `GET` | `/u/{slug}/api/project/recent-imports` | List recent import backups for the workspace |
-| `POST` | `/u/{slug}/api/project/restore` | Restore a project from an import backup (`{ archiveFile: "..." }`) |
-| `WS` | `/u/{slug}/ws/import` | WebSocket stream for import progress (send import request as first message) |
+| `GET` | `/u/{slug}/api/lessons` | Lesson catalog manifest (always returns a catalog; `error` field when temporarily unavailable) |
+| `POST` | `/u/{slug}/api/lessons/load` | Validate/resolve a module id (the load itself streams over WS) |
+| `WS` | `/u/{slug}/ws/lesson-load` | Stream a module load (send `{ moduleId }` as the first message) |
+| `POST` | `/u/{slug}/api/project/import` | Validate a GitHub repo-root URL (returns the parsed clone URL) |
+| `WS` | `/u/{slug}/ws/import` | Stream a team import (send `{ url }` as the first message) |
 
 ### Limits
 
-- **Repository size:** ≤ 100 MB (checked after shallow clone inside the container).
-- **Rate limit:** 6 imports per user per hour (in-memory, resets on control-plane restart).
-- **Backup retention:** ≤ 5 import backups per workspace; oldest pruned automatically.
+- **Repository size:** ≤ 200 MB (checked after clone inside the container; applies to both imports and catalog loads).
+- **Rate limit:** 6 GitHub imports per user per hour (in-memory; catalog loads are not rate-limited).
 - **Clone timeout:** 60 seconds.
 
-### Where import backups live
-
-```
-data/users/<workspaceId>/backups/import-<timestamp>.tar.gz   # project archive
-data/users/<workspaceId>/backups/import-<timestamp>.json      # import metadata
-```
-
-### Manual restore (admin)
-
-If the student UI fails, an operator can restore an import backup using the admin restore endpoint:
-
-```bash
-# Find the backup path
-ls data/users/<workspaceId>/backups/
-
-# Use the admin backup endpoint or the workspace restore endpoint
-curl -X POST \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"path": "data/backups/..."}' \
-  http://localhost:4000/admin/workspaces/<workspaceId>/restore
-```
-
-Or the student can use the import dialog's **Restore** button to restore from a recent import backup directly.
+Module switch, lesson reset, and GitHub import all stop the active robot run and
+disconnect HALSim/NT4/gamepad before replacing files, and clear the editor's
+`workspaceStorage` cache so VS Code re-opens the new folder cleanly.
 
 ---
 
@@ -868,10 +887,9 @@ All admin actions are recorded in the `audit_log` database table for accountabil
 | `user.demote` | Demoting an admin to user |
 | `user.delete` | Deleting a user and their workspace |
 | `container.stop` | Stopping a workspace's containers |
-| `container.restart` | Restarting a workspace's code container |
-| `template.seed` | Re-seeding a workspace from the template |
-| `backup.create` | Creating a project backup |
-| `backup.restore` | Restoring a project from backup |
+| `container.restart-code` | Restarting a workspace's code container |
+| `workspace.backup` | Creating an operator workspace backup archive |
+| `workspace.restore` | Restoring a workspace from an operator backup archive |
 | `allowlist.add` | Adding an email/domain to the allowlist |
 | `allowlist.remove` | Removing an email/domain from the allowlist |
 | `config.max-active-containers` | Changing the container concurrency cap |

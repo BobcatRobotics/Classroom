@@ -88,9 +88,15 @@ RUN mkdir -p /opt/frc-extensions-cache \
                      --extensions-dir /opt/frc-extensions-cache \
     && rm -rf /tmp/exts
 
+# ── Bundled lesson catalog ────────────────────────────────────────────
+# Baked into the image so bundled module loads copy locally (no network).
+COPY catalog/ /opt/frc-catalog/
+RUN chown -R abc:abc /opt/frc-catalog
+
 # ── Gradle / WPILib cache priming ─────────────────────────────────────
+# Prime the cache from the bundled robot module in a throwaway build dir.
 WORKDIR /workspace
-COPY templates/wpilib-java-command/ /workspace/template/
+RUN cp -a /opt/frc-catalog/modules/robot-starter /workspace/template
 
 RUN mkdir -p /config/.gradle \
     && chown -R abc:abc /workspace /config/.gradle
@@ -107,7 +113,7 @@ RUN ./gradlew --no-daemon --stop; \
 USER root
 RUN mkdir -p /opt/frc-gradle-cache \
     && cp -a /config/.gradle/. /opt/frc-gradle-cache/ \
-    && rm -rf /config/.gradle
+    && rm -rf /config/.gradle /workspace/template
 
 # ── Runtime defaults ──────────────────────────────────────────────────
 RUN mkdir -p /workspace/project \

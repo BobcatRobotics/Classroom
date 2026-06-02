@@ -1,20 +1,15 @@
 /**
- * Property tests for `parseGitHubUrl` and friends.
+ * Property tests for `parseGitHubUrl` (repo-root-only after Decision 029).
  *
  * P1 — for any string input, the validator either returns a normalized URL
- *      or rejects with a typed error. Never throws an unexpected error type,
- *      never returns NaN/undefined/garbage.
+ *      or rejects with a typed error. Never throws an unexpected error type.
  * P2 — idempotence: any accepted URL re-validates to the same accepted form.
- * P3 — URLs containing `..`, `\0`, control chars, or non-HTTPS scheme are rejected.
+ * P3 — URLs with non-HTTPS scheme, non-github host, or extra path segments
+ *      (tree/branch/subdir) are rejected.
  */
 import { describe, expect, test } from "bun:test";
 import fc from "fast-check";
-import {
-	ImportError,
-	parseGitHubUrl,
-	validateBranch,
-	validateSubdir,
-} from "../../imports";
+import { ImportError, parseGitHubUrl } from "../../imports";
 
 const NUM_RUNS = Number(process.env.FAST_CHECK_NUM_RUNS ?? 200);
 
@@ -92,94 +87,21 @@ describe("parseGitHubUrl — properties", () => {
 			{ numRuns: 50 },
 		);
 	});
-});
 
-describe("validateBranch — properties", () => {
-	test("P1 never throws non-ImportError", () => {
-		fc.assert(
-			fc.property(fc.string(), (raw) => {
-				try {
-					validateBranch(raw);
-				} catch (err) {
-					if (!(err instanceof ImportError)) {
-						throw err;
-					}
-				}
-			}),
-			{ numRuns: NUM_RUNS },
-		);
-	});
-
-	test("accepts ordinary branch names", () => {
-		fc.assert(
-			fc.property(
-				fc.stringMatching(/^[A-Za-z0-9][A-Za-z0-9_./-]{0,30}$/),
-				(branch) => {
-					validateBranch(branch); // should not throw
-				},
-			),
-			{ numRuns: NUM_RUNS },
-		);
-	});
-
-	test("rejects branches starting with `-` (could be parsed as a flag)", () => {
-		fc.assert(
-			fc.property(fc.stringMatching(/^-[A-Za-z0-9]{1,20}$/), (branch) => {
-				expect(() => validateBranch(branch)).toThrow();
-			}),
-			{ numRuns: 50 },
-		);
-	});
-
-	test("rejects branches with shell-meta or whitespace characters", () => {
+	test("P3 rejects tree/branch/subdir and extra-segment forms", () => {
 		fc.assert(
 			fc.property(
 				fc.constantFrom(
-					";",
-					"&",
-					"|",
-					"$",
-					"`",
-					"\n",
-					"\r",
-					"\t",
-					" ",
-					"\\",
-					"<",
-					">",
+					"https://github.com/o/r/tree/main/sub",
+					"https://github.com/o/r/tree/main",
+					"https://github.com/o/r/a/b",
+					"https://github.com/o/r/pulls",
 				),
-				(bad) => {
-					expect(() => validateBranch(`main${bad}rm`)).toThrow();
+				(url) => {
+					expect(() => parseGitHubUrl(url)).toThrow(ImportError);
 				},
 			),
-			{ numRuns: 50 },
+			{ numRuns: 20 },
 		);
-	});
-});
-
-describe("validateSubdir — properties", () => {
-	test("P1 never throws non-ImportError", () => {
-		fc.assert(
-			fc.property(fc.string(), (raw) => {
-				try {
-					validateSubdir(raw);
-				} catch (err) {
-					if (!(err instanceof ImportError)) {
-						throw err;
-					}
-				}
-			}),
-			{ numRuns: NUM_RUNS },
-		);
-	});
-
-	test("rejects absolute paths", () => {
-		expect(() => validateSubdir("/etc/passwd")).toThrow();
-	});
-
-	test("rejects `..` traversal in any position", () => {
-		for (const sub of ["..", "a/..", "../a", "a/../b", "..\\evil"]) {
-			expect(() => validateSubdir(sub)).toThrow();
-		}
 	});
 });

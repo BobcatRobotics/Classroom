@@ -1,9 +1,12 @@
 # Lessons & Modules — Design
 
-Status: **Draft / planning.** This document captures the architecture and user
-flows for reworking the workspace starting-state UX from "one default project +
-GitHub import" into "pick-a-lesson modules + GitHub import." It is the source of
-truth for this feature; lesson *content* lives in [`Lesson-Modules.md`](./Lesson-Modules.md).
+Status: **Implemented (2026-05).** This document captures the architecture and
+user flows for reworking the workspace starting-state UX from "one default
+project + GitHub import" into "pick-a-lesson modules + GitHub import." It is the
+source of truth for this feature; lesson *content* lives in
+[`Lesson-Modules.md`](./Lesson-Modules.md). Implementation-level decisions and
+any deviations from this plan are recorded in
+[`docs/decisions/029-lessons-and-modules.md`](./docs/decisions/029-lessons-and-modules.md).
 
 Related: [`V2-Design.md`](./V2-Design.md) (system architecture),
 [`apps/control/src/imports.ts`](./apps/control/src/imports.ts) (the clone/swap
@@ -89,7 +92,7 @@ These were decided during planning (2026-05) and drive the rest of the design:
 
 ---
 
-## 3. Current state (what we're changing)
+## 3. Pre-implementation state (what changed)
 
 - **Workspace seeding** — `ensureWorkspaceForUser` (`apps/control/src/storage.ts`)
   creates `data/users/<id>/{project,home,logs,assets}` and today seeds `project`
@@ -510,7 +513,7 @@ No open questions remain. Decisions intentionally left for later:
   periodically, and copy the subdir into containers.
 - **Bundled demo `robot` module upgrade (deferred).** L-1 ships the repackaged
   `templates/wpilib-java-command` (plain WPILib-command) as the demo robot module
-  to get the bundled catalog working. It runs in sim but has no
-  `Logger.recordOutput`, so the AdvantageScope path looks empty in a demo. Replace
-  it later with a minimal AdvantageKit module so the demo actually shows
-  telemetry.
+  to get the bundled catalog working. It runs in sim and publishes a tiny raw-NT
+  `/SmartDashboard` telemetry example, but it has no `Logger.recordOutput`.
+  Replace it later with a minimal AdvantageKit module so the bundled demo matches
+  the production lesson style.

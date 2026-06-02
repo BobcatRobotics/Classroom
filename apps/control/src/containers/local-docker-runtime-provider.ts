@@ -338,7 +338,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		if (result.exitCode !== 0) {
 			log.error("code image not available", { image });
 			throw new Error(
-				`CODE image ${image} is not available. Build it with bun run docker:build:code.`,
+				`CODE image ${image} is not available. Build it with bun run docker:build:workspace.`,
 			);
 		}
 	}

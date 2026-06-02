@@ -31,7 +31,7 @@ export function notFound(): Response {
 
 export function sessionResponse(
 	auth: AuthContext,
-	options: { demo?: boolean } = {},
+	options: { demo?: boolean; projectEmpty: boolean },
 ): SessionResponse {
 	return {
 		user: {
@@ -45,6 +45,9 @@ export function sessionResponse(
 		workspace: {
 			id: auth.workspace.id,
 			slug: auth.workspace.slug,
+			currentModule: auth.workspace.current_module ?? null,
+			currentModuleKind: auth.workspace.current_module_kind ?? null,
+			projectEmpty: options.projectEmpty,
 		},
 		...(options.demo ? { demo: true } : {}),
 	};

@@ -11,7 +11,9 @@ export type ControlConfig = {
 	logLevel: LogLevel;
 	dataDir: string;
 	dbPath: string;
-	templateDir: string;
+	catalogRepo: string | null;
+	catalogBranch: string;
+	catalogDir: string;
 	migrationsDir: string;
 	webDistDir: string;
 	advantageScopeDistDir: string;
@@ -170,10 +172,13 @@ export function loadControlConfig(
 		dbPath: resolve(
 			input.dbPath ?? Bun.env.FRC_DB_PATH ?? resolve(dataDir, "app.db"),
 		),
-		templateDir: resolve(
-			input.templateDir ??
-				Bun.env.FRC_TEMPLATE_DIR ??
-				resolve(repoRoot, "templates", "wpilib-java-command"),
+		catalogRepo: input.catalogRepo ?? Bun.env.LESSONS_CATALOG_REPO ?? null,
+		catalogBranch:
+			input.catalogBranch ?? Bun.env.LESSONS_CATALOG_BRANCH ?? "main",
+		catalogDir: resolve(
+			input.catalogDir ??
+				Bun.env.LESSONS_CATALOG_DIR ??
+				resolve(repoRoot, "catalog"),
 		),
 		migrationsDir: resolve(
 			input.migrationsDir ??

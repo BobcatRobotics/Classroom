@@ -11,7 +11,7 @@ import {
 import { cookieFrom, exists, login, withApp } from "./helpers";
 
 describe("session login and ownership", () => {
-	test("new login creates a user, workspace, session, and project files", async () => {
+	test("new login creates a user, workspace, session, and an empty project dir", async () => {
 		await withApp(async (app) => {
 			const response = await login(app, "alice");
 			expect(response.status).toBe(303);
@@ -34,29 +34,21 @@ describe("session login and ownership", () => {
 				.query("SELECT * FROM workspaces WHERE slug = ?")
 				.get("alice") as {
 				project_path: string;
+				current_module: string | null;
+				current_module_kind: string | null;
 			};
 
 			expect(userCount.count).toBe(1);
 			expect(workspaceCount.count).toBe(1);
 			expect(sessionCount.count).toBe(1);
-			expect(
-				await exists(
-					join(
-						workspace.project_path,
-						"src",
-						"main",
-						"java",
-						"frc",
-						"robot",
-						"Robot.java",
-					),
-				),
-			).toBe(true);
-			expect(
-				await exists(
-					join(workspace.project_path, ".wpilib", "wpilib_preferences.json"),
-				),
-			).toBe(true);
+
+			// The project dir exists but is EMPTY (no first-login template seed):
+			// the student fills it from the lesson picker (Decision 029 / D7).
+			expect(await exists(workspace.project_path)).toBe(true);
+			const { readdir } = await import("node:fs/promises");
+			expect((await readdir(workspace.project_path)).length).toBe(0);
+			expect(workspace.current_module).toBeNull();
+			expect(workspace.current_module_kind).toBeNull();
 		});
 	});
 

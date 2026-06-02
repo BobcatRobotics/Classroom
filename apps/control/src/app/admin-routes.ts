@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { mkdir, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type {
 	AdminActionResponse,
@@ -141,35 +141,6 @@ export async function handleAdminRoute(
 					action: "stop-containers",
 					workspaceId: workspace.id,
 					detail: "All containers stopped.",
-				} satisfies AdminActionResponse);
-			}
-
-			if (action === "seed-template") {
-				const projectDir = workspace.project_path;
-				let entries: string[] = [];
-				try {
-					entries = await readdir(projectDir);
-				} catch {
-					// Directory doesn't exist yet — treat as empty.
-				}
-				if (entries.length > 0) {
-					return jsonResponse(
-						{ error: "Workspace project directory is not empty." },
-						{ status: 409 },
-					);
-				}
-				await mkdir(projectDir, { recursive: true });
-				await cp(storage.config.templateDir, projectDir, { recursive: true });
-				recordAuditEvent(storage, {
-					actor,
-					action: "workspace.seed-template",
-					target: { kind: "workspace", id: workspace.id },
-				});
-				return jsonResponse({
-					ok: true,
-					action: "seed-template",
-					workspaceId: workspace.id,
-					detail: "Template seeded.",
 				} satisfies AdminActionResponse);
 			}
 

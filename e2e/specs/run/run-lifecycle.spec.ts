@@ -5,7 +5,10 @@
  */
 import { expect, test } from "../../fixtures/app";
 import { loginAs } from "../../fixtures/auth";
-import { seedRuntimeRunning } from "../../fixtures/runtime";
+import {
+	seedRuntimeRunning,
+	seedWorkspaceProject,
+} from "../../fixtures/runtime";
 import { WorkspacePage } from "../../page-objects/workspace.po";
 
 test("run → build → running → stop", async ({
@@ -19,6 +22,7 @@ test("run → build → running → stop", async ({
 	const workspace = app.storage.findWorkspaceBySlug(
 		session.user.slug as never,
 	)!;
+	await seedWorkspaceProject(workspace.project_path);
 	seedRuntimeRunning({
 		runtime,
 		workspaceId: workspace.id,

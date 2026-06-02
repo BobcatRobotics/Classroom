@@ -25,7 +25,8 @@ apps/control/src/metrics-collector.ts  15s Docker stats poller that writes per-c
 apps/web/                      React + Vite browser IDE shell
 packages/contracts/            Shared API schemas, message types, and path rules
 containers/code/               V2 merged openvscode-server + sim container
-templates/wpilib-java-command/ Source of truth for new student WPILib projects
+catalog/                       Bundled (zero-config) lesson catalog: modules.json + modules/<id>/, baked into the code image
+lessons-repo-root/             Staging for the standalone remote lessons repo (will move out of this repo); not used by the app build
 scripts/                       TypeScript utility scripts run by Bun
 patches/advantagescope/        Source-level AS Lite patches
 docs/decisions/                Decision logs
@@ -49,12 +50,27 @@ data/                          Runtime data, gitignored
 
 V2 is complete. The system uses per-student merged containers (`coderunner-workspace`) running openvscode-server with bundled Java and WPILib extensions. The control plane proxies editor, run, and telemetry traffic through authenticated routes.
 
+**Lessons & Modules (post-V2):** first-login template seeding is removed —
+workspaces start empty and the student fills them via the topbar **Switch
+Project** surface, which offers a lesson catalog plus a public GitHub team
+import. The catalog has two sources behind one interface: a **bundled** `catalog/`
+(zero-config, baked into the image) and a **remote** lessons repo when
+`LESSONS_CATALOG_REPO` is set. Catalog loads are gitless (reset = re-load); team
+imports keep `.git` for push. The per-import backup/restore flow was removed
+(pure discard + git). Source of truth: [`Lessons-Design.md`](./Lessons-Design.md)
+and `docs/decisions/029-lessons-and-modules.md`.
+
 ## Working Principles
 
 - Prefer boring, explicit TypeScript over clever abstractions.
 - Use shared contracts before changing API shapes.
 - Add or update a decision log for non-obvious architecture or tooling choices.
-- Preserve student data under `data/users/<workspaceId>/project`.
+- Preserve student data under `data/users/<workspaceId>/project`, but note
+  switching/resetting a lesson or importing a repo **intentionally discards** it
+  (D4) — git is the safety net for team work, not server-side backups.
+- Edit lessons in the remote lessons repo (or `catalog/` for the bundled demo);
+  the bundled `catalog/` is the source of truth for the image's Gradle-cache
+  priming and offline demos.
 - Do not use query-param user identity in production routes.
 - Do not expose per-user editor or NT4 ports directly to the browser.
 - Keep AS Lite patches source-level and repeatable.
@@ -65,6 +81,8 @@ V2 is complete. The system uses per-student merged containers (`coderunner-works
 ## Key References
 
 - `V2-Design.md` — V2 design, phases, and definitions of done.
+- `Lessons-Design.md` — lessons & modules design (catalog sources, run-mode split, phases L-0…L-7); `Lesson-Modules.md` is the lesson content outline.
+- `docs/decisions/029-lessons-and-modules.md` — lessons & modules implementation decisions.
 - `docs/decisions/011-v2-editor-spike.md` — accepted openvscode/redhat.java/WPILib spike evidence.
 - `V1-Design.md` — archived V1 design, phases, and definitions of done.
 - `docs/archive/mvp-docs/Project-MVP.md` — original MVP spec, archived for historical context.
@@ -100,8 +118,8 @@ See `docs/runbook.md` for full operator documentation.
 
 Three test tiers, all runnable without Docker:
 
-- **`bun run test`** — Bun unit/integration tests for the control plane (~263 tests). Covers auth, runs, proxy, containers, security, reconciliation, property-based tests, and metrics route-templating cardinality.
-- **`bun run test:web`** — Vitest frontend tests (~65 tests). Covers React hooks (`useSession`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`), DriverStation components, Zustand store, keyboard/gamepad mappings.
+- **`bun run test`** — Bun unit/integration tests for the control plane (~290 tests). Covers auth, runs, proxy, containers, the lessons catalog + load pipeline, security, reconciliation, property-based tests, and metrics route-templating cardinality.
+- **`bun run test:web`** — Vitest frontend tests (~70 tests). Covers React hooks (`useSession`, `useLessons`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`), DriverStation components, Zustand store, keyboard/gamepad mappings.
 - **`bun run e2e`** — Playwright E2E mocked tier (~55 tests). Full login→editor→run→telemetry→DS flows against in-process `ControlApp` with fake openvscode-server, HALSim, and NT4 backends. No Docker required.
 - **`bun run e2e:security`** — Playwright security specs (CSRF, XSS output encoding, response headers).
 
@@ -114,7 +132,7 @@ Key E2E fixtures:
 - `e2e/fixtures/gamepad-shim.ts` — Playwright addInitScript gamepad override
 - `e2e/fixtures/runtime.ts` — Runtime seeding helpers
 
-The Docker smoke tier (`e2e:docker`) was intentionally not implemented — see `docs/decisions/022-skip-docker-smoke-and-import-tests.md`. Import/backup-restore tests are deferred pending a flow rework.
+The Docker smoke tier (`e2e:docker`) was intentionally not implemented — see `docs/decisions/022-skip-docker-smoke-and-import-tests.md`. The old per-import backup/restore flow is gone; import coverage now lives in control-plane tests plus the mocked E2E URL-validation spec.
 
 See `TESTING-PLAN.md` for the full test architecture and catalog.
 

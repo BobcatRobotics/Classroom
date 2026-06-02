@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { chmod, cp, mkdir, readdir } from "node:fs/promises";
+import { chmod, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type {
 	ContainerRole,
@@ -25,6 +25,8 @@ export type WorkspaceRow = {
 	project_path: string;
 	created_at: string;
 	last_accessed_at: string;
+	current_module: string | null;
+	current_module_kind: "plain-java" | "robot" | null;
 };
 
 export type ContainerLeaseRow = {
@@ -98,13 +100,8 @@ async function ensureWorkspaceFiles(
 		// Windows filesystems may ignore POSIX modes; the Linux Docker host enforces ownership at runtime.
 	}
 
-	if ((await readdir(projectDir)).length === 0) {
-		await cp(config.templateDir, projectDir, {
-			recursive: true,
-			errorOnExist: false,
-		});
-	}
-
+	// The project dir starts EMPTY: the student fills it from the lesson catalog
+	// (or a GitHub import) via the picker on first login. No template seeding.
 	return projectDir;
 }
 
@@ -294,6 +291,18 @@ export class AppStorage {
 			.run(timestamp, workspaceId);
 	}
 
+	setCurrentModule(
+		workspaceId: WorkspaceId,
+		moduleId: string | null,
+		kind: "plain-java" | "robot" | null,
+	): void {
+		this.db
+			.query(
+				"UPDATE workspaces SET current_module = ?, current_module_kind = ? WHERE id = ?",
+			)
+			.run(moduleId, kind, workspaceId);
+	}
+
 	getContainerLease(workspaceId: WorkspaceId): ContainerLeaseRow | null {
 		return (
 			(this.db
@@ -455,6 +464,8 @@ export class AppStorage {
             w.id AS w_id, w.user_id AS w_user_id, w.slug AS w_slug,
             w.project_path AS w_project_path, w.created_at AS w_created_at,
             w.last_accessed_at AS w_last_accessed_at,
+            w.current_module AS w_current_module,
+            w.current_module_kind AS w_current_module_kind,
             u.id AS u_id, u.name AS u_name, u.email AS u_email,
             u.role AS u_role, u.slug AS u_slug,
             cl.workspace_id AS cl_workspace_id, cl.nt4_port,
@@ -473,6 +484,8 @@ export class AppStorage {
 			w_project_path: string;
 			w_created_at: string;
 			w_last_accessed_at: string;
+			w_current_module: string | null;
+			w_current_module_kind: "plain-java" | "robot" | null;
 			u_id: string | null;
 			u_name: string | null;
 			u_email: string | null;
@@ -496,6 +509,8 @@ export class AppStorage {
 				project_path: row.w_project_path,
 				created_at: row.w_created_at,
 				last_accessed_at: row.w_last_accessed_at,
+				current_module: row.w_current_module,
+				current_module_kind: row.w_current_module_kind,
 			},
 			user: {
 				id: row.u_id ?? row.w_user_id,

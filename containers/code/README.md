@@ -26,7 +26,7 @@ The runtime seeds conservative memory defaults for classroom density:
 ## Build
 
 ```bash
-bun run docker:build:code
+bun run docker:build:workspace
 ```
 
 Tags the image as `coderunner-workspace` by default. Override with `CODE_IMAGE` env var.

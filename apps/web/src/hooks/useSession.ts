@@ -26,10 +26,12 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	return (await response.json()) as T;
 }
 
-export function useSession(workspaceSlug: string | null) {
+export function useSession(workspaceSlug: string | null, reloadKey = 0) {
 	const [state, setState] = useState<LoadState>({ status: "loading" });
 
-	// Load session on mount
+	// Load session on mount, and whenever `reloadKey` changes (e.g. after a
+	// project swap, so currentModule / currentModuleKind / projectEmpty update).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `reloadKey` is a manual refetch trigger.
 	useEffect(() => {
 		if (!workspaceSlug) {
 			return;
@@ -59,7 +61,7 @@ export function useSession(workspaceSlug: string | null) {
 		return () => {
 			cancelled = true;
 		};
-	}, [workspaceSlug]);
+	}, [workspaceSlug, reloadKey]);
 
 	// Workspace activity heartbeat every 60s for idle-container accounting.
 	useEffect(() => {

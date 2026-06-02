@@ -23,8 +23,8 @@ bin/
 # IDEs
 .idea/
 .vscode/
-!templates/wpilib-java-command/.vscode/
-!templates/wpilib-java-command/.vscode/settings.json
+!catalog/**/.vscode/
+!catalog/**/.vscode/*.json
 !.wpilib/
 
 # OS
@@ -63,3 +63,10 @@ override.tf.json
 
 # CloudFlare Worker
 _worker.bundle
+
+lessons-repo-root/
+
+# Bundled catalog build artifacts (keep sources, ignore generated output)
+catalog/**/build/
+catalog/**/bin/
+catalog/**/.gradle/

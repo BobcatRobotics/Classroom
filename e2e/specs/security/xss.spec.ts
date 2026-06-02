@@ -8,7 +8,10 @@
 import { makeScriptedRunCommandFactory } from "../../../apps/control/src/__tests__/helpers";
 import { expect, test } from "../../fixtures/app";
 import { cookieHeader, loginAs } from "../../fixtures/auth";
-import { seedRuntimeRunning } from "../../fixtures/runtime";
+import {
+	seedRuntimeRunning,
+	seedWorkspaceProject,
+} from "../../fixtures/runtime";
 
 test("S16 — malicious display name does not execute", async ({ page, app }) => {
 	await loginAs(page, app, {
@@ -63,6 +66,7 @@ test.describe("S17 — run console renders messages as text (no innerHTML)", () 
 		const workspace = app.storage.findWorkspaceBySlug(
 			session.user.slug as never,
 		)!;
+		await seedWorkspaceProject(workspace.project_path);
 		seedRuntimeRunning({
 			runtime,
 			workspaceId: workspace.id,
@@ -72,6 +76,8 @@ test.describe("S17 — run console renders messages as text (no innerHTML)", () 
 
 		// Navigate to workspace page first so the WS console is connected
 		await page.goto(`/u/${session.user.slug}`);
+		const console = page.locator("[data-testid='run-console']");
+		await expect(console).toContainText("Run channel connected.");
 
 		// Trap any XSS execution
 		await page.evaluate(() => {
@@ -98,7 +104,6 @@ test.describe("S17 — run console renders messages as text (no innerHTML)", () 
 		expect(runResp.status).toBe(202);
 
 		// Wait for the console to display the payload as literal text
-		const console = page.locator("[data-testid='run-console']");
 		await expect(console).toContainText(XSS_PAYLOAD, { timeout: 10000 });
 
 		// Verify the payload was NOT parsed as HTML (no <img> element injected)

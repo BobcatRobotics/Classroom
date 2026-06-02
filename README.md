@@ -1,8 +1,10 @@
 # CodeRunner
 
-A browser-based IDE for learning FRC robot programming. Students write Java in a full VS Code editor (openvscode-server), run a WPILib simulation, and view telemetry through AdvantageScope Lite.
+A browser-based IDE for learning FRC robot programming. Students pick a **lesson module** (or import a team repo), write Java in a full VS Code editor (openvscode-server), run a WPILib simulation, and view telemetry through AdvantageScope Lite.
 
 Status: **V2 complete.** Each student gets a per-student container running openvscode-server with the redhat.java and wpilibsuite.vscode-wpilib extensions, providing auto-import, Ctrl-click into library classes, diagnostics, and full VS Code features. See [`V2-Design.md`](V2-Design.md) for architecture.
+
+Workspaces start empty; students fill them from the topbar **Switch Project** surface, which offers a lesson catalog and a public GitHub team import. The catalog ships a zero-config **bundled** demo set and can point at a **remote** lessons repo via `LESSONS_CATALOG_REPO`. See [`Lessons-Design.md`](Lessons-Design.md) and [`docs/decisions/029-lessons-and-modules.md`](docs/decisions/029-lessons-and-modules.md).
 
 See [`docs/runbook.md`](docs/runbook.md) for operator setup, [`docs/manual-tests.md`](docs/manual-tests.md) for acceptance test procedures, and [`V2-Design.md`](V2-Design.md) for architecture. Historical V1 and MVP documents are preserved in [`V1-Design.md`](V1-Design.md) and [`docs/archive/mvp-docs/`](docs/archive/mvp-docs/).
 
@@ -47,7 +49,8 @@ apps/control/src/containers/     Docker client, metadata, ports, lifecycle, and 
 apps/web/                      React + Vite browser shell served by the control plane
 packages/contracts/            Shared schemas, message types, and path rules
 containers/code/               V2 merged openvscode-server + sim container
-templates/wpilib-java-command/ WPILib Java command-based starter template
+catalog/                       Bundled zero-config lesson catalog (baked into the code image)
+lessons-repo-root/             Staging for the standalone remote lessons repo (moves out of this repo)
 scripts/                       Bun utility scripts
 patches/advantagescope/        Source-level AS Lite patches
 vendor/AdvantageScope/         Pinned upstream submodule
@@ -85,8 +88,8 @@ Three test tiers, all runnable without Docker:
 
 | Command | What it runs |
 | --- | --- |
-| `bun run test` | Bun unit/integration tests — control plane, security, property-based, metrics (~263 tests) |
-| `bun run test:web` | Vitest frontend tests — hooks, components, store (~65 tests) |
+| `bun run test` | Bun unit/integration tests — control plane, lessons/catalog, security, property-based, metrics (~290 tests) |
+| `bun run test:web` | Vitest frontend tests — hooks, components, store (~70 tests) |
 | `bun run e2e` | Playwright E2E — mocked tier, full login→editor→run→telemetry flows (~55 tests) |
 | `bun run e2e:security` | Playwright security specs — CSRF, XSS, response headers |
 | `bun run e2e:ui` | Playwright UI mode for interactive debugging |

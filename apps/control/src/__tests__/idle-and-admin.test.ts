@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	cookieFrom,
@@ -290,65 +290,6 @@ describe("idle lifecycle and admin controls", () => {
 		});
 	});
 
-	test("admin seed-template copies template into an empty workspace project directory", async () => {
-		await withApp(async (app) => {
-			const admin = await login(app, "alice", { role: "admin" });
-			const adminCookie = cookieFrom(admin);
-			const workspace = workspaceBySlug(app, "alice");
-			const projectPath = workspaceProjectPath(app, "alice");
-
-			// The workspace is seeded on first login, so seed-template should return 409.
-			const conflict = await app.fetch(
-				new Request(
-					`http://localhost/admin/workspaces/${workspace.id}/seed-template`,
-					{
-						method: "POST",
-						headers: { cookie: adminCookie },
-					},
-				),
-			);
-			expect(conflict.status).toBe(409);
-
-			// Clear the project directory contents.
-			const { rm: rmFs } = await import("node:fs/promises");
-			const entries = await readdir(projectPath);
-			for (const entry of entries) {
-				await rmFs(join(projectPath, entry), { recursive: true, force: true });
-			}
-
-			// Now seed-template should succeed.
-			const response = await app.fetch(
-				new Request(
-					`http://localhost/admin/workspaces/${workspace.id}/seed-template`,
-					{
-						method: "POST",
-						headers: { cookie: adminCookie },
-					},
-				),
-			);
-			expect(response.status).toBe(200);
-			const body = (await response.json()) as { ok: boolean; action: string };
-			expect(body.ok).toBe(true);
-			expect(body.action).toBe("seed-template");
-
-			// Verify the template was copied.
-			expect(await exists(join(projectPath, "build.gradle"))).toBe(true);
-			expect(
-				await exists(
-					join(
-						projectPath,
-						"src",
-						"main",
-						"java",
-						"frc",
-						"robot",
-						"Robot.java",
-					),
-				),
-			).toBe(true);
-		});
-	});
-
 	test("admin backup creates a backup of a workspace project", async () => {
 		await withApp(async (app) => {
 			const admin = await login(app, "alice", { role: "admin" });
@@ -395,6 +336,17 @@ describe("idle lifecycle and admin controls", () => {
 			const adminCookie = cookieFrom(admin);
 			const workspace = workspaceBySlug(app, "alice");
 			const projectPath = workspaceProjectPath(app, "alice");
+
+			// The workspace project starts empty (no first-login seed). Seed some
+			// content so backup/restore has something to round-trip.
+			await mkdir(join(projectPath, "src", "main", "java", "frc", "robot"), {
+				recursive: true,
+			});
+			await writeFile(
+				join(projectPath, "build.gradle"),
+				"plugins {}\n",
+				"utf8",
+			);
 
 			// First backup.
 			const backupResponse = await app.fetch(
@@ -596,6 +548,14 @@ describe("idle lifecycle and admin controls", () => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
 
+				// The bind-mounted project dir persists across teardown. Write a
+				// marker into it (the project starts empty — no first-login seed).
+				await writeFile(
+					join(workspace.project_path, "Marker.java"),
+					"marker\n",
+					"utf8",
+				);
+
 				await app.containers.ensureCodeContainer(workspace);
 
 				await app.containers.stopWorkspaceContainers(workspace.id);
@@ -604,19 +564,9 @@ describe("idle lifecycle and admin controls", () => {
 					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
 				).toBe(false);
 
-				expect(
-					await exists(
-						join(
-							workspace.project_path,
-							"src",
-							"main",
-							"java",
-							"frc",
-							"robot",
-							"Robot.java",
-						),
-					),
-				).toBe(true);
+				expect(await exists(join(workspace.project_path, "Marker.java"))).toBe(
+					true,
+				);
 
 				await app.containers.ensureCodeContainer(workspace);
 				expect(
@@ -748,6 +698,12 @@ describe("idle lifecycle and admin controls", () => {
 				const admin = await login(app, "alice", { role: "admin" });
 				const adminCookie = cookieFrom(admin);
 				const workspace = workspaceBySlug(app, "alice");
+				// The project starts empty; write a file so disk-usage is non-zero.
+				await writeFile(
+					join(workspace.project_path, "README.md"),
+					"# project\n",
+					"utf8",
+				);
 				await app.containers.ensureCodeContainer(workspace);
 
 				const stats = await app.fetch(

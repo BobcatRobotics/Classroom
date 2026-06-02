@@ -24,30 +24,74 @@ export async function exists(path: string): Promise<boolean> {
 	}
 }
 
-export async function createTemplate(root: string): Promise<string> {
-	const templateDir = join(root, "template");
-	await mkdir(join(templateDir, "src", "main", "java", "frc", "robot"), {
+/**
+ * Build a bundled-catalog fixture: a `catalog/` dir with a `modules.json`
+ * manifest plus one `plain-java` and one `robot` module subdir. Returned path
+ * is wired into the test `ControlApp` as `catalogDir`.
+ */
+export async function createCatalogDir(root: string): Promise<string> {
+	const catalogDir = join(root, "catalog");
+
+	// hello-name (plain-java)
+	const helloDir = join(catalogDir, "modules", "hello-name");
+	await mkdir(join(helloDir, "src"), { recursive: true });
+	await mkdir(join(helloDir, ".vscode"), { recursive: true });
+	await writeFile(
+		join(helloDir, "src", "Main.java"),
+		"public class Main {\n  public static void main(String[] a) {}\n}\n",
+		"utf8",
+	);
+	await writeFile(join(helloDir, "README.md"), "# Hello, Name\n", "utf8");
+	await writeFile(
+		join(helloDir, ".vscode", "launch.json"),
+		'{ "version": "0.2.0", "configurations": [] }\n',
+		"utf8",
+	);
+
+	// robot-starter (robot)
+	const robotDir = join(catalogDir, "modules", "robot-starter");
+	await mkdir(join(robotDir, "src", "main", "java", "frc", "robot"), {
 		recursive: true,
 	});
-	await mkdir(join(templateDir, ".wpilib"), { recursive: true });
-	await mkdir(join(templateDir, "gradle", "wrapper"), { recursive: true });
-	await writeFile(join(templateDir, "build.gradle"), "plugins {}\n", "utf8");
+	await writeFile(join(robotDir, "build.gradle"), "plugins {}\n", "utf8");
 	await writeFile(
-		join(templateDir, "src", "main", "java", "frc", "robot", "Robot.java"),
+		join(robotDir, "src", "main", "java", "frc", "robot", "Robot.java"),
 		"package frc.robot;\n",
 		"utf8",
 	);
+	await writeFile(join(robotDir, "README.md"), "# Robot Starter\n", "utf8");
+
 	await writeFile(
-		join(templateDir, ".wpilib", "wpilib_preferences.json"),
-		"{}\n",
+		join(catalogDir, "modules.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 1,
+				modules: [
+					{
+						id: "hello-name",
+						title: "Hello, Name",
+						description: "Variables and stdin.",
+						subdir: "modules/hello-name",
+						kind: "plain-java",
+						order: 10,
+					},
+					{
+						id: "robot-starter",
+						title: "Robot Starter",
+						description: "A starter robot project.",
+						subdir: "modules/robot-starter",
+						kind: "robot",
+						order: 20,
+					},
+				],
+			},
+			null,
+			2,
+		),
 		"utf8",
 	);
-	await writeFile(
-		join(templateDir, "gradle", "wrapper", "gradle-wrapper.jar"),
-		"hidden\n",
-		"utf8",
-	);
-	return templateDir;
+
+	return catalogDir;
 }
 
 export async function createWebDist(root: string): Promise<string> {
@@ -111,12 +155,12 @@ export async function withApp<T>(
 	options: Partial<ControlAppOptions> = {},
 ): Promise<T> {
 	const root = await mkdtemp(join(tmpdir(), "frc-v2-control-"));
-	const templateDir = await createTemplate(root);
+	const catalogDir = await createCatalogDir(root);
 	const webDistDir = await createWebDist(root);
 	const advantageScopeDistDir = await createAdvantageScopeDist(root);
 	const app = await createApp({
 		dataDir: join(root, "data"),
-		templateDir,
+		catalogDir,
 		webDistDir,
 		advantageScopeDistDir,
 		sessionSecret: "test-session-secret",

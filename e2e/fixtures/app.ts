@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import { test as base } from "@playwright/test";
 import {
 	createAdvantageScopeDist,
-	createTemplate,
+	createCatalogDir,
 	MockWorkspaceRuntimeProvider,
 	makeScriptedRunCommandFactory,
 } from "../../apps/control/src/__tests__/helpers";
@@ -100,7 +100,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
 		use,
 	) => {
 		const root = await mkdtemp(join(tmpdir(), "frc-e2e-"));
-		const templateDir = await createTemplate(root);
+		const catalogDir = await createCatalogDir(root);
 		const ascopeDistDir = await createAdvantageScopeDist(root);
 		const webDistDir = resolve(__dirname, "../../apps/web/dist");
 
@@ -116,7 +116,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
 			const baseUrl = `http://127.0.0.1:${port}`;
 			const candidate = await createApp({
 				dataDir: join(root, "data"),
-				templateDir,
+				catalogDir,
 				webDistDir,
 				advantageScopeDistDir: ascopeDistDir,
 				sessionSecret: "e2e-session-secret",

@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { WorkspaceId } from "@frc-coderunner/contracts";
-import { type ImportContext, ImportManager } from "../../imports";
+import { type GithubImportContext, ImportManager } from "../../imports";
 import type { WorkspaceRow } from "../../storage";
 import {
 	cookieFrom,
@@ -47,13 +47,11 @@ describe("S9 — ImportManager passes argv as arrays to the runtime", () => {
 			]);
 
 			const importer = new ImportManager(app.storage, mock);
-			const ctx: ImportContext = {
+			const ctx: GithubImportContext = {
+				source: "github",
 				workspace,
 				userId: workspace.user_id,
 				cloneUrl: "https://github.com/o/r.git",
-				branch: "main",
-				subdir: "",
-				backup: false,
 				send: () => {},
 			};
 			await importer.run(ctx);
@@ -104,13 +102,10 @@ describe("S9 — ImportManager passes argv as arrays to the runtime", () => {
 
 			const importer = new ImportManager(app.storage, mock);
 			await importer.run({
+				source: "github",
 				workspace,
 				userId: workspace.user_id,
 				cloneUrl: "https://github.com/o/r.git",
-				// Even a branch with dots — once it reaches ImportManager it has been validated.
-				branch: "main",
-				subdir: "",
-				backup: false,
 				send: () => {},
 			});
 
@@ -173,12 +168,10 @@ describe("S11 — clone target path never includes user-supplied subdir before v
 
 			const importer = new ImportManager(app.storage, mock);
 			await importer.run({
+				source: "github",
 				workspace,
 				userId: workspace.user_id,
 				cloneUrl: "https://github.com/o/r.git",
-				branch: "main",
-				subdir: "",
-				backup: false,
 				send: () => {},
 			});
 
