@@ -13,6 +13,19 @@ RUN apt-get update -qq \
         jq procps wget \
     && rm -rf /var/lib/apt/lists/*
 
+# ── GitHub CLI (gh) ────────────────────────────────────────────────────
+# Installed from GitHub's apt repo. Student auth (gh auth login) persists in
+# ~/.config/gh under HOME=/config, which is the per-workspace bind mount.
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        > /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update -qq \
+    && apt-get install -y --no-install-recommends gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # ── JDK 17 (Adoptium Temurin, Linux x64) ──────────────────────────────
 ARG JDK_VERSION=17.0.15+6
 ARG JDK_URL=https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.15%2B6/OpenJDK17U-jdk_x64_linux_hotspot_17.0.15_6.tar.gz
