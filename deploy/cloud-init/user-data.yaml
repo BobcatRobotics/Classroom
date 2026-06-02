@@ -114,6 +114,7 @@ write_files:
         # JSON logs flow stdout → journald → Alloy → Grafana Cloud Loki.
         # Don't change without updating the loki.source.journal pipeline below.
         echo "LOG_FORMAT=json"
+        echo "LESSONS_CATALOG_REPO=mathewdunne/CodeRunner-Lessons"
         # Add new control-plane env vars above this line.
       } > "$tmp"
       install -o "$${APP_USER}" -g "$${APP_USER}" -m 600 "$tmp" /opt/coderunner/.env
