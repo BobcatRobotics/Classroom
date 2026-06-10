@@ -7,7 +7,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config: Config = {
   title: 'CodeRunner',
   tagline: 'Browser-based IDE and simulator for FRC programming training',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/coderunner-icon.png',
 
   future: {
     v4: true,
@@ -58,7 +58,7 @@ const config: Config = {
       title: 'CodeRunner',
       logo: {
         alt: 'CodeRunner logo',
-        src: 'img/logo.svg',
+        src: 'img/coderunner-icon.png',
       },
       items: [
         {
