@@ -23,7 +23,7 @@ describe("bundled lesson catalog", () => {
 
 		expect(catalog.schemaVersion).toBe(1);
 		const ids = catalog.modules.map((module) => module.id).sort();
-		expect(ids).toEqual(["hello-name", "robot-starter"]);
+		expect(ids).toEqual(["hello-world", "robot-starter"]);
 	});
 
 	test("every module subdir exists and is non-empty", async () => {
@@ -41,10 +41,10 @@ describe("bundled lesson catalog", () => {
 		}
 	});
 
-	test("hello-name plain-java module ships its sources and launch config", async () => {
+	test("hello-world plain-java module ships its sources and launch config", async () => {
 		await Promise.all([
-			expectCatalogFile("modules/hello-name/src/Main.java"),
-			expectCatalogFile("modules/hello-name/.vscode/launch.json"),
+			expectCatalogFile("modules/hello-world/src/Main.java"),
+			expectCatalogFile("modules/hello-world/.vscode/launch.json"),
 		]);
 	});
 

@@ -155,16 +155,16 @@ describe("lesson catalog schemas", () => {
 				schemaVersion: 1,
 				modules: [
 					{
-						id: "hello-name",
+						id: "hello-world",
 						title: "Hello, Name",
 						description: "Variables and stdin.",
-						subdir: "modules/hello-name",
+						subdir: "modules/hello-world",
 						kind: "plain-java",
 						order: 10,
 					},
 				],
 			}),
-		).toMatchObject({ modules: [{ id: "hello-name", kind: "plain-java" }] });
+		).toMatchObject({ modules: [{ id: "hello-world", kind: "plain-java" }] });
 	});
 
 	test("rejects an unknown module kind", () => {
@@ -188,7 +188,7 @@ describe("lesson catalog schemas", () => {
 	test("rejects unsafe module subdir values", () => {
 		for (const subdir of [
 			"../escape",
-			"/modules/hello-name",
+			"/modules/hello-world",
 			"modules/../escape",
 			"modules/hello name",
 			"modules/hello;rm",
@@ -226,8 +226,8 @@ describe("lesson catalog schemas", () => {
 	});
 
 	test("lessonLoadRequestSchema requires a non-empty moduleId", () => {
-		expect(lessonLoadRequestSchema.parse({ moduleId: "hello-name" })).toEqual({
-			moduleId: "hello-name",
+		expect(lessonLoadRequestSchema.parse({ moduleId: "hello-world" })).toEqual({
+			moduleId: "hello-world",
 		});
 		expect(lessonLoadRequestSchema.safeParse({ moduleId: "" }).success).toBe(
 			false,

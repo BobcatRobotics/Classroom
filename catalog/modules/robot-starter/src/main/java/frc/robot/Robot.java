@@ -1,49 +1,65 @@
-// Starter telemetry example for the classroom simulator template.
 package frc.robot;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.networktables.IntegerPublisher;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.StructPublisher;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import org.littletonrobotics.junction.LogFileUtil;
+import org.littletonrobotics.junction.LoggedRobot;
+import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.NT4Publisher;
+import org.littletonrobotics.junction.wpilog.WPILOGReader;
+import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
-public class Robot extends TimedRobot {
-    private final RobotContainer container = new RobotContainer();
+/**
+ * Sets up AdvantageKit logging and forwards the robot lifecycle to {@link RobotContainer}, where
+ * your code lives. You should not need to edit this file -- write your robot logic in {@link
+ * RobotContainer#robotPeriodic()} instead.
+ */
+public class Robot extends LoggedRobot {
+  private final RobotContainer robotContainer;
 
-    private final IntegerPublisher counterPub =
-        NetworkTableInstance.getDefault()
-            .getIntegerTopic("/SmartDashboard/counter")
-            .publish();
+  public Robot() {
+    // Record metadata
+    Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
+    Logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
+    Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+    Logger.recordMetadata("GitDate", BuildConstants.GIT_DATE);
+    Logger.recordMetadata("GitBranch", BuildConstants.GIT_BRANCH);
+    Logger.recordMetadata(
+        "GitDirty",
+        switch (BuildConstants.DIRTY) {
+          case 0 -> "All changes committed";
+          case 1 -> "Uncommitted changes";
+          default -> "Unknown";
+        });
 
-    private final StructPublisher<Pose2d> posePub =
-        NetworkTableInstance.getDefault()
-            .getStructTopic("/SmartDashboard/robotPose", Pose2d.struct)
-            .publish();
+    // Set up data receivers & replay source
+    switch (Constants.currentMode) {
+      case REAL:
+        // Running on a real robot, log to a USB stick ("/U/logs")
+        Logger.addDataReceiver(new WPILOGWriter());
+        Logger.addDataReceiver(new NT4Publisher());
+        break;
 
-    private final Timer timer = new Timer();
-    private long counter = 0;
+      case SIM:
+        // Running a physics simulator, log to NT
+        Logger.addDataReceiver(new NT4Publisher());
+        break;
 
-    @Override
-    public void robotInit() {
-        timer.start();
+      case REPLAY:
+        // Replaying a log, set up replay source
+        setUseTiming(false); // Run as fast as possible
+        String logPath = LogFileUtil.findReplayLog();
+        Logger.setReplaySource(new WPILOGReader(logPath));
+        Logger.addDataReceiver(new WPILOGWriter(LogFileUtil.addPathSuffix(logPath, "_sim")));
+        break;
     }
 
-    @Override
-    public void robotPeriodic() {
-        CommandScheduler.getInstance().run();
+    // Start AdvantageKit logger
+    Logger.start();
 
-        counter++;
-        counterPub.set(counter);
+    robotContainer = new RobotContainer();
+  }
 
-        double seconds = timer.get();
-        double radius = 2.0;
-        double omega = 1.0;
-        double x = 4.0 + radius * Math.cos(omega * seconds);
-        double y = 4.0 + radius * Math.sin(omega * seconds);
-        Rotation2d heading = new Rotation2d(omega * seconds + Math.PI / 2);
-        posePub.set(new Pose2d(x, y, heading));
-    }
+  @Override
+  public void robotPeriodic() {
+    robotContainer.robotPeriodic();
+  }
 }

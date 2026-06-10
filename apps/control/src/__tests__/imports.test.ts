@@ -295,7 +295,7 @@ describe("ImportManager — github import", () => {
 				.query("SELECT * FROM workspaces WHERE slug = ?")
 				.get("alice") as WorkspaceRow;
 			// Pretend a lesson was previously loaded.
-			app.storage.setCurrentModule(workspace.id, "hello-name", "plain-java");
+			app.storage.setCurrentModule(workspace.id, "hello-world", "plain-java");
 
 			const mock = new MockWorkspaceRuntimeProvider([
 				runningRuntime(workspace.id),
@@ -401,8 +401,8 @@ describe("ImportManager — bundled catalog load", () => {
 					source: "catalog",
 					workspace,
 					userId: workspace.user_id,
-					moduleId: "hello-name",
-					subdir: "modules/hello-name",
+					moduleId: "hello-world",
+					subdir: "modules/hello-world",
 					kind: "plain-java",
 					remote: null,
 					send: (m) => messages.push(m),

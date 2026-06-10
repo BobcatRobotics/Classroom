@@ -24,7 +24,7 @@ describe("GET /u/:slug/api/lessons", () => {
 				expect(body.ok).toBe(true);
 				expect(body.error).toBeNull();
 				expect(body.modules.map((m) => m.id)).toEqual([
-					"hello-name",
+					"hello-world",
 					"robot-starter",
 				]);
 				expect(body.modules[0]?.kind).toBe("plain-java");
@@ -64,7 +64,7 @@ describe("POST /u/:slug/api/lessons/load", () => {
 					new Request("http://localhost/u/alice/api/lessons/load", {
 						method: "POST",
 						headers: { cookie, "content-type": "application/json" },
-						body: JSON.stringify({ moduleId: "hello-name" }),
+						body: JSON.stringify({ moduleId: "hello-world" }),
 					}),
 				);
 				expect(ok.status).toBe(200);
@@ -125,7 +125,7 @@ describe("/api/session reflects the loaded module", () => {
 					.get("alice") as { id: string; project_path: string };
 				app.storage.setCurrentModule(
 					workspace.id as never,
-					"hello-name",
+					"hello-world",
 					"plain-java",
 				);
 				const { writeFile } = await import("node:fs/promises");
@@ -148,7 +148,7 @@ describe("/api/session reflects the loaded module", () => {
 						projectEmpty: boolean;
 					};
 				};
-				expect(after.workspace.currentModule).toBe("hello-name");
+				expect(after.workspace.currentModule).toBe("hello-world");
 				expect(after.workspace.currentModuleKind).toBe("plain-java");
 				expect(after.workspace.projectEmpty).toBe(false);
 			},

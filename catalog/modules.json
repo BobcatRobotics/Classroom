@@ -2,17 +2,17 @@
 	"schemaVersion": 1,
 	"modules": [
 		{
-			"id": "hello-name",
-			"title": "Hello, Name",
-			"description": "Variables, terminal input, and printing values.",
-			"subdir": "modules/hello-name",
+			"id": "hello-world",
+			"title": "Hello, World",
+			"description": "Basic java hello world project",
+			"subdir": "modules/hello-world",
 			"kind": "plain-java",
 			"order": 10
 		},
 		{
 			"id": "robot-starter",
 			"title": "Robot Starter",
-			"description": "A minimal WPILib command-based robot you run from the Driver Station.",
+			"description": "A minimal WPILib and AdvantageKit command-based robot you run from the Driver Station.",
 			"subdir": "modules/robot-starter",
 			"kind": "robot",
 			"order": 20

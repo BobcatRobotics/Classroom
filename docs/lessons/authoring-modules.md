@@ -30,7 +30,7 @@ A lessons repository has a manifest at its root and one directory per module:
 ```text
 modules.json              ← the catalog manifest (required, at repo root)
 modules/
-  hello-name/             ← one directory per module
+  hello-world/             ← one directory per module
     README.md             ← the lesson text (auto-opened for the student)
     .vscode/              ← editor config (run config, Java settings)
     src/...               ← the starting source files
@@ -62,10 +62,10 @@ manifest, which is a complete and valid example:
   "schemaVersion": 1,
   "modules": [
     {
-      "id": "hello-name",
+      "id": "hello-world",
       "title": "Hello, Name",
       "description": "Variables, terminal input, and printing values.",
-      "subdir": "modules/hello-name",
+      "subdir": "modules/hello-world",
       "kind": "plain-java",
       "order": 10
     },
@@ -97,7 +97,7 @@ Every field is required.
 | `id` | string | Stable, unique identifier. Used internally and recorded as the student's current module. Don't reuse or rename casually. |
 | `title` | string | Shown in the Switch Project menu. |
 | `description` | string | One-line summary shown under the title. May be empty. |
-| `subdir` | string | Relative path from the repo root to the module directory (for example `modules/hello-name`). Must be a relative path of safe segments — no leading slash and no `..`. |
+| `subdir` | string | Relative path from the repo root to the module directory (for example `modules/hello-world`). Must be a relative path of safe segments — no leading slash and no `..`. |
 | `kind` | string | Either `plain-java` or `robot`. See below. |
 | `order` | integer | Sort position in the menu (ascending). |
 
@@ -119,7 +119,7 @@ hidden because there is no robot. Use this for programming fundamentals:
 variables, loops, classes, terminal I/O.
 
 A `plain-java` module needs a `.vscode/launch.json` with a run configuration so
-the editor knows what to launch. The bundled `hello-name` module uses this:
+the editor knows what to launch. The bundled `hello-world` module uses this:
 
 ```json
 {
@@ -164,7 +164,7 @@ startup editor, so the lesson instructions are the first thing the student sees.
 Write the README as the student-facing walkthrough: goal, steps, and optional
 bonus challenges.
 
-For example, the bundled `hello-name` README opens with the goal, lists numbered
+For example, the bundled `hello-world` README opens with the goal, lists numbered
 steps, and finishes with bonus challenges.
 
 ## The `.vscode/` folder

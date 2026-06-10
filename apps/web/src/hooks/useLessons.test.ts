@@ -7,10 +7,10 @@ const CATALOG = {
 	error: null,
 	modules: [
 		{
-			id: "hello-name",
+			id: "hello-world",
 			title: "Hello, Name",
 			description: "Variables and input.",
-			subdir: "modules/hello-name",
+			subdir: "modules/hello-world",
 			kind: "plain-java",
 			order: 10,
 		},
@@ -49,7 +49,7 @@ describe("useLessons", () => {
 		const { result } = renderHook(() => useLessons("test-slug"));
 		await waitFor(() => expect(result.current.loading).toBe(false));
 		expect(result.current.modules).toHaveLength(2);
-		expect(result.current.modules[0]?.id).toBe("hello-name");
+		expect(result.current.modules[0]?.id).toBe("hello-world");
 		expect(result.current.error).toBeNull();
 	});
 

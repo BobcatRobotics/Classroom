@@ -28,7 +28,7 @@ See `Lessons-Design.md` for the full rationale.
      `catalogDir` (`LESSONS_CATALOG_DIR`, default `<repoRoot>/catalog`).
    - Removed config: `templateDir` / `FRC_TEMPLATE_DIR`.
 
-2. **Bundled demo catalog content.** Ships two modules (D11 / §11): `hello-name`
+2. **Bundled demo catalog content.** Ships two modules (D11 / §11): `hello-world`
    (`plain-java`, copied from the lessons repo) and `robot-starter` (`robot`,
    repackaged from the old `templates/wpilib-java-command` WPILib-command starter
    plus a lesson `README.md` and a tiny raw-NT telemetry example). The
@@ -41,8 +41,8 @@ See `Lessons-Design.md` for the full rationale.
    and Gradle-cache priming in the Docker image. The catalog replaces the first;
    the Dockerfile now primes the Gradle cache from
    `/opt/frc-catalog/modules/robot-starter/` instead of
-   `templates/wpilib-java-command/`. `templates/plain-java-hello-name` (the spike
-   PoC) is also deleted — `hello-name` now lives in the catalog.
+   `templates/wpilib-java-command/`. `templates/plain-java-hello-world` (the spike
+   PoC) is also deleted — `hello-world` now lives in the catalog.
 
 4. **README auto-open is implemented via `workbench.startupEditor: "readme"`**
    (D6), seeded into the per-workspace VS Code *User* settings by the container

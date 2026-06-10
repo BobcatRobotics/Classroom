@@ -32,8 +32,8 @@ export async function exists(path: string): Promise<boolean> {
 export async function createCatalogDir(root: string): Promise<string> {
 	const catalogDir = join(root, "catalog");
 
-	// hello-name (plain-java)
-	const helloDir = join(catalogDir, "modules", "hello-name");
+	// hello-world (plain-java)
+	const helloDir = join(catalogDir, "modules", "hello-world");
 	await mkdir(join(helloDir, "src"), { recursive: true });
 	await mkdir(join(helloDir, ".vscode"), { recursive: true });
 	await writeFile(
@@ -68,10 +68,10 @@ export async function createCatalogDir(root: string): Promise<string> {
 				schemaVersion: 1,
 				modules: [
 					{
-						id: "hello-name",
+						id: "hello-world",
 						title: "Hello, Name",
 						description: "Variables and stdin.",
-						subdir: "modules/hello-name",
+						subdir: "modules/hello-world",
 						kind: "plain-java",
 						order: 10,
 					},

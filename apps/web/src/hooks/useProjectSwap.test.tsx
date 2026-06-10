@@ -71,13 +71,13 @@ describe("useProjectSwap", () => {
 	test("lesson swaps use /ws/lesson-load and send the module id", () => {
 		const { result } = renderHook(() => useProjectSwap("alice"));
 		act(() =>
-			result.current.startSwap({ kind: "lesson", moduleId: "hello-name" }),
+			result.current.startSwap({ kind: "lesson", moduleId: "hello-world" }),
 		);
 		const socket = FakeSocket.instances[0]!;
 		expect(socket.url).toMatch(/\/u\/alice\/ws\/lesson-load$/);
 
 		act(() => socket.open());
-		expect(socket.sent).toEqual([JSON.stringify({ moduleId: "hello-name" })]);
+		expect(socket.sent).toEqual([JSON.stringify({ moduleId: "hello-world" })]);
 		expect(result.current.state.status).toBe("running");
 	});
 
@@ -132,7 +132,7 @@ describe("useProjectSwap", () => {
 	test("unexpected close while running becomes an error", () => {
 		const { result } = renderHook(() => useProjectSwap("alice"));
 		act(() =>
-			result.current.startSwap({ kind: "lesson", moduleId: "hello-name" }),
+			result.current.startSwap({ kind: "lesson", moduleId: "hello-world" }),
 		);
 		const socket = FakeSocket.instances[0]!;
 		act(() => socket.open());

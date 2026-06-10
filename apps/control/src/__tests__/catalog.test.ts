@@ -23,10 +23,10 @@ const MANIFEST = {
 			order: 20,
 		},
 		{
-			id: "hello-name",
+			id: "hello-world",
 			title: "Hello, Name",
 			description: "Plain java.",
-			subdir: "modules/hello-name",
+			subdir: "modules/hello-world",
 			kind: "plain-java",
 			order: 10,
 		},
@@ -47,7 +47,7 @@ describe("BundledCatalogSource", () => {
 			const source = new BundledCatalogSource(dir);
 			const { modules, error } = await source.getManifest();
 			expect(error).toBeNull();
-			expect(modules.map((m) => m.id)).toEqual(["hello-name", "robot-starter"]);
+			expect(modules.map((m) => m.id)).toEqual(["hello-world", "robot-starter"]);
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}
@@ -57,9 +57,9 @@ describe("BundledCatalogSource", () => {
 		const dir = await makeBundledCatalog();
 		try {
 			const source = new BundledCatalogSource(dir);
-			const module = await source.resolveModule("hello-name");
+			const module = await source.resolveModule("hello-world");
 			expect(module.kind).toBe("plain-java");
-			expect(module.subdir).toBe("modules/hello-name");
+			expect(module.subdir).toBe("modules/hello-world");
 			await expect(source.resolveModule("nope")).rejects.toThrow(ImportError);
 		} finally {
 			await rm(dir, { recursive: true, force: true });
@@ -154,7 +154,7 @@ describe("RemoteCatalogSource", () => {
 		const first = await source.getManifest();
 		expect(first.error).toBeNull();
 		expect(first.modules.map((m) => m.id)).toEqual([
-			"hello-name",
+			"hello-world",
 			"robot-starter",
 		]);
 		expect(calls[0]).toBe(
