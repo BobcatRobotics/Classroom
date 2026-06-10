@@ -1,0 +1,91 @@
+import type * as Preset from '@docusaurus/preset-classic';
+import type {Config} from '@docusaurus/types';
+import {themes as prismThemes} from 'prism-react-renderer';
+
+// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+
+const config: Config = {
+  title: 'CodeRunner',
+  tagline: 'Browser-based IDE and simulator for FRC programming training',
+  favicon: 'img/favicon.ico',
+
+  future: {
+    v4: true,
+  },
+
+  // Placeholder until a hosting target is chosen; deployment is out of scope for now.
+  url: 'https://coderunner.example.com',
+  baseUrl: '/',
+
+  onBrokenLinks: 'throw',
+  onBrokenAnchors: 'throw',
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'throw',
+    },
+  },
+
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en'],
+  },
+
+  presets: [
+    [
+      'classic',
+      {
+        docs: {
+          path: '../docs',
+          routeBasePath: '/',
+          sidebarPath: './sidebars.ts',
+          // Decision logs are maintainer/agent records, not site content.
+          exclude: [
+            'decisions/**',
+            // TODO(docs-migration): legacy docs pending distill-and-delete;
+            // remove these entries once they are gone.
+            'plan/**',
+            'archive/**',
+            'V1-Design.md',
+            'V2-Design.md',
+            'runbook.md',
+            'manual-tests.md',
+          ],
+          editUrl: 'https://github.com/mathewdunne/CodeRunner/tree/main/docs/',
+        },
+        blog: false,
+        pages: false,
+        theme: {
+          customCss: './src/css/custom.css',
+        },
+      } satisfies Preset.Options,
+    ],
+  ],
+
+  themeConfig: {
+    navbar: {
+      title: 'CodeRunner',
+      logo: {
+        alt: 'CodeRunner logo',
+        src: 'img/logo.svg',
+      },
+      items: [
+        {
+          href: 'https://github.com/mathewdunne/CodeRunner',
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
+    },
+    footer: {
+      style: 'dark',
+      copyright: `Copyright © ${new Date().getFullYear()} CodeRunner contributors. Built with Docusaurus.`,
+    },
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+      additionalLanguages: ['java', 'bash', 'json', 'groovy', 'docker', 'hcl'],
+    },
+  } satisfies Preset.ThemeConfig,
+};
+
+export default config;
