@@ -13,9 +13,15 @@ const config: Config = {
     v4: true,
   },
 
-  // Placeholder until a hosting target is chosen; deployment is out of scope for now.
-  url: 'https://coderunner.example.com',
-  baseUrl: '/',
+  // Deployed to GitHub Pages as a project site at
+  // https://mathewdunne.github.io/CodeRunner/ (see .github/workflows/deploy-docs.yml).
+  url: 'https://mathewdunne.github.io',
+  baseUrl: '/CodeRunner/',
+
+  // GitHub Pages deployment config (used by `docusaurus deploy` and for metadata).
+  organizationName: 'mathewdunne',
+  projectName: 'CodeRunner',
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
