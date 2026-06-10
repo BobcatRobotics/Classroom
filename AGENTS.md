@@ -2,9 +2,9 @@
 
 ## What This Is
 
-A browser-based IDE for learning FRC robot programming. Students write Java, click Run, and watch their robot simulate in real time with telemetry rendered by AdvantageScope Lite. V2 uses per-student openvscode-server containers with bundled redhat.java and wpilibsuite.vscode-wpilib extensions for full VS Code editor features.
+A browser-based IDE for learning FRC robot programming. Students write Java, click Run, and watch their robot simulate in real time with telemetry rendered by AdvantageScope Lite. Each student gets a per-student openvscode-server container with bundled redhat.java and wpilibsuite.vscode-wpilib extensions for full VS Code editor features.
 
-Source of truth for V2 scope and architecture: [`V2-Design.md`](./V2-Design.md). V1 and MVP materials are historical references archived in-repo.
+Architecture and design details: [`docs/about/architecture.md`](./docs/about/architecture.md). Decision logs live in [`docs/decisions/`](./docs/decisions/).
 
 ## Stack Rule
 
@@ -29,8 +29,8 @@ catalog/                       Bundled (zero-config) lesson catalog: modules.jso
 lessons-repo-root/             Staging for the standalone remote lessons repo (will move out of this repo); not used by the app build
 scripts/                       TypeScript utility scripts run by Bun
 patches/advantagescope/        Source-level AS Lite patches
-docs/decisions/                Decision logs
-docs/archive/mvp-docs/         Archived MVP documents and decision logs
+docs/                          Site content (Docusaurus pages) + decision logs (docs/decisions/)
+website/                       Docusaurus site config; docs/ is the content source
 vendor/AdvantageScope/         Pinned upstream submodule
 e2e/                           Playwright E2E tests (specs/ and fixtures/)
 data/                          Runtime data, gitignored
@@ -57,7 +57,7 @@ import. The catalog has two sources behind one interface: a **bundled** `catalog
 (zero-config, baked into the image) and a **remote** lessons repo when
 `LESSONS_CATALOG_REPO` is set. Catalog loads are gitless (reset = re-load); team
 imports keep `.git` for push. The per-import backup/restore flow was removed
-(pure discard + git). Source of truth: [`Lessons-Design.md`](./Lessons-Design.md)
+(pure discard + git). See [`docs/lessons/overview.md`](./docs/lessons/overview.md)
 and `docs/decisions/029-lessons-and-modules.md`.
 
 ## Working Principles
@@ -77,16 +77,12 @@ and `docs/decisions/029-lessons-and-modules.md`.
 - Do not re-verify upstream extension-owned behavior unless editor or extension versions changed. Decision 011 is the evidence record.
 - Keep metrics instrumentation backend-agnostic. The control plane only speaks Prometheus exposition at `/metrics`; deploy-specific shipping (Alloy → Grafana Cloud, or whatever replaces it) lives outside `apps/control/`. Decision 023 is the record.
 - Run `bun run check:fix` before finalizing any code change. It applies Biome's safe lint fixes, formatting, and import organization in one pass. `bun run verify` gates on `biome ci` so unfixed issues will fail CI.
+- Documentation for users and operators lives in `docs/` (the Docusaurus site); update the relevant page when changing behavior. Decision logs stay in `docs/decisions/` and are not published to the site.
 
 ## Key References
 
-- `V2-Design.md` — V2 design, phases, and definitions of done.
-- `Lessons-Design.md` — lessons & modules design (catalog sources, run-mode split, phases L-0…L-7); `Lesson-Modules.md` is the lesson content outline.
-- `docs/decisions/029-lessons-and-modules.md` — lessons & modules implementation decisions.
-- `docs/decisions/011-v2-editor-spike.md` — accepted openvscode/redhat.java/WPILib spike evidence.
-- `V1-Design.md` — archived V1 design, phases, and definitions of done.
-- `docs/archive/mvp-docs/Project-MVP.md` — original MVP spec, archived for historical context.
-- `docs/archive/mvp-docs/decisions/` — archived MVP decisions.
+- `docs/` + `website/` — docs site content and Docusaurus config; run `bun run docs:dev` to browse locally, `bun run docs:build` to build.
+- `docs/decisions/` — all architecture decision logs (011–029 active; 001–010 archived under `docs/decisions/archive/`).
 - Pinned AdvantageScope submodule: `vendor/AdvantageScope` at tag `v26.0.2`.
 
 ## Commands
@@ -111,8 +107,11 @@ and `docs/decisions/029-lessons-and-modules.md`.
 - Backup projects: `bun run backup`
 - Restore projects: `bun run restore -- <backup-dir>`
 - Cleanup containers: `bun run docker:cleanup`
+- Browse docs locally: `bun run docs:dev`
+- Build docs site: `bun run docs:build`
+- Install docs dependencies: `bun run docs:install`
 
-See `docs/runbook.md` for full operator documentation.
+See `docs/deploying/` and `docs/operating/` for operator documentation.
 
 ## Testing
 
@@ -134,7 +133,7 @@ Key E2E fixtures:
 
 The Docker smoke tier (`e2e:docker`) was intentionally not implemented — see `docs/decisions/022-skip-docker-smoke-and-import-tests.md`. The old per-import backup/restore flow is gone; import coverage now lives in control-plane tests plus the mocked E2E URL-validation spec.
 
-See `TESTING-PLAN.md` for the full test architecture and catalog.
+See [`docs/development/testing.md`](./docs/development/testing.md) for the full test architecture and catalog.
 
 ## graphify
 

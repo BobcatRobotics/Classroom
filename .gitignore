@@ -48,6 +48,9 @@ test-results/
 
 data-alloy/
 
+# Docusaurus site (website/node_modules and website/build are covered above)
+website/.docusaurus/
+
 # Terraform
 **/.terraform/
 *.tfstate

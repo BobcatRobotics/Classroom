@@ -1,0 +1,227 @@
+---
+sidebar_position: 6
+title: Troubleshooting
+---
+
+# Troubleshooting
+
+## Container won't start
+
+**Symptom.** A student's workspace shows "starting" indefinitely, or the
+container status is "error". The admin panel shows no running container for
+that workspace.
+
+**Cause.** Docker is not running, or the workspace image is missing.
+
+**Fix.**
+
+```bash
+# Confirm Docker is running
+docker info
+
+# Check whether the workspace image exists
+docker images coderunner-workspace
+
+# If missing, pull the pre-built image
+bun run docker:pull:workspace
+
+# Or rebuild it locally (takes 5–15 min on first build)
+bun run docker:build:workspace
+```
+
+Check for port conflicts — if all ports in `SIM_PORT_RANGE` or
+`VSCODE_PORT_RANGE` are in use, container startup fails. Verify the ranges are
+not overlapping with other services on the host. Defaults are `25810–25899`
+(sim NT4) and `33000–33099` (openvscode-server).
+
+After the image is present and Docker is healthy, the student's container will
+start on their next workspace open.
+
+---
+
+## Build times out
+
+**Symptom.** A run shows "failed" after approximately 90 seconds with no
+obvious error. The problem typically occurs on the student's first build of a
+new project.
+
+**Cause.** The Gradle build exceeded `RUN_BUILD_TIMEOUT_MS` (default: 90000 ms,
+i.e. 90 seconds). Cold-cache first builds can legitimately take 2–3 minutes on
+slower hosts.
+
+**Fix.** Increase the timeout in your `.env`:
+
+```bash
+RUN_BUILD_TIMEOUT_MS=180000
+```
+
+Restart the control plane for the change to take effect. Subsequent builds are
+much faster because Gradle's incremental cache (in `data/users/*/home/`) is
+warm.
+
+---
+
+## Sim doesn't start after a successful build
+
+**Symptom.** The build succeeds (the console shows Gradle output), but the run
+stays in "building" for 30 seconds and then fails.
+
+**Cause.** The WPILib simulator process did not report readiness within
+`SIM_STARTUP_TIMEOUT_MS` (default: 30000 ms).
+
+**Fix.** Increase the startup timeout:
+
+```bash
+SIM_STARTUP_TIMEOUT_MS=60000
+```
+
+If this happens consistently for one student, check the container logs:
+
+```bash
+docker logs coderunner-workspace-<workspaceId> --tail 100
+```
+
+Look for the simulator failing to bind its HALSim port. If `HALSIM_PORT_RANGE`
+ports are exhausted, restart the control plane or stop idle containers to free
+leases.
+
+---
+
+## OAuth login fails
+
+**Symptom.** Students see an OAuth error page, a "not authorized" flash, or
+are silently redirected back to the login page.
+
+**Cause — wrong callback URL.** The OAuth app registration does not include
+the actual host URL. Fix by ensuring the callback URL registered with GitHub
+or Google matches `BETTER_AUTH_URL`:
+
+- GitHub: `<BETTER_AUTH_URL>/api/auth/callback/github`
+- Google: `<BETTER_AUTH_URL>/api/auth/callback/google`
+
+`BETTER_AUTH_URL` must be the externally reachable base URL of the control
+plane (for example `https://coderunner.yourteam.ca`). On a local deployment
+it is `http://<host-ip>:4000`.
+
+**Cause — email not on allowlist.** The student's email or domain is not in
+`data/allowlist.json`. Check and add:
+
+```bash
+bun run allowlist:list
+bun run allowlist:add student@gmail.com
+# or allow a whole domain
+bun run allowlist:add yourteam.org
+```
+
+**Cause — empty allowlist.** If the allowlist is empty, everyone is blocked.
+Confirm with `bun run allowlist:list` and add at least one entry.
+
+---
+
+## Port range exhausted
+
+**Symptom.** Container startup fails with a log message about no free ports, or
+many students get "server at capacity" even when the concurrency cap has not
+been reached.
+
+**Cause.** All ports in `SIM_PORT_RANGE`, `VSCODE_PORT_RANGE`, or
+`HALSIM_PORT_RANGE` are leased (or stale leases were not cleaned up).
+
+**Fix.** Each range supports 90 concurrent leases by default (e.g.
+`25810–25899`). If you have more than 90 simultaneous students, expand the
+ranges:
+
+```bash
+SIM_PORT_RANGE=25810-25999
+VSCODE_PORT_RANGE=33000-33199
+HALSIM_PORT_RANGE=34000-34199
+```
+
+Stale leases can accumulate if containers were stopped without the control
+plane running. Restart the control plane — startup reconciles Docker container
+state against the database and releases stale leases.
+
+---
+
+## Disk full
+
+**Symptom.** File saves fail, builds fail with I/O errors, or container startup
+fails. `df -h /` shows the data partition at or near 100%.
+
+**Cause.** Gradle caches, run logs, and Docker image layers have grown to fill
+the disk.
+
+**Fix.** Free space in order of safety:
+
+```bash
+# 1. Prune run logs (safest, often largest single contributor)
+find data/users/*/logs/runs -name "*.log" -delete
+
+# 2. Prune stopped managed containers and their layers
+bun run docker:cleanup
+docker system prune -f
+docker builder prune -f
+
+# 3. Prune Gradle caches for all workspaces (stop containers first)
+for dir in data/users/*/; do
+  rm -rf "$dir/home"
+  mkdir -p "$dir/home"
+done
+```
+
+Never delete `data/users/*/project/` — that is student source code. If space
+is critically low, back up project files first:
+
+```bash
+bun run backup
+```
+
+---
+
+## Control plane crashes or becomes unresponsive
+
+**Symptom.** The browser shows disconnected. The `coderunner.service` systemd
+unit shows `failed` or logs a fatal error.
+
+**Cause.** An unhandled exception, OOM on the host, or a corrupt database.
+
+**Fix.** On a local deployment, restart the control plane:
+
+```bash
+bun run start
+```
+
+On the cloud VM:
+
+```bash
+sudo systemctl restart coderunner
+sudo journalctl -u coderunner -n 100
+```
+
+On startup the control plane reconnects to existing containers via Docker
+labels, reconciles container state with the database, and resumes the idle
+sweep. Student files and running containers are preserved across restarts.
+
+---
+
+## Student workspace is at capacity (503)
+
+**Symptom.** A student sees "Server at capacity — try again in a moment." when
+opening their workspace. Other students with running containers are unaffected.
+
+**Cause.** The active container count has reached `MAX_ACTIVE_CONTAINERS`.
+
+**Fix.** Check the admin panel or the admin API for current vs. maximum
+container count. If idle containers have not yet been stopped, wait for the
+idle sweep (or reduce `IDLE_STOP_MINUTES`). If the load is legitimate and the
+host has headroom, raise the cap at runtime without restarting:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"value": 15}' \
+  http://localhost:4000/admin/config/max-active-containers
+```
+
+Verify host memory and CPU before raising the cap further — see
+[Capacity](./capacity.md) for sizing guidance.

@@ -1,0 +1,338 @@
+---
+sidebar_position: 4
+title: Google Cloud Deployment
+---
+
+# Google Cloud Deployment
+
+A single Google Compute Engine VM, provisioned by Terraform, fronted by Caddy
+for automatic HTTPS on your own domain. Releases ship through a GitHub Actions
+workflow — no manual SSH after the one-time bootstrap.
+
+Everything in this guide is driven by the Terraform config and workflow in this
+repo. The primary source of truth is
+[`deploy/README.md`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/README.md).
+The Terraform files are in
+[`deploy/terraform/`](https://github.com/mathewdunne/CodeRunner/tree/main/deploy/terraform).
+
+## What gets provisioned
+
+- One `c4-standard-4` VM (4 vCPU / 15 GiB) in `us-central1-a` by default
+- A 50 GB `hyperdisk-balanced` boot disk and a 50 GB `hyperdisk-balanced` data
+  disk mounted at `/var/lib/coderunner/data` (SQLite + student project files)
+- The data disk is `prevent_destroy = true` — it survives VM recreation
+- Daily snapshots of the data disk with 7-day retention
+- A reserved static IPv4 address
+- Caddy (auto-TLS via Let's Encrypt) in front of the control plane on port 4000
+- Grafana Alloy scraping `/metrics` and shipping to Grafana Cloud
+- Workload Identity Federation so GitHub Actions deploys without long-lived keys
+
+C4 machines require Hyperdisk volumes — `pd-*` disk types are not compatible.
+
+## Prerequisites
+
+- A GCP project with billing enabled and the `gcloud` CLI authenticated
+- Terraform 1.6+
+- A domain name where you can add DNS records
+- OAuth credentials for at least one provider — register them first and note the
+  client ID and secret; see [OAuth Credentials](./oauth-credentials.md)
+
+## One-time bootstrap
+
+Run these steps once. After the bootstrap, releases ship via GitHub Actions.
+
+### 1. Create and configure the GCP project
+
+```bash
+export PROJECT_ID=your-coderunner-project   # pick a unique ID
+gcloud projects create $PROJECT_ID --name="CodeRunner"
+gcloud billing projects link $PROJECT_ID --billing-account=<YOUR_BILLING_ID>
+gcloud config set project $PROJECT_ID
+
+gcloud services enable \
+  compute.googleapis.com \
+  secretmanager.googleapis.com \
+  iamcredentials.googleapis.com \
+  sts.googleapis.com \
+  iap.googleapis.com
+```
+
+### 2. Create the Terraform state bucket
+
+```bash
+gcloud storage buckets create gs://$PROJECT_ID-tf-state \
+  --location=us-central1 --uniform-bucket-level-access
+gcloud storage buckets update gs://$PROJECT_ID-tf-state --versioning
+```
+
+### 3. Configure Terraform variables
+
+```bash
+cd deploy/terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars`. The variables you must set are:
+
+| Variable | Description |
+| --- | --- |
+| `project_id` | Your GCP project ID |
+| `domain` | The public hostname students visit (e.g. `coderunner.example.com`) |
+| `github_repo` | `owner/repo` of your fork — must match the repo you push tags from |
+| `ssh_break_glass_cidr` | Your home IP in CIDR notation (e.g. `203.0.113.42/32`) for emergency SSH |
+
+Optional variables with sensible defaults:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `region` | `us-central1` | GCP region |
+| `zone` | `us-central1-a` | GCP zone |
+| `machine_type` | `c4-standard-4` | 4 vCPU / 15 GiB |
+| `network_tier` | `STANDARD` | Lower egress cost for a single-region classroom app |
+| `boot_disk_size_gb` | `50` | OS boot disk size |
+| `data_disk_size_gb` | `50` | Data disk for SQLite + student projects |
+| `instance_label` | `coderunner` | Prometheus `instance` label in Grafana |
+
+See [`deploy/terraform/variables.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/variables.tf)
+for the full list.
+
+### 4. Apply Terraform
+
+```bash
+terraform init -backend-config="bucket=$PROJECT_ID-tf-state"
+terraform apply
+```
+
+Note the outputs — you will need `static_ip`, `workload_identity_provider`, and
+`deployer_service_account` in later steps.
+
+### 5. Populate Secret Manager
+
+Terraform creates the Secret Manager containers but leaves them empty. Populate
+them now. Generate strong random values for the first three:
+
+```bash
+# Generated secrets
+gcloud secrets versions add coderunner-better-auth-secret \
+  --data-file=<(openssl rand -hex 32)
+gcloud secrets versions add coderunner-metrics-token \
+  --data-file=<(openssl rand -hex 32)
+gcloud secrets versions add coderunner-admin-token \
+  --data-file=<(openssl rand -hex 32)
+
+# OAuth credentials (register apps at the provider first — see ./oauth-credentials.md)
+# Use the real domain in the callback URLs: https://<your-domain>/api/auth/callback/github
+echo -n '<your-github-client-id>'     | gcloud secrets versions add coderunner-github-client-id --data-file=-
+echo -n '<your-github-client-secret>' | gcloud secrets versions add coderunner-github-client-secret --data-file=-
+echo -n '<your-google-client-id>'     | gcloud secrets versions add coderunner-google-client-id --data-file=-
+echo -n '<your-google-client-secret>' | gcloud secrets versions add coderunner-google-client-secret --data-file=-
+
+# Grafana Cloud (create a free stack at grafana.com)
+echo -n 'https://prometheus-prod-XX-prod-us-central-0.grafana.net/api/prom/push' \
+  | gcloud secrets versions add coderunner-grafana-cloud-url --data-file=-
+echo -n '<numeric-prometheus-instance-id>' \
+  | gcloud secrets versions add coderunner-grafana-cloud-user --data-file=-
+echo -n '<glc_eyJ...-access-policy-token>' \
+  | gcloud secrets versions add coderunner-grafana-cloud-token --data-file=-
+echo -n 'https://logs-prod-XXX.grafana.net/loki/api/v1/push' \
+  | gcloud secrets versions add coderunner-grafana-cloud-loki-url --data-file=-
+echo -n '<numeric-loki-instance-id>' \
+  | gcloud secrets versions add coderunner-grafana-cloud-loki-user --data-file=-
+```
+
+The exact secret names (all prefixed `coderunner-`) are defined in
+[`deploy/terraform/secrets.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/secrets.tf).
+The `render-env.sh` script on the VM reads every one of them at boot — if any
+are missing the service will not start.
+
+**Finding Grafana Cloud values:** in the Grafana Cloud portal open your stack.
+The Prometheus remote-write URL and numeric username are on the
+Prometheus/Metrics card's Details page. The Loki push URL and its separate
+numeric instance ID are on the Loki/Logs Details page. For the token, create a
+Cloud Access Policy token with both `metrics:write` and `logs:write` scopes —
+one token covers both pipelines.
+
+### 6. Add a DNS A record
+
+At your registrar, create an A record pointing your domain at the static IP:
+
+```
+<your-domain>  A  <terraform output -raw static_ip>
+```
+
+### 7. Reset the VM to render config
+
+The VM booted before secrets existed, so `.env` is empty. A VM reset triggers
+the startup script, which calls `render-env.sh` and restarts services:
+
+```bash
+gcloud compute instances reset coderunner --zone=us-central1-a
+```
+
+After about 30 seconds, verify TLS is working:
+
+```bash
+curl -I https://<your-domain>/healthz
+```
+
+You should get an HTTP 200 with a valid Let's Encrypt certificate.
+
+### 8. Configure GitHub Actions
+
+Under **Settings → Secrets and variables → Actions → Variables** in your GitHub
+repo, set:
+
+| Variable | Value | Required |
+| --- | --- | --- |
+| `GCP_PROJECT` | Your `project_id` from `terraform.tfvars` | Yes |
+| `GCP_DEPLOY_SA` | `terraform output -raw deployer_service_account` | Yes |
+| `GCP_WIF_PROVIDER` | `terraform output -raw workload_identity_provider` | Yes |
+| `GCP_ZONE` | Your `zone` from `terraform.tfvars` | No (defaults to `us-central1-a`) |
+| `GCP_VM_NAME` | `terraform output -raw vm_name` | No (defaults to `coderunner`) |
+
+No GitHub *secrets* are needed — Workload Identity Federation replaces
+long-lived service account keys.
+
+### 9. Deploy for the first time
+
+After `terraform apply` the web assets are not yet on the VM (`apps/web/dist`
+is empty; `/` returns 404 until the first deploy). Run the workflow against a
+valid release tag to populate them:
+
+```bash
+gh workflow run "Deploy to GCE" --ref main -f tag=v2.0.0
+```
+
+### 10. Promote yourself to admin
+
+The first user to sign in is a regular user. After signing in once, promote
+yourself via IAP SSH:
+
+```bash
+gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
+  --command='cd /opt/coderunner/app && sudo -u coderunner bun run users:promote <your-email>'
+```
+
+You also need to allowlist emails before anyone can sign in. Do this from the
+same IAP SSH session or run it locally if the DB is accessible:
+
+```bash
+bun run allowlist:add coach@frcteam.org
+```
+
+See [OAuth Credentials](./oauth-credentials.md) for the full allowlist and admin
+bootstrap flow.
+
+## Runtime shape on the VM
+
+Once bootstrapped, the VM runs three systemd services:
+
+- **`coderunner`** — the Bun control plane, reading
+  `/opt/coderunner/.env` for all configuration
+- **`caddy`** — terminates TLS for `<your-domain>` and `origin.<your-domain>`,
+  reverse-proxies to `localhost:4000`
+- **`alloy`** — scrapes `/metrics` and ships to Grafana Cloud
+
+`render-env.sh` runs on every boot (via `metadata_startup_script`) to
+re-materialize `/opt/coderunner/.env` from Secret Manager. Hand-edits to `.env`
+on the VM do not survive a reboot.
+
+For monitoring details — Prometheus metrics, Loki log shipping, and Grafana
+dashboards — see [Monitoring](../operating/monitoring.md).
+
+## Releasing
+
+Create a semver tag on a commit reachable from `main`, then dispatch the
+workflow:
+
+```bash
+gh workflow run "Deploy to GCE" --ref main -f tag=v2.4.0
+```
+
+The **Deploy to GCE** workflow (defined in `.github/workflows/deploy.yml`):
+
+1. Validates the tag format and that it is reachable from `main`
+2. Runs `bun run verify` (Biome, typecheck, unit tests, E2E)
+3. Builds and pushes `ghcr.io/<owner>/coderunner-workspace:<tag>` and `:latest`
+   to GHCR
+4. Builds the web shell and AdvantageScope Lite, uploads
+   `web-dist.tar.gz` + `ascope-dist.tar.gz` to the GitHub Release
+5. SSHes into the VM via IAP, checks out the tag, runs `bun install`, fetches
+   the prebuilt tarballs, pulls the workspace image, removes managed workspace
+   containers (student data is preserved — only containers are removed), and
+   starts `coderunner`
+6. Polls `/healthz` until the service is healthy
+
+Nothing is built on the VM — emsdk and Node are not installed there.
+
+Migrations apply automatically because `bun run start` runs
+`bun run migrate` first (see `package.json`).
+
+## Changing env vars
+
+The VM's `.env` is regenerated on every boot from `render-env.sh`. Changes fall
+into three buckets:
+
+**A. Secrets already wired to Secret Manager** (`BETTER_AUTH_SECRET`,
+`GITHUB_CLIENT_*`, `GOOGLE_CLIENT_*`, `ADMIN_TOKEN`, `METRICS_TOKEN`, Grafana
+Cloud values): update the secret version, then re-render:
+
+```bash
+printf '<new-value>' | gcloud secrets versions add coderunner-<name> --data-file=-
+gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
+  --command="sudo /opt/coderunner/render-env.sh && sudo systemctl restart coderunner alloy"
+```
+
+**B. Non-secret defaults in the template** (`PORT`, `LOG_LEVEL`, `CODE_IMAGE`,
+`CODE_MEMORY_LIMIT`, `IDLE_STOP_MINUTES`, etc.): edit the relevant `echo` line
+in the `render-env.sh` block inside
+[`deploy/cloud-init/user-data.yaml`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/cloud-init/user-data.yaml),
+commit, then on the VM:
+
+```bash
+sudo /opt/coderunner/render-env.sh && sudo systemctl restart coderunner
+```
+
+Note that `render-env.sh` on the VM is a frozen copy from first boot. The
+template in `user-data.yaml` is the canonical source; edits there only reach
+the live VM after you copy the updated script to the VM manually, or after the
+VM is recreated by Terraform.
+
+**C. New variables not yet in the template**: add a new `echo "VAR=value"` line
+in the same block in `user-data.yaml`. If the value is a secret, also add a
+`fetch` call near the top of `render-env.sh` and reference the shell variable.
+Follow the existing pattern for `BETTER_AUTH_SECRET`.
+
+## Rollback
+
+Redeploy an earlier tag:
+
+```bash
+gh workflow run "Deploy to GCE" --ref main -f tag=v2.3.0
+```
+
+Or use the GitHub Actions UI: **Deploy to GCE → Run workflow → enter the
+previous tag**.
+
+## Verification checklist
+
+| Check | How |
+| --- | --- |
+| Cloud-init finished | `gcloud compute instances get-serial-port-output coderunner \| grep "bootstrap complete"` |
+| TLS and healthz | `curl -I https://<your-domain>/healthz` returns 200 |
+| Control plane logs | `journalctl -u coderunner -n 50` via IAP SSH |
+| Workspace image present | `docker images \| grep coderunner-workspace` via IAP SSH |
+| Metrics in Grafana | In Grafana Cloud Explore: `up{instance="coderunner"}` — expect three series, all `1` |
+
+## Cost and sizing
+
+The default `c4-standard-4` with two 50 GB `hyperdisk-balanced` disks runs to a
+modest always-on cost (low tens of US dollars per month). Each active student
+uses roughly 2.5 GB RAM at the default `CODE_MEMORY_LIMIT=3200m` set by
+`render-env.sh` in production. To scale up, set
+`machine_type = "c4-standard-8"` or larger in `terraform.tfvars` and run
+`terraform apply`.
+
+To take the deployment to near-zero cost between seasons (snapshot the data
+disk, stop the VM), follow the
+[Seasonal Teardown](../operating/seasonal-teardown.md) runbook.
