@@ -13,9 +13,11 @@ const config: Config = {
     v4: true,
   },
 
-  // Deployed to GitHub Pages as a project site at
-  // https://mathewdunne.github.io/CodeRunner/ (see .github/workflows/deploy-docs.yml).
-  url: 'https://mathewdunne.github.io',
+  // Deployed to GitHub Pages (see .github/workflows/deploy-docs.yml). The repo
+  // owner's user-site custom domain (mathewdunne.ca) makes GitHub redirect every
+  // project site from mathewdunne.github.io/CodeRunner/ to mathewdunne.ca/CodeRunner/,
+  // so that redirect target is the canonical URL.
+  url: 'https://mathewdunne.ca',
   baseUrl: '/CodeRunner/',
 
   // GitHub Pages deployment config (used by `docusaurus deploy` and for metadata).
@@ -64,7 +66,7 @@ const config: Config = {
       title: 'CodeRunner',
       logo: {
         alt: 'CodeRunner logo',
-        src: 'img/coderunner-icon.png',
+        src: 'img/coderunner-header.png',
       },
       items: [
         {
