@@ -5,4 +5,242 @@ title: Day-to-Day Operations
 
 # Day-to-Day Operations
 
-(content coming)
+This page covers the routine tasks a mentor performs during an active season:
+starting and stopping the app, managing who can sign in, and keeping an eye on
+what the system is doing.
+
+## Starting and stopping
+
+### Local deployment
+
+Start the control plane from the repo root:
+
+```bash
+bun run start
+```
+
+This applies any pending database migrations and then serves the control plane.
+Students connect to `http://<host-ip>:4000/` in their browsers. Stop with
+`Ctrl+C`. The student workspace containers keep running after the control plane
+stops and are reconciled automatically when it starts again.
+
+### Google Cloud VM deployment
+
+On the cloud VM the control plane runs as a systemd service named
+`coderunner.service`. Standard systemd commands apply:
+
+```bash
+sudo systemctl start coderunner
+sudo systemctl stop coderunner
+sudo systemctl restart coderunner
+sudo systemctl status coderunner
+```
+
+The service is configured to start automatically on boot and to restart on
+failure.
+
+### Stopping workspace containers
+
+Containers are not stopped when the control plane stops. To stop all running
+student workspace containers:
+
+```bash
+# Stop and remove only stopped/exited managed containers
+bun run docker:cleanup
+
+# Force-stop all currently running managed containers
+docker stop $(docker ps -q --filter label=frc-sim.managed=true)
+```
+
+You can also stop a single workspace's container via the admin API (see
+[Admin API break-glass](#admin-api-break-glass) below).
+
+### Between sessions
+
+You do not need to stop containers manually between class sessions. The idle
+sweep stops containers automatically after students have been inactive for the
+configured timeout. The default is 30 minutes (`IDLE_STOP_MINUTES`); the cloud
+VM deployment uses 10 minutes. Containers are reconciled on the next session
+without any student-visible data loss.
+
+---
+
+## Managing who can sign in
+
+Access is controlled by an allowlist of email addresses and domains. Sign-in
+is via OAuth (GitHub and/or Google), but only emails that match the allowlist
+are permitted through. An empty allowlist blocks everyone.
+
+### Viewing the allowlist
+
+```bash
+bun run allowlist:list
+```
+
+### Adding an entry
+
+Pass an individual email address or a whole domain. The script auto-detects
+which kind you mean based on whether the value contains an `@`:
+
+```bash
+# Allow a specific person
+bun run allowlist:add coach@frcteam.org
+
+# Allow everyone at a domain (useful for team Google Workspace accounts)
+bun run allowlist:add frcteam.org
+```
+
+### Removing an entry
+
+```bash
+bun run allowlist:remove old-member@frcteam.org
+bun run allowlist:remove frcteam.org
+```
+
+Changes take effect immediately — the running control plane watches
+`data/allowlist.json` and picks up edits without a restart.
+
+---
+
+## Managing user roles
+
+After a coach or mentor signs in for the first time they are a regular user.
+Promote them to admin so they can access the admin panel and use the admin API:
+
+```bash
+# List all users (shows ID, name, email, role, workspace slug)
+bun run users:list
+
+# Grant admin role (the user must already exist in the DB)
+bun run users:promote coach@frcteam.org
+
+# Remove admin role
+bun run users:demote coach@frcteam.org
+```
+
+Admins can also promote and demote users from the admin panel in the browser.
+The system prevents demoting the last remaining admin.
+
+---
+
+## Container concurrency cap
+
+The system limits how many workspace containers can run simultaneously to
+prevent the host from being overloaded when many students sign in at once. The
+default cap is **10** (`MAX_ACTIVE_CONTAINERS`).
+
+When a student tries to open their workspace and the cap has been reached, they
+see a toast: "Server at capacity — try again in a moment." Students with
+already-running containers are unaffected.
+
+### Checking and adjusting the cap at runtime
+
+You can read and change the cap without restarting the control plane:
+
+```bash
+# Read current effective cap
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://localhost:4000/admin/config/max-active-containers
+
+# Set cap to 15
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"value": 15}' \
+  http://localhost:4000/admin/config/max-active-containers
+```
+
+The runtime override is stored in the database and takes precedence over the
+environment variable until changed again. The admin panel also shows the current
+cap and active container count with an inline editor.
+
+---
+
+## Audit log
+
+All admin actions — promoting users, stopping containers, modifying the
+allowlist, changing the concurrency cap — are recorded in the audit log.
+
+### What is logged
+
+| Action | Trigger |
+|---|---|
+| `user.promote` | Promoting a user to admin |
+| `user.demote` | Demoting an admin |
+| `user.delete` | Deleting a user and their workspace |
+| `container.stop` | Stopping a workspace's containers |
+| `container.restart-code` | Restarting a workspace's code container |
+| `workspace.backup` | Creating an operator workspace backup |
+| `workspace.restore` | Restoring a workspace from a backup |
+| `allowlist.add` | Adding an email/domain to the allowlist |
+| `allowlist.remove` | Removing an email/domain from the allowlist |
+| `config.max-active-containers` | Changing the container concurrency cap |
+
+Each entry records the timestamp, the acting user (ID and email), the action,
+the target (kind and ID), and optional metadata.
+
+### Viewing the audit log
+
+The admin panel has an "Audit Log" tab with filters by actor, action, and time
+range.
+
+Via the API:
+
+```bash
+# Latest entries
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://localhost:4000/admin/audit-log
+
+# Filter by action prefix
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:4000/admin/audit-log?action=user&limit=50"
+
+# Filter by actor email (substring match)
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:4000/admin/audit-log?actor=coach"
+
+# Paginate using the smallest id from the previous page as cursor
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:4000/admin/audit-log?before=42&limit=25"
+```
+
+### Pruning old entries
+
+Audit entries accumulate indefinitely. Prune them periodically:
+
+```bash
+# Remove all entries before a date
+bun run audit:prune -- --before 2026-01-01
+
+# Preview without deleting
+bun run audit:prune -- --before 2026-01-01 --dry-run
+```
+
+Running this monthly is a reasonable cadence for a classroom deployment.
+
+---
+
+## Admin API break-glass
+
+If `ADMIN_TOKEN` is set in your environment, you can call admin endpoints
+directly with a bearer token — useful for scripting and for bootstrapping
+before the first admin user has signed in.
+
+```bash
+# Overall system status: workspaces, container states, active builds
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://localhost:4000/admin/status | jq .
+
+# Stop one workspace's containers
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -X POST \
+  http://localhost:4000/admin/workspaces/<workspaceId>/stop-containers
+
+# Restart one workspace's code container
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -X POST \
+  http://localhost:4000/admin/workspaces/<workspaceId>/restart-code
+```
+
+If `ADMIN_TOKEN` is not set, admin endpoints require a signed-in admin session
+cookie. The token is optional and intended as a break-glass mechanism, not as
+the primary admin interface.
