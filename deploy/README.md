@@ -212,6 +212,8 @@ Or via the GitHub Actions UI: *Deploy to GCE* → *Run workflow* → enter the p
 | Disaster recovery | `terraform destroy -target=google_compute_instance.coderunner` then `terraform apply` — site comes back up; data disk is `prevent_destroy=true` |
 
 > **Teardown note:** `prevent_destroy = true` on `google_compute_disk.data` means a plain `terraform destroy` will error. To fully tear down (e.g. a throwaway test project): temporarily set `prevent_destroy = false` in `deploy/terraform/disk.tf`, `terraform apply` (no-op other than the lifecycle change), then `terraform destroy`. Production should leave the guard on.
+>
+> **Off-season teardown:** to take a live deployment down to near-zero cost over a break (snapshot the data disk, delete the disks + VM, restore in the fall), follow [`SEASONAL-TEARDOWN.md`](./SEASONAL-TEARDOWN.md) instead — it preserves student data via a manual snapshot.
 
 ## Sizing reference
 
@@ -352,6 +354,8 @@ Same as GCE — redeploy an older tag. Both jobs run from the same tag.
 ```
 deploy/
 ├── README.md                    # This file
+├── SEASONAL-TEARDOWN.md         # Off-season teardown to near-zero cost +
+│                                # snapshot-based fall restore
 ├── cloudflare/
 │   ├── wrangler.toml            # CF Pages config;
 │   └── functions/
