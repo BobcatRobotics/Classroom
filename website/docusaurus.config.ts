@@ -41,14 +41,6 @@ const config: Config = {
           // Decision logs are maintainer/agent records, not site content.
           exclude: [
             'decisions/**',
-            // TODO(docs-migration): legacy docs pending distill-and-delete;
-            // remove these entries once they are gone.
-            'plan/**',
-            'archive/**',
-            'V1-Design.md',
-            'V2-Design.md',
-            'runbook.md',
-            'manual-tests.md',
           ],
           editUrl: 'https://github.com/mathewdunne/CodeRunner/tree/main/docs/',
         },

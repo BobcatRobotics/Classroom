@@ -18,7 +18,7 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 Clone the repository and fetch its submodules:
 
 ```bash
-git clone <owner>/<repo> coderunner
+git clone https://github.com/mathewdunne/CodeRunner coderunner
 cd coderunner
 git submodule update --init --recursive
 ```
