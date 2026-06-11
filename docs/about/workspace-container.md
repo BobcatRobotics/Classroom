@@ -5,7 +5,7 @@ title: The Workspace Container
 
 # The Workspace Container
 
-Each student gets their own Docker container — one per workspace, started on
+Each student gets their own Docker container: one per workspace, started on
 demand when they open the IDE, stopped automatically when they have been idle
 for a configurable period. This page explains what is inside that container and
 how the control plane manages it.
@@ -75,7 +75,7 @@ the container being stopped, restarted, or recreated. See
 ## Container ports
 
 Three ports are published inside the container and bound on the **host loopback
-interface** (`127.0.0.1`) only — never on a public network interface:
+interface** (`127.0.0.1`) only, never on a public network interface:
 
 | Container port | Purpose |
 |---|---|
@@ -86,7 +86,7 @@ interface** (`127.0.0.1`) only — never on a public network interface:
 The control plane allocates host-side port numbers from configurable ranges
 (defaults: `33000–33099` for the editor, `25810–25899` for NT4,
 `34000–34099` for HALSim) and records the assignments in its SQLite database.
-The browser never connects to these ports directly — all traffic is proxied
+The browser never connects to these ports directly; all traffic is proxied
 through the control plane's single public port.
 
 ## Container labels
@@ -128,7 +128,7 @@ The control plane's idle manager checks every 60 seconds (configurable via
 `IDLE_CHECK_INTERVAL_MS`) and stops containers whose workspace has not received
 a heartbeat within the idle window. The default idle window is **30 minutes**,
 controlled by the `IDLE_STOP_MINUTES` environment variable. Stopped containers
-are not removed — they are restarted the next time the student opens their
+are not removed; they are restarted the next time the student opens their
 workspace.
 
 ## Capacity limit

@@ -28,20 +28,20 @@ telemetry build (`bun run build:ascope`) depends on.
 
 A one-line map of the top-level directories you'll touch most:
 
-- `apps/control/` — Bun control plane: HTTP, WebSocket, sessions, container orchestration, the editor/run/telemetry proxies.
-- `apps/web/` — React + Vite browser IDE shell.
-- `packages/contracts/` — shared API schemas, message types, and path rules consumed by both sides.
-- `containers/code/` — the merged openvscode-server + simulator Docker image (see [Workspace Image](./workspace-image.md)).
-- `catalog/` — bundled, zero-config lesson catalog baked into the workspace image.
-- `e2e/` — Playwright end-to-end tests and fixtures.
-- `scripts/` — TypeScript utility scripts run by Bun (build, backup, cleanup, user admin).
-- `docs/` — this documentation site.
+- `apps/control/`: Bun control plane (HTTP, WebSocket, sessions, container orchestration, the editor/run/telemetry proxies).
+- `apps/web/`: React + Vite browser IDE shell.
+- `packages/contracts/`: shared API schemas, message types, and path rules consumed by both sides.
+- `containers/code/`: the merged openvscode-server + simulator Docker image (see [Workspace Image](./workspace-image.md)).
+- `catalog/`: bundled, zero-config lesson catalog baked into the workspace image.
+- `e2e/`: Playwright end-to-end tests and fixtures.
+- `scripts/`: TypeScript utility scripts run by Bun (build, backup, cleanup, user admin).
+- `docs/`: this documentation site.
 
 ## The two dev servers
 
 You'll usually run both at once, in separate terminals.
 
-### Control plane — `bun run dev:control`
+### Control plane: `bun run dev:control`
 
 ```bash
 bun run dev:control
@@ -65,7 +65,7 @@ bun run dev:control -- --demo
 The `--demo` flag (or the `CODERUNNER_DEMO_MODE` env var) is read at startup. Do
 not enable it for anything reachable by real students.
 
-### Web shell — `bun run dev:web`
+### Web shell: `bun run dev:web`
 
 ```bash
 bun run dev:web
@@ -73,7 +73,7 @@ bun run dev:web
 
 This starts the Vite dev server on **port 5173** with hot module replacement.
 Vite proxies API, health, metrics, AdvantageScope, admin, and per-user
-(`/u/<id>/…`) traffic — including WebSocket upgrades — to the control plane at
+(`/u/<id>/…`) traffic, including WebSocket upgrades, to the control plane at
 `http://localhost:4000`. The proxy config lives in `apps/web/vite.config.ts`, so
 front-end changes hot-reload at `http://localhost:5173` while every backend call
 is forwarded to `dev:control`. Run both servers together for the full HMR loop.
@@ -98,7 +98,7 @@ migration. Migrations target the configured `dbPath` (under `data/` by default).
 
 Formatting, linting, and import organization are handled by [Biome](https://biomejs.dev).
 
-Run this before finalizing any code change — it applies Biome's safe lint fixes,
+Run this before finalizing any code change; it applies Biome's safe lint fixes,
 formatting, and import organization in one pass:
 
 ```bash

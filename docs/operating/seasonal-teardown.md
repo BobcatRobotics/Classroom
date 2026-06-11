@@ -7,13 +7,13 @@ title: Seasonal Teardown
 
 This page covers how to take the Google Cloud VM deployment down to near-zero
 cost over the off-season (for example, summer break) and how to bring it back
-in the fall. This is the "we are done meeting for the year" procedure — it is
+in the fall. This is the "we are done meeting for the year" procedure; it is
 distinct from a throwaway `terraform destroy`.
 
 The guiding principle is that **the boot disk is disposable and the data disk
 is precious.** The boot disk is just Ubuntu plus cloud-init plus a Docker image
 pull, fully rebuilt by `terraform apply`. The data disk holds the SQLite
-database and every student's project files — it must be captured in a manual
+database and every student's project files; it must be captured in a manual
 snapshot before deletion.
 
 :::note Local deployments
@@ -30,12 +30,12 @@ A `TERMINATED` VM still bills for attached disks and reserved addresses:
 |---|---|---|
 | Boot disk (50 GB hyperdisk-balanced) | Yes | ~$5/mo |
 | Data disk (50 GB hyperdisk-balanced) | Yes | ~$5/mo |
-| Reserved static IP (`google_compute_address.coderunner`) | Yes — reserved IPv4 bills even when unattached | ~$3/mo |
+| Reserved static IP (`google_compute_address.coderunner`) | Yes; reserved IPv4 bills even when unattached | ~$3/mo |
 | Daily auto-snapshots (7-day retention) | Yes, tiny | &lt;$1/mo |
-| VM compute, network, subnet, firewall, IAM, secrets | No / ~$0 | — |
+| VM compute, network, subnet, firewall, IAM, secrets | No / ~$0 | n/a |
 
 Leaving the VM stopped costs roughly **$13/mo**. Full teardown reduces that to
-under **~$1/mo** — just the manual snapshot billed on used data.
+under **~$1/mo**, just the manual snapshot billed on used data.
 
 To stop paying for the boot disk you must delete the VM. The boot disk is
 created inside `initialize_params` in `vm.tf`, so it cannot exist without the
@@ -44,13 +44,13 @@ instance.
 ## Teardown
 
 Use `gcloud`, not `terraform destroy`. The data disk has `prevent_destroy = true`
-in `disk.tf` — that is a deliberate guard against destroying student data.
+in `disk.tf`; that is a deliberate guard against destroying student data.
 It only blocks Terraform; `gcloud` commands are not affected.
 
 ### Step 1. Take a manual snapshot of the data disk
 
 The daily auto-snapshots have 7-day retention (`max_retention_days = 7`) and
-will expire long before fall. Do not rely on them. Take a manual snapshot now —
+will expire long before fall. Do not rely on them. Take a manual snapshot now;
 manual snapshots never auto-expire:
 
 ```bash
@@ -92,10 +92,10 @@ gcloud compute disks delete coderunner-data --zone=northamerica-northeast2-a
 
 A reserved static IPv4 costs roughly $3/mo even when nothing is attached.
 
-**Keep it** — do nothing. The DNS A record stays valid and fall startup needs
+**Keep it**: do nothing. The DNS A record stays valid and fall startup needs
 no DNS change.
 
-**Release it** — saves that cost, but you get a new IP in the fall and must
+**Release it**: saves that cost, but you get a new IP in the fall and must
 update the DNS A record (`coderunner.wiredcats5885.ca` → new IP) and wait for
 propagation before TLS and OAuth callbacks work.
 
@@ -106,13 +106,13 @@ gcloud compute addresses delete coderunner --region=northamerica-northeast2
 
 ### What remains after teardown (~$0)
 
-- The manual snapshot — billed on used data only (roughly 7 GB → cents/mo).
-- Secret Manager (pennies), network, subnet, firewall, IAM,
-  Cloudflare Pages — free or negligible. The snapshot resource policy stays but
-  does nothing with no disk attached.
+- The manual snapshot, billed on used data only (roughly 7 GB → cents/mo).
+- Secret Manager (pennies), network, subnet, firewall, IAM, and
+  Cloudflare Pages, all free or negligible. The snapshot resource policy stays
+  but does nothing with no disk attached.
 
 **Terraform state note.** Deleting via `gcloud` leaves Terraform state showing
-a VM and data disk that no longer exist. That is fine — the fall `terraform apply`
+a VM and data disk that no longer exist. That is fine; the fall `terraform apply`
 reconciles by recreating them. If you prefer truthful state in the meantime:
 
 ```bash
@@ -155,12 +155,12 @@ terraform apply
 
 This recreates everything:
 
-- **Data disk** — created from the snapshot, restoring the DB and all student
-  projects — at the baseline 3000 IOPS / 140 MiB/s pinned in the config.
-- **VM and boot disk** — rebuilt from the Ubuntu image; cloud-init
+- **Data disk**: created from the snapshot, restoring the DB and all student
+  projects, at the baseline 3000 IOPS / 140 MiB/s pinned in the config.
+- **VM and boot disk**: rebuilt from the Ubuntu image; cloud-init
   re-bootstraps, pulls the workspace image from GHCR, and re-renders `.env`
   from Secret Manager.
-- **Static IP** — re-attached if kept, or freshly allocated if released.
+- **Static IP**: re-attached if kept, or freshly allocated if released.
 
 ### Step 3. If you released the static IP
 
@@ -170,7 +170,7 @@ TLS or OAuth callbacks.
 
 ### Step 4. Deploy a release
 
-A freshly rebuilt VM has an empty `apps/web/dist` until the first deploy —
+A freshly rebuilt VM has an empty `apps/web/dist` until the first deploy:
 `/` returns 404, though `/healthz` works. Run a deploy from `main` against your
 latest release tag:
 
@@ -197,10 +197,10 @@ gh workflow run "Deploy to GCE" --ref main -f tag=vX.Y.Z
 ## Summary
 
 1. Take a manual snapshot of `coderunner-data` (auto-snapshots expire in
-   7 days — do not rely on them).
+   7 days; do not rely on them).
 2. Verify snapshot is `READY`, then delete the VM (takes the boot disk with
    it), then delete the data disk.
-3. Keep or release the static IP — a DNS update trade-off.
+3. Keep or release the static IP (a DNS update trade-off).
 4. In the fall: add `snapshot =` to `disk.tf`, run `terraform apply`, deploy a
    release tag, verify end-to-end, then remove the snapshot line and delete the
    snapshot.

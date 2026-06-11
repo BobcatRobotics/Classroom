@@ -5,7 +5,7 @@ title: Local Deployment
 
 # Local Deployment
 
-Everything runs on one machine — a lab PC, a spare laptop, or a mini PC — and
+Everything runs on one machine (a lab PC, a spare laptop, or a mini PC) and
 students connect over the local network. This is the simplest path and requires
 no cloud account, domain name, or TLS certificate.
 
@@ -17,7 +17,7 @@ For a public URL with HTTPS, see [Google Cloud Deployment](./gcloud.md) instead.
 | --- | --- | --- |
 | **Bun** | 1.3.13+ | Latest stable |
 | **Docker Engine** | 24+ | Native Linux Docker |
-| **Git** | 2.x | — |
+| **Git** | 2.x | n/a |
 | **RAM** | 16 GB (3–5 students) | 32 GB (10 students) |
 | **CPU** | 4 cores | 6+ cores |
 | **Disk** | 20 GB free | 50+ GB free |
@@ -26,7 +26,7 @@ For a public URL with HTTPS, see [Google Cloud Deployment](./gcloud.md) instead.
 On Windows, use PowerShell 7 (`pwsh`) for all commands.
 
 You also need at least one OAuth provider configured before students can sign in.
-Register your GitHub or Google OAuth app first — see [OAuth Credentials](./oauth-credentials.md).
+Register your GitHub or Google OAuth app first; see [OAuth Credentials](./oauth-credentials.md).
 
 ## 1. Clone and set up the repo
 
@@ -62,7 +62,7 @@ GITHUB_CLIENT_SECRET=<your-github-client-secret>
 # GOOGLE_CLIENT_SECRET=<your-google-client-secret>
 ```
 
-`BETTER_AUTH_SECRET` defaults to a hardcoded dev placeholder — always change it
+`BETTER_AUTH_SECRET` defaults to a hardcoded dev placeholder; always change it
 in any non-demo deployment. `BETTER_AUTH_URL` defaults to
 `http://localhost:4000`, which works for single-machine use but must be updated
 to the LAN IP if students are on other devices (OAuth callbacks must match).

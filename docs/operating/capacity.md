@@ -14,8 +14,8 @@ consumption per active student:
 |---|---|---|
 | RAM | ~1.0–1.5 GB | ~1.5–2.5 GB |
 | CPU | minimal (idle) | 1–2 cores |
-| Disk — project files | ~50 MB | ~50 MB |
-| Disk — Gradle/editor caches | ~500 MB | ~500 MB |
+| Disk (project files) | ~50 MB | ~50 MB |
+| Disk (Gradle/editor caches) | ~500 MB | ~500 MB |
 
 Reserve roughly 4 GB for the OS, Docker daemon, and browser overhead on the
 host itself.
@@ -53,7 +53,7 @@ are next restarted.
 | 10+ | 48+ GB | 8+ cores | 80 GB | Large classroom; increase `CODE_MEMORY_LIMIT` and cap |
 
 The Google Cloud default VM is a `c4-standard-4` (4 vCPU / 15 GB RAM) with a
-50 GB data disk — sized for a small-to-medium classroom. Verify the current
+50 GB data disk, sized for a small-to-medium classroom. Verify the current
 machine type in
 [`deploy/terraform/vm.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/vm.tf).
 
@@ -61,10 +61,10 @@ machine type in
 
 `MAX_ACTIVE_CONTAINERS` (default: `10`) is an admission-control gate: when a
 student tries to open their workspace and the cap is already reached, the server
-returns HTTP 503 and the browser shows "Server at capacity — try again in a
-moment." Students with already-running containers are not affected.
+returns HTTP 503 and the browser shows a "Server at capacity" toast. Students
+with already-running containers are not affected.
 
-The cap can be changed at runtime without a restart — see
+The cap can be changed at runtime without a restart; see
 [Day-to-Day Operations](./day-to-day.md#container-concurrency-cap).
 
 Set a conservative cap relative to available RAM. A rough rule: multiply
@@ -96,11 +96,11 @@ well-matched to actual student behaviour.
 
 Student caches grow over time. The main contributors are:
 
-- **Gradle cache** (`data/users/*/home/`) — grows per workspace as new
+- **Gradle cache** (`data/users/*/home/`): grows per workspace as new
   dependencies are downloaded. Typically reaches 300–500 MB per student after a
   few builds.
-- **Run logs** (`data/users/*/logs/`) — appended on every build and run.
-- **Docker layer cache** on the host — grows when you rebuild or update the
+- **Run logs** (`data/users/*/logs/`): appended on every build and run.
+- **Docker layer cache** on the host: grows when you rebuild or update the
   workspace image.
 
 ### Checking disk usage
@@ -153,5 +153,5 @@ docker system prune -f
 docker builder prune -f
 ```
 
-Never delete `data/users/*/project/` — that is the student's source code.
+Never delete `data/users/*/project/`; that is the student's source code.
 Back it up first if you are unsure (see [Backups](./backups.md)).

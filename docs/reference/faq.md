@@ -13,17 +13,17 @@ Each active student workspace uses approximately 2.5 GB of RAM at the default `C
 - **6–10 students:** 32 GB RAM, 6+ cores
 - **10+ students:** 48+ GB RAM, 8+ cores
 
-These are simultaneous-use numbers — if only half your team codes at once, you can size down accordingly. See [Capacity planning](../operating/capacity.md) for monitoring guidance and tuning tips.
+These are simultaneous-use numbers: if only half your team codes at once, you can size down accordingly. See [Capacity planning](../operating/capacity.md) for monitoring guidance and tuning tips.
 
 ### Can CodeRunner run offline or without internet?
 
-After initial setup it mostly can. The bundled lesson catalog (baked into the workspace Docker image at `/opt/frc-catalog`) and the Gradle/WPILib dependency cache (primed during the image build) are all local — students can open lessons, edit code, and run simulations without any network access.
+After initial setup it mostly can. The bundled lesson catalog (baked into the workspace Docker image at `/opt/frc-catalog`) and the Gradle/WPILib dependency cache (primed during the image build) are all local, so students can open lessons, edit code, and run simulations without any network access.
 
 What does require internet: pulling the workspace Docker image for the first time (`bun run build` downloads several gigabytes), and OAuth sign-in. GitHub and Google OAuth redirect students to external servers to authenticate, so login does not work without internet. For a fully offline evaluation you can use demo mode (`--demo`), which bypasses authentication entirely.
 
 ### Can students accidentally break each other's work?
 
-No. Each student gets an isolated workspace container with their own openvscode-server instance and file system. Containers are namespaced — students cannot see or modify each other's files. The control plane routes each authenticated user only to their own container.
+No. Each student gets an isolated workspace container with their own openvscode-server instance and file system. Containers are namespaced; students cannot see or modify each other's files. The control plane routes each authenticated user only to their own container.
 
 ### Can students push code to GitHub?
 
@@ -35,17 +35,17 @@ The workspace image bundles **GradleRIO 2026.1.1** (the 2026 FRC season), Java *
 
 ### Do students need accounts? What if I just want to try it?
 
-For a real team deployment, students sign in with GitHub or Google — whichever OAuth provider you configure. You control who is allowed in via an email/domain allowlist. No accounts are created in advance; students sign in with their existing provider accounts, and their workspace is created automatically on first login.
+For a real team deployment, students sign in with GitHub or Google, whichever OAuth provider you configure. You control who is allowed in via an email/domain allowlist. No accounts are created in advance; students sign in with their existing provider accounts, and their workspace is created automatically on first login.
 
 For a solo evaluation or demo, run with the `--demo` flag (`bun run start -- --demo`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
 
 ### What happens to a student's work when they switch lessons?
 
-Switching to a different lesson or resetting a project intentionally discards the current workspace contents. This is by design — the lesson catalog is a learning tool, not a long-term storage model. For team projects where students need to preserve history, they should use a GitHub team import (which keeps `.git` and can push to the remote). For bundled lessons, the expectation is that completed exercises are pushed somewhere before switching. See [Lessons overview](../lessons/overview.md) for the full project-lifecycle explanation.
+Switching to a different lesson or resetting a project intentionally discards the current workspace contents. This is by design: the lesson catalog is a learning tool, not a long-term storage model. For team projects where students need to preserve history, they should use a GitHub team import (which keeps `.git` and can push to the remote). For bundled lessons, the expectation is that completed exercises are pushed somewhere before switching. See [Lessons overview](../lessons/overview.md) for the full project-lifecycle explanation.
 
 ### Is a Chromebook sufficient for students?
 
-Yes. All computation — Java compilation, Gradle builds, the WPILib simulator, and the VS Code editor (openvscode-server) — runs inside Docker containers on the CodeRunner server. The browser receives a proxied editor session over HTTP. A Chromebook, tablet with a keyboard, or any device with a modern browser is sufficient. No local Java or VS Code installation is required on the student's device.
+Yes. All computation (Java compilation, Gradle builds, the WPILib simulator, and the openvscode-server editor) runs inside Docker containers on the CodeRunner server. The browser receives a proxied editor session over HTTP. A Chromebook, tablet with a keyboard, or any device with a modern browser is sufficient. No local Java or VS Code installation is required on the student's device.
 
 ### Can I write my own lessons?
 
@@ -53,7 +53,7 @@ Yes. Lessons are Gradle WPILib projects with a small metadata file. You can auth
 
 ### How much does cloud hosting cost?
 
-The reference deployment uses a `c4-standard-4` VM (4 vCPU, 15 GB RAM) on Google Cloud with a 50 GB Hyperdisk data disk and daily snapshots. At us-central1 on-demand pricing that is roughly **$120–150/month** for the VM alone, plus a small amount for disk and snapshot storage. Grafana Cloud's free tier covers metrics and logs for a small deployment. Running the VM only during build season (a few months) and using the [seasonal teardown](../deploying/gcloud.md) procedure to snapshot and delete resources between seasons can bring the annual total well under $300. These are rough estimates — actual cost depends on region, committed-use discounts, and bandwidth.
+The reference deployment uses a `c4-standard-4` VM (4 vCPU, 15 GB RAM) on Google Cloud with a 50 GB Hyperdisk data disk and daily snapshots. At us-central1 on-demand pricing that is roughly **$120–150/month** for the VM alone, plus a small amount for disk and snapshot storage. Grafana Cloud's free tier covers metrics and logs for a small deployment. Running the VM only during build season (a few months) and using the [seasonal teardown](../deploying/gcloud.md) procedure to snapshot and delete resources between seasons can bring the annual total well under $300. These are rough estimates; actual cost depends on region, committed-use discounts, and bandwidth.
 
 ### Why is the first build or run slow?
 

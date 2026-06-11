@@ -5,13 +5,13 @@ title: Quick Start
 
 # Quick Start
 
-This is the fastest way to see CodeRunner running on your own machine. It uses **demo mode**, which skips all of the login and account setup so you can land directly in the editor and try things out. Demo mode is for evaluation only — see the caveats at the end before you put an instance in front of students.
+This is the fastest way to see CodeRunner running on your own machine. It uses **demo mode**, which skips all of the login and account setup so you can land directly in the editor and try things out. Demo mode is for evaluation only. See the caveats at the end before you put an instance in front of students.
 
 ## Prerequisites
 
 - **Bun 1.3.13 or newer.** CodeRunner's control plane and tooling run on Bun. Install it from [bun.sh](https://bun.sh).
 - **Docker**, up and running. Each workspace and the robot simulation run inside containers, so Docker is required even in demo mode.
-- **Git with submodule support.** AdvantageScope is pulled in as a Git submodule, so a plain ZIP download will not work — clone the repository.
+- **Git with submodule support.** AdvantageScope is pulled in as a Git submodule, so a plain ZIP download will not work. Clone the repository instead.
 
 ## Steps
 
@@ -59,7 +59,7 @@ Demo mode is enabled with the `--demo` flag (or by setting the environment varia
 
 When demo mode is on:
 
-- Authentication is bypassed entirely — there is no login screen.
+- Authentication is bypassed entirely, so there is no login screen.
 - Every visitor resolves to the **same** seeded admin user and shares **one** workspace.
 - The server prints a warning banner on startup, and the web UI shows a banner reminding you that you are in demo mode.
 
@@ -69,7 +69,7 @@ Because of that shared identity, demo mode has no privacy boundary between visit
 
 ## Where to go next
 
-Demo mode is a tour, not a deployment. To run CodeRunner for a real team — with individual student logins and isolated workspaces — you will set up an OAuth provider and configure who is allowed in:
+Demo mode is a tour, not a deployment. To run CodeRunner for a real team, with individual student logins and isolated workspaces, you will set up an OAuth provider and configure who is allowed in:
 
-- [Deploying overview](./deploying/overview.md) — the full path to a multi-user instance.
-- [OAuth credentials](./deploying/oauth-credentials.md) — registering GitHub and/or Google sign-in.
+- [Deploying overview](./deploying/overview.md): the full path to a multi-user instance.
+- [OAuth credentials](./deploying/oauth-credentials.md): registering GitHub and/or Google sign-in.

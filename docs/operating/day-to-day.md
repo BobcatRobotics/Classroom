@@ -97,7 +97,7 @@ bun run allowlist:remove old-member@frcteam.org
 bun run allowlist:remove frcteam.org
 ```
 
-Changes take effect immediately — the running control plane watches
+Changes take effect immediately; the running control plane watches
 `data/allowlist.json` and picks up edits without a restart.
 
 ---
@@ -130,8 +130,9 @@ prevent the host from being overloaded when many students sign in at once. The
 default cap is **10** (`MAX_ACTIVE_CONTAINERS`).
 
 When a student tries to open their workspace and the cap has been reached, they
-see a toast: "Server at capacity — try again in a moment." Students with
-already-running containers are unaffected.
+see a toast: "Server at capacity. Your coach has been notified. Please try
+again in a few minutes." Students with already-running containers are
+unaffected.
 
 ### Checking and adjusting the cap at runtime
 
@@ -157,8 +158,8 @@ cap and active container count with an inline editor.
 
 ## Audit log
 
-All admin actions — promoting users, stopping containers, modifying the
-allowlist, changing the concurrency cap — are recorded in the audit log.
+All admin actions (promoting users, stopping containers, modifying the
+allowlist, changing the concurrency cap) are recorded in the audit log.
 
 ### What is logged
 
@@ -222,8 +223,8 @@ Running this monthly is a reasonable cadence for a classroom deployment.
 ## Admin API break-glass
 
 If `ADMIN_TOKEN` is set in your environment, you can call admin endpoints
-directly with a bearer token — useful for scripting and for bootstrapping
-before the first admin user has signed in.
+directly with a bearer token. This is useful for scripting and for
+bootstrapping before the first admin user has signed in.
 
 ```bash
 # Overall system status: workspaces, container states, active builds

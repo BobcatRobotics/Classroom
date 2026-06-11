@@ -5,7 +5,7 @@ title: Configuration Reference
 
 # Configuration Reference
 
-CodeRunner is configured entirely through environment variables. Copy `.env.example` to `.env` in the repo root and edit only the values you need — the defaults are reasonable for local use. The control plane reads `.env` once at startup; restart the process to apply any changes.
+CodeRunner is configured entirely through environment variables. Copy `.env.example` to `.env` in the repo root and edit only the values you need; the defaults are reasonable for local use. The control plane reads `.env` once at startup; restart the process to apply any changes.
 
 ## Server
 
@@ -19,7 +19,7 @@ These rarely need changing in a standard deployment. Override them only if you n
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `FRC_DATA_DIR` | `data/` (repo root) | Runtime data root — SQLite database, student project files, allowlist, and backups all land here. |
+| `FRC_DATA_DIR` | `data/` (repo root) | Runtime data root: the SQLite database, student project files, allowlist, and backups all land here. |
 | `FRC_DB_PATH` | `{FRC_DATA_DIR}/app.db` | Path to the SQLite database file. Defaults to `app.db` inside `FRC_DATA_DIR`. |
 | `FRC_MIGRATIONS_DIR` | auto-detected from source | Path to DB migration files. Leave unset unless you are running a non-standard layout. |
 | `FRC_WEB_DIST_DIR` | `apps/web/dist` | Built React web shell assets. Must exist before starting; run `bun run build:web` first. |
@@ -27,11 +27,11 @@ These rarely need changing in a standard deployment. Override them only if you n
 
 ## Lessons Catalog
 
-CodeRunner has two catalog sources behind one interface. When `LESSONS_CATALOG_REPO` is not set the bundled `catalog/` directory (baked into the workspace image) is used — this works offline with no configuration. Set the repo variable to pull lessons from a remote public GitHub repository instead, which lets you update lesson content without rebuilding the Docker image.
+CodeRunner has two catalog sources behind one interface. When `LESSONS_CATALOG_REPO` is not set the bundled `catalog/` directory (baked into the workspace image) is used; this works offline with no configuration. Set the repo variable to pull lessons from a remote public GitHub repository instead, which lets you update lesson content without rebuilding the Docker image.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `LESSONS_CATALOG_REPO` | none | Remote lessons repo — `owner/repo` slug or full `https://` URL. When unset, the bundled catalog is used. |
+| `LESSONS_CATALOG_REPO` | none | Remote lessons repo, as an `owner/repo` slug or full `https://` URL. When unset, the bundled catalog is used. |
 | `LESSONS_CATALOG_BRANCH` | `main` | Branch to check out from the remote lessons repo. Ignored when `LESSONS_CATALOG_REPO` is unset. |
 | `LESSONS_CATALOG_DIR` | `catalog/` (repo root) | Path to the bundled catalog. Only needed if you relocate the bundled catalog directory. |
 
@@ -77,7 +77,7 @@ These control how long the control plane waits during a build-and-run cycle befo
 | `RUN_BUILD_TIMEOUT_MS` | `90000` | Maximum time (ms) to wait for `gradle build` to complete before reporting a build timeout. |
 | `SIM_STARTUP_TIMEOUT_MS` | `30000` | Maximum time (ms) to wait for the simulator to become ready after a successful build. |
 
-The first build is always slower — Gradle downloads dependencies and warms up the JVM. Subsequent builds hit the cache and complete in a few seconds. See [FAQ — why is the first run slow?](./faq.md#why-is-the-first-build-or-run-slow) for details.
+The first build is always slower: Gradle downloads dependencies and warms up the JVM. Subsequent builds hit the cache and complete in a few seconds. See [FAQ: why is the first run slow?](./faq.md#why-is-the-first-build-or-run-slow) for details.
 
 ## Idle Management
 
@@ -112,21 +112,21 @@ Demo mode (`CODERUNNER_DEMO_MODE=1`) can also be activated at startup with the c
 bun run start -- --demo
 ```
 
-The flag takes precedence and sets the same behavior: authentication is skipped, every visitor is the same admin user, and the UI shows a warning banner. Use demo mode only on your own machine or a trusted local network — it has no privacy boundary between visitors.
+The flag takes precedence and sets the same behavior: authentication is skipped, every visitor is the same admin user, and the UI shows a warning banner. Use demo mode only on your own machine or a trusted local network; it has no privacy boundary between visitors.
 
 ## How environment is loaded
 
-The control plane reads `.env` from the repo root at startup using Bun's built-in dotenv support. Variables already set in the shell environment take precedence over `.env` values. There is no hot-reload — restart the process after any change.
+The control plane reads `.env` from the repo root at startup using Bun's built-in dotenv support. Variables already set in the shell environment take precedence over `.env` values. There is no hot-reload; restart the process after any change.
 
 On a cloud VM the `.env` file is regenerated on every boot by `render-env.sh`, so hand-edits are overwritten on the next reboot. Make permanent changes in the cloud-init template instead. See [Google Cloud deployment](../deploying/gcloud.md) for details.
 
 ---
 
-## .env.example vs config.ts — notes
+## Notes on .env.example vs config.ts
 
 Two variables appear in `.env.example` but are not in `config.ts`'s `ControlConfig` struct because they are read outside of it:
 
-- `PORT` — read directly by `apps/control/src/main.ts` as the listen port; also feeds the `BETTER_AUTH_URL` default in `config.ts`.
-- `LOG_FORMAT` — read directly by `apps/control/src/logging.ts`; not part of `ControlConfig`.
+- `PORT`: read directly by `apps/control/src/main.ts` as the listen port; also feeds the `BETTER_AUTH_URL` default in `config.ts`.
+- `LOG_FORMAT`: read directly by `apps/control/src/logging.ts`; not part of `ControlConfig`.
 
-Both are real, documented, and functional — they are just not stored in the config object.
+Both are real, documented, and functional; they are just not stored in the config object.

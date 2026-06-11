@@ -13,7 +13,7 @@ Offline" screen when the VM is powered down, instead of a browser
 connection-refused error. When the VM is running, requests pass through
 transparently.
 
-The VM and all its Terraform-provisioned infrastructure are **unchanged** — you
+The VM and all its Terraform-provisioned infrastructure are **unchanged**; you
 are only adding a Cloudflare layer in front.
 
 ## How it works
@@ -45,7 +45,7 @@ When the VM is off, the function returns `503 {"error":"service_unavailable"}`
 and the React app renders the offline screen. Students never see a raw browser
 error.
 
-Your domain does **not** need to be on Cloudflare nameservers — a CNAME at your
+Your domain does **not** need to be on Cloudflare nameservers; a CNAME at your
 existing registrar is enough.
 
 ## One-time setup
@@ -89,7 +89,7 @@ wrangler pages deploy --commit-dirty=true --branch main --project-name=coderunne
 ```
 
 This creates the `coderunner` Pages project in your Cloudflare account if it
-does not exist yet. Do not attach the custom domain at this step — the backend
+does not exist yet. Do not attach the custom domain at this step; the backend
 proxy will not work until the secret in step 4 is set and a second deployment
 is created.
 
@@ -101,7 +101,7 @@ The catch-all function is
 ### 4. Set `BACKEND_ORIGIN` as a Pages secret
 
 `BACKEND_ORIGIN` tells the function where to proxy backend requests. It must be
-set as a **secret** (not a `[vars]` entry in `wrangler.toml` — Cloudflare
+set as a **secret** (not a `[vars]` entry in `wrangler.toml`; Cloudflare
 rejects deployments when a var and a secret share the same binding name):
 
 ```bash
@@ -158,7 +158,7 @@ the backend is always ahead of the frontend during a rollout.
 
 ## Rollback
 
-Same as the GCE rollback — redeploy an older tag. Both jobs run from the same
+Same as the GCE rollback: redeploy an older tag. Both jobs run from the same
 tag:
 
 ```bash

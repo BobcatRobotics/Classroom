@@ -29,7 +29,7 @@ bun run docker:pull:workspace
 bun run docker:build:workspace
 ```
 
-Check for port conflicts — if all ports in `SIM_PORT_RANGE` or
+Check for port conflicts: if all ports in `SIM_PORT_RANGE` or
 `VSCODE_PORT_RANGE` are in use, container startup fails. Verify the ranges are
 not overlapping with other services on the host. Defaults are `25810–25899`
 (sim NT4) and `33000–33099` (openvscode-server).
@@ -92,7 +92,7 @@ leases.
 **Symptom.** Students see an OAuth error page, a "not authorized" flash, or
 are silently redirected back to the login page.
 
-**Cause — wrong callback URL.** The OAuth app registration does not include
+**Cause: wrong callback URL.** The OAuth app registration does not include
 the actual host URL. Fix by ensuring the callback URL registered with GitHub
 or Google matches `BETTER_AUTH_URL`:
 
@@ -103,7 +103,7 @@ or Google matches `BETTER_AUTH_URL`:
 plane (for example `https://coderunner.yourteam.ca`). On a local deployment
 it is `http://<host-ip>:4000`.
 
-**Cause — email not on allowlist.** The student's email or domain is not in
+**Cause: email not on allowlist.** The student's email or domain is not in
 `data/allowlist.json`. Check and add:
 
 ```bash
@@ -113,7 +113,7 @@ bun run allowlist:add student@gmail.com
 bun run allowlist:add yourteam.org
 ```
 
-**Cause — empty allowlist.** If the allowlist is empty, everyone is blocked.
+**Cause: empty allowlist.** If the allowlist is empty, everyone is blocked.
 Confirm with `bun run allowlist:list` and add at least one entry.
 
 ---
@@ -138,7 +138,7 @@ HALSIM_PORT_RANGE=34000-34199
 ```
 
 Stale leases can accumulate if containers were stopped without the control
-plane running. Restart the control plane — startup reconciles Docker container
+plane running. Restart the control plane; startup reconciles Docker container
 state against the database and releases stale leases.
 
 ---
@@ -169,7 +169,7 @@ for dir in data/users/*/; do
 done
 ```
 
-Never delete `data/users/*/project/` — that is student source code. If space
+Never delete `data/users/*/project/`; that is student source code. If space
 is critically low, back up project files first:
 
 ```bash
@@ -206,7 +206,7 @@ sweep. Student files and running containers are preserved across restarts.
 
 ## Student workspace is at capacity (503)
 
-**Symptom.** A student sees "Server at capacity — try again in a moment." when
+**Symptom.** A student sees a "Server at capacity" toast when
 opening their workspace. Other students with running containers are unaffected.
 
 **Cause.** The active container count has reached `MAX_ACTIVE_CONTAINERS`.
@@ -223,5 +223,5 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
   http://localhost:4000/admin/config/max-active-containers
 ```
 
-Verify host memory and CPU before raising the cap further — see
+Verify host memory and CPU before raising the cap further; see
 [Capacity](./capacity.md) for sizing guidance.

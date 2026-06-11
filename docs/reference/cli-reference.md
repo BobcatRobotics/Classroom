@@ -48,7 +48,7 @@ All scripts are run from the repo root with `bun run NAME`. They require Bun 1.3
 | `docker:build:workspace` | Builds the workspace image locally from `containers/code/Dockerfile`. Use when iterating on the container itself; normal deployments pull the prebuilt image instead. |
 | `docker:push:workspace` | Builds and then pushes the workspace image to GHCR. Used by the release workflow; not needed for normal operation. |
 | `docker:cleanup` | Removes all stopped managed containers (those with the `frc-sim.managed=true` label). Safe to run while the control plane is up. Accepts `--dry-run` to preview what would be removed. |
-| `docker:rebuild-workspaces` | Removes all running and stopped managed V2 workspace containers and clears their database leases, forcing fresh containers on next login. Student project files are untouched — they are bind-mounted and survive container removal. Accepts `--dry-run`. Run this after updating the workspace image to force students into the new image on their next session. |
+| `docker:rebuild-workspaces` | Removes all running and stopped managed V2 workspace containers and clears their database leases, forcing fresh containers on next login. Student project files are untouched; they are bind-mounted and survive container removal. Accepts `--dry-run`. Run this after updating the workspace image to force students into the new image on their next session. |
 
 ## Users and Access
 

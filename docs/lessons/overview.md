@@ -9,8 +9,8 @@ CodeRunner gives every student an empty workspace. They fill it from the
 **Switch Project** menu in the editor topbar, which offers two ways to get
 starting code:
 
-- **Lessons** — load a ready-made module from a lesson catalog.
-- **Team import** — clone a real team project from a public GitHub repository
+- **Lessons**: load a ready-made module from a lesson catalog.
+- **Team import**: clone a real team project from a public GitHub repository
   (see [Importing a Team Project](./team-import.md)).
 
 This page explains how the lesson catalog works for you as the operator. If you
@@ -20,7 +20,7 @@ want to write your own lessons, see
 ## Two catalog sources, one menu
 
 A "lesson catalog" is a list of **modules**. Each module is a complete starting
-project — source files, a project README, and editor configuration — that a
+project (source files, a project README, and editor configuration) that a
 student loads into their workspace with one click.
 
 CodeRunner can serve that catalog from one of two sources, and students see the
@@ -29,15 +29,15 @@ same Switch Project menu either way:
 ### Bundled catalog (default, zero-config)
 
 A small demo catalog is baked into the application image. It works out of the
-box with no configuration and no network access — useful for a first run, an
-offline classroom, or a demo. This is the default when you have not configured a
+box with no configuration and no network access, which makes it useful for a
+first run, an offline classroom, or a demo. This is the default when you have not configured a
 remote catalog.
 
 ### Remote catalog (your own lessons repo)
 
 Point CodeRunner at a public GitHub repository and it serves that repository's
 modules instead. This lets you write and update lessons for your team without
-rebuilding or redeploying the app — push to the repo and the new lessons appear.
+rebuilding or redeploying the app: push to the repo and the new lessons appear.
 
 Enable it by setting environment variables on the control plane:
 
@@ -66,7 +66,7 @@ A few behaviors are worth understanding before you put this in front of
 students:
 
 - **Lessons are gitless.** Loading a lesson does not create a Git repository in
-  the workspace. "Reset" is therefore just re-loading the same module — the
+  the workspace. "Reset" is therefore just re-loading the same module: the
   student gets a fresh, clean copy of the starting project.
 - **Switching modules discards the current workspace.** Moving from one lesson
   to another (or to a different lesson, or resetting) **intentionally throws
@@ -85,10 +85,10 @@ keep something, they should copy it out or move to an imported team project.
 The bundled catalog ships with two modules that double as a smoke test of the
 whole edit → run → telemetry loop:
 
-- **Hello, Name** — a plain-Java exercise covering variables, terminal input,
+- **Hello, Name**: a plain-Java exercise covering variables, terminal input,
   and printing values. The student runs it straight from the editor; no robot
   simulation is involved.
-- **Robot Starter** — a minimal WPILib command-based robot project. The student
+- **Robot Starter**: a minimal WPILib command-based robot project. The student
   runs it from the Driver Station and watches telemetry appear in
   AdvantageScope and the Driver Station panel.
 

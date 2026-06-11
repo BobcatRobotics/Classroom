@@ -27,8 +27,8 @@ refreshed daily while the student is active.
 
 OAuth alone is not enough to sign in. After the OAuth provider confirms a
 user's identity, CodeRunner checks whether the returned email address is on the
-**allowlist** (`data/allowlist.json`). The check runs in two places — on new
-user creation and again on every OAuth callback — so a removed entry takes
+**allowlist** (`data/allowlist.json`). The check runs in two places (on new
+user creation and again on every OAuth callback), so a removed entry takes
 effect at the next login attempt.
 
 The allowlist accepts individual addresses and whole domains. A team using
@@ -49,14 +49,14 @@ An admin can manage the allowlist through the admin UI or the admin API.
 Users have a `role` field: `student` (the default) or `admin`. Admin-only
 routes require the session's role to be `admin`. An operator can also use a
 static break-glass token (`ADMIN_TOKEN`) by passing it as a `Bearer` token in
-the `Authorization` header — this is intended for automated tooling and
+the `Authorization` header. This is intended for automated tooling and
 one-off operator commands, not for day-to-day use.
 
 ## Single entry point
 
 The control plane is the only process that listens on a public port (default
-`4000`, set by `PORT`). Every request — web shell assets, editor traffic, run
-commands, telemetry, gamepad input — enters through that one port and is
+`4000`, set by `PORT`). Every request (web shell assets, editor traffic, run
+commands, telemetry, gamepad input) enters through that one port and is
 authenticated before any proxying takes place.
 
 Container ports are bound to `127.0.0.1` only. No container port is reachable
@@ -96,8 +96,8 @@ radius of an unusually large concurrent session spike.
 
 ## Audit log
 
-Significant actions — sign-in, workspace creation, run start/stop, project
-loads, and admin operations — are written to an `audit_log` table in the
+Significant actions (sign-in, workspace creation, run start/stop, project
+loads, and admin operations) are written to an `audit_log` table in the
 SQLite database. Each entry records the actor's user ID and email, the action,
 an optional target, and a millisecond timestamp. Admins can query the log
 through the admin API.
@@ -118,7 +118,7 @@ OAuth entirely: every request is treated as a single synthetic admin session.
 This is designed for zero-configuration local evaluation only.
 
 **Demo mode must never be deployed publicly.** There is no privacy boundary
-between concurrent visitors in demo mode — all requests resolve to the same
+between concurrent visitors in demo mode: all requests resolve to the same
 user. The control plane prints a multi-line warning banner at startup and the
 workspace shell displays a yellow banner to make this visible. See
 [Deploying](../deploying/overview.md) for how to configure OAuth for a real

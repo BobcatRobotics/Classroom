@@ -20,7 +20,7 @@ bunx playwright install chromium
 
 ## Test tiers
 
-### `bun run test` — control-plane unit and integration tests
+### `bun run test`: control-plane unit and integration tests
 
 ```bash
 bun run test
@@ -40,7 +40,7 @@ Runs Bun's built-in test runner across the control plane
 - Property-based tests via `fast-check`: URL validation, slug generation, contract schema round-trips, audit-filter SQL parameterization
 - Metrics: route-templating cardinality
 
-### `bun run test:web` — frontend unit and component tests
+### `bun run test:web`: frontend unit and component tests
 
 ```bash
 bun run test:web
@@ -53,15 +53,15 @@ Runs Vitest inside `apps/web/`. Approximately 70 tests covering:
 - Zustand store: input-mode transitions, gamepad selection persistence
 - Keyboard and gamepad mappings
 
-### `bun run e2e` — Playwright mocked tier
+### `bun run e2e`: Playwright mocked tier
 
 ```bash
 bun run e2e
 ```
 
 Runs the Playwright test suite against the `mocked` project. No Docker
-daemon required. Each test gets a fully isolated control-plane instance
-— see [Fixture architecture](#fixture-architecture) below. Approximately
+daemon required. Each test gets a fully isolated control-plane instance;
+see [Fixture architecture](#fixture-architecture) below. Approximately
 55 tests covering the full login→editor→run→telemetry→driver-station
 flow, including:
 
@@ -75,7 +75,7 @@ flow, including:
 - Public routes: health check, OpenAPI endpoint
 
 Some browser-heavy specs that depend on `data-testid` attributes not yet
-added to components are marked `test.fixme` — they appear in Playwright
+added to components are marked `test.fixme`; they appear in Playwright
 reports as expected-not-implemented markers and do not fail the suite.
 Their HTTP-layer counterparts run as normal tests.
 
@@ -84,7 +84,7 @@ The unit and mocked E2E tiers already cover the logic paths; container
 behaviour (JNI loading, Gradle lock isolation, headless GUI removal) is
 upstream-owned and manually validated during image updates.
 
-### `bun run e2e:security` — security E2E tests
+### `bun run e2e:security`: security E2E tests
 
 ```bash
 bun run e2e:security
@@ -95,7 +95,7 @@ Covers CSRF gating on state-changing endpoints, XSS output encoding in the
 run console and admin pages, and response-header policy (`Content-Security-Policy`,
 `X-Frame-Options`, `X-Content-Type-Options`, `SameSite` cookie attributes).
 
-### `bun run verify` — full CI gate
+### `bun run verify`: full CI gate
 
 ```bash
 bun run verify
@@ -108,7 +108,7 @@ equivalent of CI. Run it before opening a pull request. See
 
 ## Fixture architecture
 
-The E2E suite runs the control plane in-process — Playwright never launches
+The E2E suite runs the control plane in-process: Playwright never launches
 `main.ts` as an external subprocess. Each `test()` calls `createApp()` directly
 inside the worker process and binds a `Bun.serve` listener on a random port.
 This gives tests direct access to the `ControlApp` instance for seeding and
@@ -119,7 +119,7 @@ Key properties of each isolated test environment:
 - **Temporary directory**: each test gets a fresh `mkdtemp` root that is deleted on teardown.
 - **Own SQLite database**: the control plane's `dbPath` points inside that tempdir.
 - **Random port**: pre-allocated via a throwaway `Bun.serve({ port: 0 })` so the `baseUrl` baked into auth config matches the actual server address.
-- **Seeded auth**: `loginAs` in `e2e/fixtures/auth.ts` writes directly to the `user` and `session` tables and HMAC-signs the session cookie — no OAuth round trip required, no test-only production code.
+- **Seeded auth**: `loginAs` in `e2e/fixtures/auth.ts` writes directly to the `user` and `session` tables and HMAC-signs the session cookie. No OAuth round trip is required and no test-only production code exists.
 
 The fixture exposes four handles to each test:
 
@@ -132,36 +132,36 @@ The fixture exposes four handles to each test:
 
 ### In-process fake servers
 
-`e2e/fixtures/fake-vscode.ts` — a Bun HTTP+WS server on an ephemeral port.
+`e2e/fixtures/fake-vscode.ts`: a Bun HTTP+WS server on an ephemeral port.
 Returns a sentinel HTML page (`data-fake-vscode-ready="true"`) for iframe-load
 assertions, accepts WebSocket upgrades, records received headers and frames,
 and exposes `receivedHeaders()` / `receivedFrames()` / `awaitWsConnection()`
 for proxy assertions.
 
-`e2e/fixtures/fake-halsim.ts` — a Bun WS server the control plane connects to
+`e2e/fixtures/fake-halsim.ts`: a Bun WS server the control plane connects to
 as the HALSim bridge. Records every JSON frame received from the control plane,
 exposes `pushFrame()` to inject upstream frames, and `connections()` to assert
 connection state. Supports `restart()` for transient-unavailability tests.
 
-`e2e/fixtures/fake-nt4.ts` — a minimal NT4 server for telemetry isolation
+`e2e/fixtures/fake-nt4.ts`: a minimal NT4 server for telemetry isolation
 tests. Sends configurable topic-announcement frames on connect; records
 subscribe frames from the control plane.
 
-`e2e/fixtures/gamepad-shim.ts` — injected into the browser via
+`e2e/fixtures/gamepad-shim.ts`: injected into the browser via
 `page.addInitScript`. Overrides `navigator.getGamepads()` and dispatches
 `gamepadconnected` / `gamepaddisconnected` events. Helper functions
 `connectGamepad`, `disconnectGamepad`, `setGamepadAxes`, and `setGamepadButton`
 drive gamepad state from test code via `page.evaluate()`.
 
-`e2e/fixtures/runtime.ts` — helpers (`seedRuntimeRunning`,
+`e2e/fixtures/runtime.ts`: helpers (`seedRuntimeRunning`,
 `seedRuntimeMissing`) that configure the `MockWorkspaceRuntimeProvider` with
 fake endpoint URLs pointing at the in-process fake servers.
 
 ## Debugging helpers
 
 ```bash
-bun run e2e:ui       # Playwright UI mode — step through tests visually
-bun run e2e:debug    # PWDEBUG=1 — open Playwright Inspector on launch
+bun run e2e:ui       # Playwright UI mode: step through tests visually
+bun run e2e:debug    # PWDEBUG=1: open Playwright Inspector on launch
 bun run e2e:report   # Open the last HTML report with traces
 ```
 

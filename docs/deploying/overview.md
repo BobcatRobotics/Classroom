@@ -6,7 +6,7 @@ title: Deployment Overview
 # Deployment Overview
 
 CodeRunner is self-hosted. You run the control plane and the per-student
-workspace containers on a machine you control — there is no managed SaaS. There
+workspace containers on a machine you control; there is no managed SaaS. There
 are two supported deployment shapes, and this section walks through both. Pick
 the one that matches how your students will reach the app.
 
@@ -14,7 +14,7 @@ the one that matches how your students will reach the app.
 
 ### A classroom / LAN machine
 
-Everything runs on one box — a lab PC, a spare laptop, or a mini PC — and
+Everything runs on one box (a lab PC, a spare laptop, or a mini PC) and
 students connect to it over the local network (for example
 `http://192.168.1.50:4000/`). This is the simplest path: clone the repo, build,
 and start. Traffic is plain HTTP, so keep the machine on a trusted network. It
@@ -34,7 +34,7 @@ Rough cost: the default VM is a `c4-standard-4` (4 vCPU / 15 GB) with a 50 GB
 boot disk and a 50 GB persistent data disk, running in `us-central1`. That is a
 modest always-on cost (low tens of US dollars per month at the time of writing);
 the data disk takes daily snapshots with 7-day retention. You can stop the VM
-between seasons to drop to near-zero — see
+between seasons to drop to near-zero; see
 [Seasonal Teardown](../operating/seasonal-teardown.md). Verify the current sizing
 in [`deploy/terraform/vm.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/vm.tf)
 and [`variables.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/variables.tf).
@@ -46,7 +46,7 @@ See [Google Cloud Deployment](./gcloud.md).
 Regardless of shape, every non-demo deployment needs:
 
 - **OAuth credentials.** Login is via GitHub and/or Google sign-in through
-  Better Auth — at least one provider must be configured. Register your apps
+  Better Auth; at least one provider must be configured. Register your apps
   first; see [OAuth Credentials](./oauth-credentials.md).
 - **Docker.** Each active student runs in a per-student workspace container
   (sim + editor), so the host needs a working Docker Engine.
@@ -56,5 +56,5 @@ Regardless of shape, every non-demo deployment needs:
 For the cloud deployment only, you can optionally put a Cloudflare Pages project
 in front of the VM so students see a styled "CodeRunner is Offline" screen when
 the VM is powered down, instead of a browser connection error. This is purely
-additive — the VM and all its infrastructure are unchanged. See
+additive: the VM and all its infrastructure are unchanged. See
 [Cloudflare Offline Page](./cloudflare.md).

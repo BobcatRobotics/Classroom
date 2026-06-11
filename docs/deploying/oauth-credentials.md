@@ -8,14 +8,14 @@ title: OAuth Credentials
 CodeRunner does not store passwords. Sign-in is handled by
 [Better Auth](https://www.better-auth.com/) using GitHub and/or Google as OAuth
 providers. **At least one provider must be configured** for any non-demo
-deployment — without one, the login page has no working sign-in button.
+deployment; without one, the login page has no working sign-in button.
 
 You only need both if you want students to choose between GitHub and Google;
 configuring one is fine.
 
 This page covers registering the OAuth apps and wiring the resulting
 credentials into CodeRunner. The values you produce here are used the same way
-whether you deploy [locally](./local.md) or to [Google Cloud](./gcloud.md) —
+whether you deploy [locally](./local.md) or to [Google Cloud](./gcloud.md);
 only the URLs differ (`http://localhost:4000` vs `https://<your-domain>`).
 
 ## The two URLs you will need
@@ -42,7 +42,7 @@ and `.../google`. For the cloud VM it is
 
 In GitHub: **Settings → Developer settings → OAuth Apps → New OAuth App**.
 
-- **Application name:** anything (e.g. "CodeRunner — Team 1234").
+- **Application name:** anything (e.g. "CodeRunner - Team 1234").
 - **Homepage URL:** your `BETTER_AUTH_URL`.
 - **Authorization callback URL:** `<BETTER_AUTH_URL>/api/auth/callback/github`.
 
@@ -53,7 +53,7 @@ Save, then generate a client secret. You now have a **Client ID** and a
 
 In the Google Cloud console:
 
-1. **APIs & Services → OAuth consent screen** — configure it once (External
+1. **APIs & Services → OAuth consent screen**: configure it once (External
    user type is fine for a team). Add your sign-in email as a test user while
    the app is in testing.
 2. **APIs & Services → Credentials → Create credentials → OAuth client ID**,
@@ -71,7 +71,7 @@ CodeRunner reads these from environment variables (see
 | Variable | Purpose |
 | --- | --- |
 | `BETTER_AUTH_URL` | Public base URL. **Must match** the homepage/callback URLs you registered. Defaults to `http://localhost:4000`. |
-| `BETTER_AUTH_SECRET` | Secret used to sign sessions. **Change this in production** — the built-in default is a dev placeholder. Generate one with `openssl rand -hex 32`. |
+| `BETTER_AUTH_SECRET` | Secret used to sign sessions. **Change this in production**; the built-in default is a dev placeholder. Generate one with `openssl rand -hex 32`. |
 | `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
@@ -104,7 +104,7 @@ Other allowlist commands: `bun run allowlist:list`, `bun run allowlist:remove`.
 
 ### 2. Promote the first admin
 
-Every user — including the first one — signs in as a regular user. After the
+Every user, including the first one, signs in as a regular user. After the
 first coach has signed in once (so their user row exists), promote them to
 admin:
 
@@ -113,7 +113,7 @@ bun run users:promote coach@frcteam.org
 ```
 
 The reverse is `bun run users:demote`, and `bun run users:list` shows current
-roles. On the cloud VM, run `users:promote` over IAP SSH — see the
+roles. On the cloud VM, run `users:promote` over IAP SSH; see the
 [Google Cloud Deployment](./gcloud.md) "Promote yourself to admin" step.
 
 > Admins also get a break-glass option: setting the `ADMIN_TOKEN` env var lets

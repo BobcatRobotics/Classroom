@@ -47,7 +47,10 @@ describe("BundledCatalogSource", () => {
 			const source = new BundledCatalogSource(dir);
 			const { modules, error } = await source.getManifest();
 			expect(error).toBeNull();
-			expect(modules.map((m) => m.id)).toEqual(["hello-world", "robot-starter"]);
+			expect(modules.map((m) => m.id)).toEqual([
+				"hello-world",
+				"robot-starter",
+			]);
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}

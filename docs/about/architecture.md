@@ -11,12 +11,12 @@ students to install: they open a URL, sign in, write code, and click **Run**.
 
 At a high level there are three moving parts:
 
-1. **The browser** — a React single-page app (the "web shell") that wraps the
+1. **The browser**: a React single-page app (the "web shell") that wraps the
    editor with Driver Station controls and live telemetry.
-2. **The control plane** — a single Bun/TypeScript server that handles sign-in,
+2. **The control plane**: a single Bun/TypeScript server that handles sign-in,
    sessions, workspace orchestration, and all proxying. It is the only thing
    exposed to the network.
-3. **Per-student workspace containers** — one Docker container per student,
+3. **Per-student workspace containers**: one Docker container per student,
    each running a browser editor plus the Java toolchain and WPILib simulator.
 
 ```text
@@ -92,8 +92,8 @@ the build and for simulator startup (defaults: build `90s`, startup `30s`).
 ## How telemetry flows
 
 The running robot program publishes telemetry to its NetworkTables server
-inside the container. AdvantageScope Lite — embedded in the browser as an
-iframe — subscribes to that data over NT4. Because containers are never exposed
+inside the container. AdvantageScope Lite, embedded in the browser as an
+iframe, subscribes to that data over NT4. Because containers are never exposed
 to the browser, the NT4 stream is proxied through the control plane: the robot
 program's NT4 server (loopback) → control plane proxy → AdvantageScope in the
 browser. The student sees field positions, signals, and plots update in real
@@ -126,10 +126,10 @@ container side of this contract.
 
 ## Where to go next
 
-- [The Student Experience](./student-experience.md) — what a student actually
+- [The Student Experience](./student-experience.md): what a student actually
   sees and does.
-- [The Workspace Container](./workspace-container.md) — what is inside each
+- [The Workspace Container](./workspace-container.md): what is inside each
   student container.
-- [Security Model](./security-model.md) — how access is gated and isolated.
-- [Quick Start](../quick-start.md) — try it locally.
-- [Deploying](../deploying/overview.md) — run it for a real team.
+- [Security Model](./security-model.md): how access is gated and isolated.
+- [Quick Start](../quick-start.md): try it locally.
+- [Deploying](../deploying/overview.md): run it for a real team.

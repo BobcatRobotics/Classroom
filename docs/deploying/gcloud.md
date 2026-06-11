@@ -7,7 +7,7 @@ title: Google Cloud Deployment
 
 A single Google Compute Engine VM, provisioned by Terraform, fronted by Caddy
 for automatic HTTPS on your own domain. Releases ship through a GitHub Actions
-workflow — no manual SSH after the one-time bootstrap.
+workflow, with no manual SSH after the one-time bootstrap.
 
 Everything in this guide is driven by the Terraform config and workflow in this
 repo. The primary source of truth is
@@ -20,21 +20,21 @@ The Terraform files are in
 - One `c4-standard-4` VM (4 vCPU / 15 GiB) in `us-central1-a` by default
 - A 50 GB `hyperdisk-balanced` boot disk and a 50 GB `hyperdisk-balanced` data
   disk mounted at `/var/lib/coderunner/data` (SQLite + student project files)
-- The data disk is `prevent_destroy = true` — it survives VM recreation
+- The data disk is `prevent_destroy = true`, so it survives VM recreation
 - Daily snapshots of the data disk with 7-day retention
 - A reserved static IPv4 address
 - Caddy (auto-TLS via Let's Encrypt) in front of the control plane on port 4000
 - Grafana Alloy scraping `/metrics` and shipping to Grafana Cloud
 - Workload Identity Federation so GitHub Actions deploys without long-lived keys
 
-C4 machines require Hyperdisk volumes — `pd-*` disk types are not compatible.
+C4 machines require Hyperdisk volumes; `pd-*` disk types are not compatible.
 
 ## Prerequisites
 
 - A GCP project with billing enabled and the `gcloud` CLI authenticated
 - Terraform 1.6+
 - A domain name where you can add DNS records
-- OAuth credentials for at least one provider — register them first and note the
+- OAuth credentials for at least one provider. Register them first and note the
   client ID and secret; see [OAuth Credentials](./oauth-credentials.md)
 
 ## One-time bootstrap
@@ -78,7 +78,7 @@ Edit `terraform.tfvars`. The variables you must set are:
 | --- | --- |
 | `project_id` | Your GCP project ID |
 | `domain` | The public hostname students visit (e.g. `coderunner.example.com`) |
-| `github_repo` | `owner/repo` of your fork — must match the repo you push tags from |
+| `github_repo` | `owner/repo` of your fork, which must match the repo you push tags from |
 | `ssh_break_glass_cidr` | Your home IP in CIDR notation (e.g. `203.0.113.42/32`) for emergency SSH |
 
 Optional variables with sensible defaults:
@@ -103,7 +103,7 @@ terraform init -backend-config="bucket=$PROJECT_ID-tf-state"
 terraform apply
 ```
 
-Note the outputs — you will need `static_ip`, `workload_identity_provider`, and
+Note the outputs: you will need `static_ip`, `workload_identity_provider`, and
 `deployer_service_account` in later steps.
 
 ### 5. Populate Secret Manager
@@ -120,7 +120,7 @@ gcloud secrets versions add coderunner-metrics-token \
 gcloud secrets versions add coderunner-admin-token \
   --data-file=<(openssl rand -hex 32)
 
-# OAuth credentials (register apps at the provider first — see ./oauth-credentials.md)
+# OAuth credentials (register apps at the provider first; see ./oauth-credentials.md)
 # Use the real domain in the callback URLs: https://<your-domain>/api/auth/callback/github
 echo -n '<your-github-client-id>'     | gcloud secrets versions add coderunner-github-client-id --data-file=-
 echo -n '<your-github-client-secret>' | gcloud secrets versions add coderunner-github-client-secret --data-file=-
@@ -142,14 +142,14 @@ echo -n '<numeric-loki-instance-id>' \
 
 The exact secret names (all prefixed `coderunner-`) are defined in
 [`deploy/terraform/secrets.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/secrets.tf).
-The `render-env.sh` script on the VM reads every one of them at boot — if any
+The `render-env.sh` script on the VM reads every one of them at boot; if any
 are missing the service will not start.
 
 **Finding Grafana Cloud values:** in the Grafana Cloud portal open your stack.
 The Prometheus remote-write URL and numeric username are on the
 Prometheus/Metrics card's Details page. The Loki push URL and its separate
 numeric instance ID are on the Loki/Logs Details page. For the token, create a
-Cloud Access Policy token with both `metrics:write` and `logs:write` scopes —
+Cloud Access Policy token with both `metrics:write` and `logs:write` scopes;
 one token covers both pipelines.
 
 ### 6. Add a DNS A record
@@ -190,7 +190,7 @@ repo, set:
 | `GCP_ZONE` | Your `zone` from `terraform.tfvars` | No (defaults to `us-central1-a`) |
 | `GCP_VM_NAME` | `terraform output -raw vm_name` | No (defaults to `coderunner`) |
 
-No GitHub *secrets* are needed — Workload Identity Federation replaces
+No GitHub *secrets* are needed; Workload Identity Federation replaces
 long-lived service account keys.
 
 ### 9. Deploy for the first time
@@ -227,18 +227,18 @@ bootstrap flow.
 
 Once bootstrapped, the VM runs three systemd services:
 
-- **`coderunner`** — the Bun control plane, reading
+- **`coderunner`**: the Bun control plane, reading
   `/opt/coderunner/.env` for all configuration
-- **`caddy`** — terminates TLS for `<your-domain>` and `origin.<your-domain>`,
+- **`caddy`**: terminates TLS for `<your-domain>` and `origin.<your-domain>`,
   reverse-proxies to `localhost:4000`
-- **`alloy`** — scrapes `/metrics` and ships to Grafana Cloud
+- **`alloy`**: scrapes `/metrics` and ships to Grafana Cloud
 
 `render-env.sh` runs on every boot (via `metadata_startup_script`) to
 re-materialize `/opt/coderunner/.env` from Secret Manager. Hand-edits to `.env`
 on the VM do not survive a reboot.
 
-For monitoring details — Prometheus metrics, Loki log shipping, and Grafana
-dashboards — see [Monitoring](../operating/monitoring.md).
+For monitoring details (Prometheus metrics, Loki log shipping, and Grafana
+dashboards), see [Monitoring](../operating/monitoring.md).
 
 ## Releasing
 
@@ -259,11 +259,11 @@ The **Deploy to GCE** workflow (defined in `.github/workflows/deploy.yml`):
    `web-dist.tar.gz` + `ascope-dist.tar.gz` to the GitHub Release
 5. SSHes into the VM via IAP, checks out the tag, runs `bun install`, fetches
    the prebuilt tarballs, pulls the workspace image, removes managed workspace
-   containers (student data is preserved — only containers are removed), and
+   containers (student data is preserved; only containers are removed), and
    starts `coderunner`
 6. Polls `/healthz` until the service is healthy
 
-Nothing is built on the VM — emsdk and Node are not installed there.
+Nothing is built on the VM; emsdk and Node are not installed there.
 
 Migrations apply automatically because `bun run start` runs
 `bun run migrate` first (see `package.json`).
@@ -322,7 +322,7 @@ previous tag**.
 | TLS and healthz | `curl -I https://<your-domain>/healthz` returns 200 |
 | Control plane logs | `journalctl -u coderunner -n 50` via IAP SSH |
 | Workspace image present | `docker images \| grep coderunner-workspace` via IAP SSH |
-| Metrics in Grafana | In Grafana Cloud Explore: `up{instance="coderunner"}` — expect three series, all `1` |
+| Metrics in Grafana | In Grafana Cloud Explore: `up{instance="coderunner"}` should return three series, all `1` |
 
 ## Cost and sizing
 

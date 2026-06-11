@@ -6,8 +6,8 @@ title: Backups
 # Backups
 
 A CodeRunner backup captures the only state that cannot be regenerated: the
-SQLite database and each student's project files. Everything else — Gradle
-caches, editor state, run logs — is recreated automatically when a student's
+SQLite database and each student's project files. Everything else (Gradle
+caches, editor state, run logs) is recreated automatically when a student's
 container next starts.
 
 ## What matters
@@ -18,9 +18,9 @@ container next starts.
 | `data/allowlist.json` | Emails and domains permitted to sign in | **Yes** |
 | `data/users/*/project/` | Student Java source code | **Yes** |
 | `data/users/*/assets/` | Per-workspace AdvantageScope assets | **Yes** |
-| `data/users/*/home/` | Gradle cache, editor state, VS Code user data | No — regenerated |
-| `data/users/*/jdtls-data/` | Java language server index | No — regenerated |
-| `data/users/*/logs/` | Build and run log history | No — transient |
+| `data/users/*/home/` | Gradle cache, editor state, VS Code user data | No (regenerated) |
+| `data/users/*/jdtls-data/` | Java language server index | No (regenerated) |
+| `data/users/*/logs/` | Build and run log history | No (transient) |
 
 Team robot project work in particular should be pushed to GitHub regularly.
 The server backup is not a substitute for version control. See
@@ -47,7 +47,7 @@ data/backups/2026-05-16-151038/
 ```
 
 The database snapshot uses SQLite's online backup API, so it is safe to run
-while the control plane is up — you get a consistent view of committed state.
+while the control plane is up; you get a consistent view of committed state.
 For project archives, prefer to take the backup when no students are actively
 saving files, or stop the control plane first if consistency matters.
 
@@ -70,7 +70,7 @@ bun run restore -- <backup-dir>
 ```
 
 This restores the database, allowlist, and every workspace's project and
-assets. Restore is destructive — existing files at the destination are
+assets. Restore is destructive: existing files at the destination are
 overwritten.
 
 ### Restore options
@@ -100,7 +100,7 @@ backup script restore only per-workspace project files; `--skip-db` and
 
 - **Daily** during active classroom use (before class or at end of day).
 - **Before** any Docker image rebuild or host OS update.
-- **Before** running `restore` — back up the current state first in case you
+- **Before** running `restore`, back up the current state first in case you
   need to roll back.
 
 ## Moving an instance between machines
@@ -121,5 +121,5 @@ bun run start
 
 For the Google Cloud deployment, the data disk holds all runtime state and
 persists independently of the VM. The seasonal teardown procedure covers how to
-snapshot and restore the data disk across seasons — see
+snapshot and restore the data disk across seasons; see
 [Seasonal Teardown](./seasonal-teardown.md).

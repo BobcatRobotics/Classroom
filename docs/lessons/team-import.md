@@ -13,7 +13,7 @@ If you are looking for how lessons work, see [How Lessons Work](./overview.md).
 
 ## What a team import is for
 
-Lessons are scratch work — they are gitless, disposable, and intended for
+Lessons are scratch work: they are gitless, disposable, and intended for
 free experimentation. Team import is different: it clones a real public GitHub
 repository into the student's workspace and **keeps the `.git` directory and
 the HTTPS origin**. The student can commit and push from the VS Code terminal
@@ -27,7 +27,7 @@ work needs to be saved in version control.
 
 1. Open the **Switch Project** menu from the editor topbar.
 2. In the **Team Import** field, paste the public GitHub URL of the repository
-   root — for example `https://github.com/frc1234/robot-2025`.
+   root, for example `https://github.com/frc1234/robot-2025`.
 3. Confirm the discard prompt. **The current workspace contents are deleted
    before the import begins.** Students should push any work they want to keep
    before switching.
@@ -60,7 +60,7 @@ When a valid URL is submitted, the control plane:
    shallow copy with all remote branches available as `origin/*`, but no
    full commit history.
 2. Verifies that `build.gradle` exists at the project root. Repositories
-   without a `build.gradle` are rejected — team import is intended for
+   without a `build.gradle` are rejected; team import is intended for
    Gradle/WPILib robot projects.
 3. Checks that the cloned project is within the 200 MB size limit.
 4. Replaces `/workspace/project` with the cloned project, keeping `.git`
@@ -104,7 +104,7 @@ init script is applied non-destructively that:
 - Enables the HALSim WebSocket server the web Driver Station needs, if it
   is not already present.
 
-The student's `build.gradle` is untouched — the init script operates at the
+The student's `build.gradle` is untouched; the init script operates at the
 Gradle API level and is invisible in the editor.
 
 ## Constraints and limits
@@ -124,7 +124,7 @@ Gradle API level and is invisible in the editor.
 Switching to a lesson, switching to a different import, or re-importing
 **replaces everything in the workspace**. There are no server-side backups of
 imported project work. Students should push their commits to GitHub before
-switching — that is the intended safety net. The discard confirmation prompt
+switching; that is the intended safety net. The discard confirmation prompt
 is there as a reminder.
 
 If a student accidentally switches away without pushing, the work is gone from

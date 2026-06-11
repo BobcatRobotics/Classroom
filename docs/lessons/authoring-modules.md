@@ -9,7 +9,7 @@ You can write your own lessons for your team and serve them from a public GitHub
 repository, with no app rebuild. This page covers the repository layout, the
 manifest schema, the two lesson kinds, and how to publish.
 
-If you only want to use the built-in demo lessons, you do not need any of this —
+If you only want to use the built-in demo lessons, you do not need any of this;
 see [How Lessons Work](./overview.md).
 
 ## Worked examples
@@ -17,11 +17,11 @@ see [How Lessons Work](./overview.md).
 Two real examples to read alongside this page:
 
 - **A complete standalone lessons repo:**
-  [github.com/mathewdunne/coderunner-lessons](https://github.com/mathewdunne/coderunner-lessons)
-  — the maintainer's own team lessons, structured exactly as described here.
+  [github.com/mathewdunne/coderunner-lessons](https://github.com/mathewdunne/coderunner-lessons),
+  the maintainer's own team lessons, structured exactly as described here.
 - **The bundled demo catalog:**
-  [`catalog/` in the CodeRunner repo](https://github.com/mathewdunne/CodeRunner/tree/main/catalog)
-  — the two demo modules baked into the app.
+  [`catalog/` in the CodeRunner repo](https://github.com/mathewdunne/CodeRunner/tree/main/catalog),
+  the two demo modules baked into the app.
 
 ## Repository layout
 
@@ -44,7 +44,7 @@ modules/
 
 Each `modules/<id>/` directory is a **complete starting project**: everything
 the student needs the moment the lesson loads. There is no separate build or
-packaging step — CodeRunner copies the directory contents directly into the
+packaging step; CodeRunner copies the directory contents directly into the
 student's workspace.
 
 The `modules/` folder name is a convention used by these examples, not a
@@ -97,7 +97,7 @@ Every field is required.
 | `id` | string | Stable, unique identifier. Used internally and recorded as the student's current module. Don't reuse or rename casually. |
 | `title` | string | Shown in the Switch Project menu. |
 | `description` | string | One-line summary shown under the title. May be empty. |
-| `subdir` | string | Relative path from the repo root to the module directory (for example `modules/hello-world`). Must be a relative path of safe segments — no leading slash and no `..`. |
+| `subdir` | string | Relative path from the repo root to the module directory (for example `modules/hello-world`). Must be a relative path of safe segments: no leading slash and no `..`. |
 | `kind` | string | Either `plain-java` or `robot`. See below. |
 | `order` | integer | Sort position in the menu (ascending). |
 
@@ -113,7 +113,7 @@ The `kind` field controls how the student runs the lesson and what the UI shows.
 
 ### `plain-java`
 
-A bare Java project with no Gradle or WPILib — just `.java` source files. The
+A bare Java project with no Gradle or WPILib, just `.java` source files. The
 student runs it **from the editor's Run button**, and the robot simulation UI is
 hidden because there is no robot. Use this for programming fundamentals:
 variables, loops, classes, terminal I/O.
@@ -141,7 +141,7 @@ Point `mainClass` at the class with your `main` method.
 
 ### `robot`
 
-A full WPILib/Gradle robot project — the same structure WPILib's project
+A full WPILib/Gradle robot project, the same structure WPILib's project
 generator produces (`build.gradle`, `gradlew`, `vendordeps/`, `.wpilib/`,
 `src/main/java/frc/robot/...`). The student runs it **from the Driver Station**,
 which builds the project and starts it in simulation; telemetry flows to
@@ -153,8 +153,8 @@ the container. CodeRunner applies a non-destructive Gradle override at run time
 that strips the desktop simulation GUI and enables the WebSocket server the web
 Driver Station needs. The student still sees their original `build.gradle`
 unchanged in the editor. (This means projects that call `addGui()` /
-`addDriverstation()` work without edits — useful to know if you base a `robot`
-module on an existing team project.)
+`addDriverstation()` work without edits, which is useful to know if you base a
+`robot` module on an existing team project.)
 
 ## The README is the lesson text
 
@@ -187,7 +187,7 @@ instead of the student having to configure the editor themselves.
    if you are not using `main`. See
    [Configuration](../reference/configuration.md).
 3. Push your changes. CodeRunner caches the module list for **60 seconds**, so
-   edits go live within about a minute — no app rebuild or redeploy.
+   edits go live within about a minute with no app rebuild or redeploy.
 
 When a remote catalog is configured, students never see the bundled demo
 modules; your repo's modules fully replace them.
@@ -197,16 +197,16 @@ modules; your repo's modules fully replace them.
 A natural progression is to start with plain-Java fundamentals and build toward
 a working WPILib robot. One worked sequence:
 
-1. **Hello, Name** (`plain-java`) — variables, terminal input, printing.
-2. **Number guessing game** (`plain-java`) — loops, conditionals, input
+1. **Hello, Name** (`plain-java`): variables, terminal input, printing.
+2. **Number guessing game** (`plain-java`): loops, conditionals, input
    validation.
-3. **Perimeter / area** (`plain-java`) — methods and arithmetic, then again
+3. **Perimeter / area** (`plain-java`): methods and arithmetic, then again
    class-based to introduce objects.
-4. **First robot run** (`robot`) — a starter robot you run from the Driver
+4. **First robot run** (`robot`): a starter robot you run from the Driver
    Station, logging values and a moving pose so students see telemetry.
-5. **Timed and command-based robots** (`robot`) — `teleopPeriodic`, subsystems,
+5. **Timed and command-based robots** (`robot`): `teleopPeriodic`, subsystems,
    commands bound to controller buttons, an autonomous chooser.
-6. **Controllers and templates** (`robot`) — PID control and a kitbot-style
+6. **Controllers and templates** (`robot`): PID control and a kitbot-style
    drivetrain template.
 
 The early `plain-java` lessons teach Java with fast edit-and-run feedback; the

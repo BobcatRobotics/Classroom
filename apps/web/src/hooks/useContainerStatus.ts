@@ -24,7 +24,7 @@ export function useContainerStatus(workspaceSlug: string | null) {
 					if (body.error === "capacity" && !capacityToastShown) {
 						capacityToastShown = true;
 						toast.error(
-							"Server at capacity — your coach has been notified. Please try again in a few minutes.",
+							"Server at capacity. Your coach has been notified. Please try again in a few minutes.",
 							{ duration: 15_000 },
 						);
 					}

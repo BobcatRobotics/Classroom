@@ -11,7 +11,7 @@ installation is required on the student's machine.
 
 ## Signing in
 
-Students authenticate through OAuth — either **GitHub** or **Google**,
+Students authenticate through OAuth with either **GitHub** or **Google**,
 depending on which providers the operator has configured. The sign-in page
 presents the available options. After the OAuth callback, CodeRunner checks
 whether the student's email is on the team's allowlist; if it is not, sign-in
@@ -23,17 +23,17 @@ their workspace.
 
 ## The workspace shell
 
-After signing in the student lands in the workspace shell — a full-page web
+After signing in the student lands in the workspace shell, a full-page web
 application built around three panes:
 
-- **Editor** (left) — openvscode-server embedded in an iframe. This is a
+- **Editor** (left): openvscode-server embedded in an iframe. This is a
   real VS Code environment in the browser, complete with the
   [Red Hat Java](https://marketplace.visualstudio.com/items?itemName=redhat.java)
   language server, the WPILib extension, IntelliSense, and a terminal.
-- **AdvantageScope Lite** (right) — a telemetry viewer embedded as a
+- **AdvantageScope Lite** (right): a telemetry viewer embedded as a
   second iframe, showing field positions, signals, and plots published by the
   running robot program over NetworkTables.
-- **Driver Station** (bottom) — run controls, mode selection, console output,
+- **Driver Station** (bottom): run controls, mode selection, console output,
   and gamepad/keyboard input. See [below](#the-driver-station).
 
 The panes are resizable. On narrow screens the AdvantageScope pane is hidden
@@ -44,7 +44,7 @@ student's account menu.
 
 ## Loading a project
 
-A new workspace starts empty — there is no code in the editor until the student
+A new workspace starts empty: there is no code in the editor until the student
 picks a project. Clicking **Switch project** opens a dialog that offers two
 ways to fill the workspace:
 
@@ -56,7 +56,7 @@ that reloads the original files from the catalog, discarding any changes.
 
 **Import from GitHub** lets a student paste a public `github.com` HTTPS URL.
 The control plane clones the repository into the workspace, preserving the
-`.git` history. This is the normal path for build-season team work — the
+`.git` history. This is the normal path for build-season team work. The
 student can push commits back to GitHub from the editor's integrated terminal
 once they have authenticated with `gh auth login`.
 
@@ -74,10 +74,10 @@ instead.
 When the sim panes are visible, the Driver Station panel at the bottom of the
 screen has three tabs:
 
-- **Console** — live output from the Gradle build and the running robot
+- **Console**: live output from the Gradle build and the running robot
   program.
-- **Workbench** — the run controls, mode selector, and status indicators.
-- **Controls** — input device selection and a live controller visualizer.
+- **Workbench**: the run controls, mode selector, and status indicators.
+- **Controls**: input device selection and a live controller visualizer.
 
 ### Starting and stopping a run
 
@@ -101,11 +101,11 @@ to zero.
 The **Controls** tab lets the student select how joystick data is sent to the
 simulated robot. Two modes are available:
 
-- **Controller** — any gamepad connected to the browser (via the
+- **Controller**: any gamepad connected to the browser (via the
   [Gamepad API](https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API))
   appears in a dropdown. Selecting one sends its live axis and button state to
   the simulator as joystick port 0.
-- **Keyboard (Xbox Mapping)** — the keyboard is mapped to a standard Xbox
+- **Keyboard (Xbox Mapping)**: the keyboard is mapped to a standard Xbox
   controller layout. A "View mapping" button shows the full key-to-axis/button
   table. Keyboard capture is active only while the Driver Station section has
   focus; a status badge shows **KEYS ACTIVE** or **FOCUS LOST** accordingly.
@@ -123,7 +123,7 @@ can pick among the available routines while the robot is running.
 
 While the robot is running, AdvantageScope Lite (right pane) connects to the
 robot's NetworkTables server. Because container ports are never exposed to the
-browser directly, this connection is proxied through the control plane — see
+browser directly, this connection is proxied through the control plane; see
 [Architecture](./architecture.md) for the full data path. The student sees
 field positions, signal graphs, and any other NetworkTables data their robot
 code publishes, updating live.
