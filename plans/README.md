@@ -21,7 +21,7 @@ targeted improvements, not a rescue.
 | 005  | Deduplicate the 4 WebSocket-upgrade blocks | P2 | S | — | DONE |
 | 006  | Apply capacity admission to container adoption | P1 | M | — | DONE |
 | 007  | Batch `docker inspect` in `managedContainerStats` | P1 | M | — | DONE |
-| 008  | Characterization tests for the WS message router | P1 | M | — | TODO |
+| 008  | Characterization tests for the WS message router | P1 | M | — | DONE |
 | 009  | Extract a shared reconnecting-WS-bridge base | P3 | M | 008 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
