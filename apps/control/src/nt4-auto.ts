@@ -6,6 +6,7 @@ import type {
 	WorkspaceId,
 } from "@frc-coderunner/contracts";
 import { getLogger } from "./logging";
+import { type BridgeEntryBase, ReconnectingWsBridge } from "./ws-bridge";
 
 type Nt4Topic = {
 	id: number;
@@ -13,15 +14,7 @@ type Nt4Topic = {
 	type: string;
 };
 
-type Nt4AutoEntry = {
-	workspaceId: WorkspaceId;
-	upstreamUrl: string;
-	socket: WebSocket | null;
-	connection: BridgeConnection;
-	connected: boolean;
-	stale: boolean;
-	lastMessageAt: string | null;
-	error: string | null;
+type Nt4AutoEntry = BridgeEntryBase<WorkspaceId> & {
 	topicsById: Map<number, Nt4Topic>;
 	topicsByName: Map<string, Nt4Topic>;
 	valuesByName: Map<string, unknown>;
@@ -344,14 +337,46 @@ function decodeMsgPack(buffer: ArrayBuffer | Uint8Array): unknown[] {
 
 const nt4Log = getLogger("nt4");
 
-export class Nt4AutoChooserBridge {
+export class Nt4AutoChooserBridge extends ReconnectingWsBridge<
+	WorkspaceId,
+	Nt4AutoEntry
+> {
 	private readonly webSocketFactory: Nt4AutoWebSocketFactory;
-	private readonly entries = new Map<WorkspaceId, Nt4AutoEntry>();
 
 	constructor(options: Nt4AutoChooserBridgeOptions = {}) {
+		super();
 		this.webSocketFactory =
 			options.webSocketFactory ??
 			((url, protocols) => new WebSocket(url, protocols));
+	}
+
+	protected createEntry(
+		workspaceId: WorkspaceId,
+		upstreamUrl: string,
+	): Nt4AutoEntry {
+		return {
+			workspaceId,
+			upstreamUrl,
+			socket: null,
+			connection: "disconnected",
+			connected: false,
+			stale: true,
+			lastMessageAt: null,
+			error: null,
+			topicsById: new Map(),
+			topicsByName: new Map(),
+			valuesByName: new Map(),
+			publishedTopics: new Map(),
+		};
+	}
+
+	protected createSocket(entry: Nt4AutoEntry): WebSocket {
+		const socket = this.webSocketFactory(entry.upstreamUrl, [
+			"v4.1.networktables.first.wpi.edu",
+			"networktables.first.wpi.edu",
+		]);
+		socket.binaryType = "arraybuffer";
+		return socket;
 	}
 
 	ensureConnected(
@@ -359,28 +384,7 @@ export class Nt4AutoChooserBridge {
 		target: string | number,
 	): AutoChoosersResponse {
 		const upstreamUrl = upstreamUrlFor(target);
-		let entry = this.entries.get(workspaceId);
-		if (entry && entry.upstreamUrl !== upstreamUrl) {
-			this.disconnect(workspaceId);
-			entry = undefined;
-		}
-		if (!entry) {
-			entry = {
-				workspaceId,
-				upstreamUrl,
-				socket: null,
-				connection: "disconnected",
-				connected: false,
-				stale: true,
-				lastMessageAt: null,
-				error: null,
-				topicsById: new Map(),
-				topicsByName: new Map(),
-				valuesByName: new Map(),
-				publishedTopics: new Map(),
-			};
-			this.entries.set(workspaceId, entry);
-		}
+		const entry = this.ensureEntry(workspaceId, upstreamUrl);
 		if (!entry.socket) {
 			nt4Log.trace("nt4 attach", { workspaceId, url: upstreamUrl });
 			this.open(entry);
@@ -456,82 +460,54 @@ export class Nt4AutoChooserBridge {
 		if (entry.socket) {
 			nt4Log.info("nt4 detach", { workspaceId });
 		}
-		const socket = entry.socket;
-		entry.socket = null;
-		entry.connection = "disconnected";
-		entry.connected = false;
-		entry.stale = true;
-		if (socket && socket.readyState !== WebSocket.CLOSED) {
-			socket.close();
-		}
+		super.disconnect(workspaceId);
 	}
 
-	close(): void {
-		for (const workspaceId of this.entries.keys()) {
-			this.disconnect(workspaceId);
-		}
-		this.entries.clear();
-	}
-
-	private open(entry: Nt4AutoEntry): void {
-		entry.connection = "reconnecting";
-		entry.connected = false;
-		entry.stale = entry.lastMessageAt !== null;
+	protected onSocketOpen(entry: Nt4AutoEntry): void {
+		entry.connection = "connected";
+		entry.connected = true;
+		entry.stale = false;
 		entry.error = null;
-		const socket = this.webSocketFactory(entry.upstreamUrl, [
-			"v4.1.networktables.first.wpi.edu",
-			"networktables.first.wpi.edu",
-		]);
-		socket.binaryType = "arraybuffer";
-		entry.socket = socket;
-		socket.addEventListener("open", () => {
-			if (entry.socket !== socket) return;
-			entry.connection = "connected";
-			entry.connected = true;
-			entry.stale = false;
-			entry.error = null;
-			for (const topic of entry.publishedTopics.values()) {
-				this.sendJson(entry, "publish", {
-					name: topic.name,
-					type: topic.type,
-					pubuid: topic.id,
-					properties: {},
-				});
-			}
-			this.sendJson(entry, "subscribe", {
-				topics: ["/"],
-				subuid: SUBSCRIPTION_ID,
-				options: { prefix: true, all: false, periodic: 0.1 },
+		for (const topic of entry.publishedTopics.values()) {
+			this.sendJson(entry, "publish", {
+				name: topic.name,
+				type: topic.type,
+				pubuid: topic.id,
+				properties: {},
 			});
+		}
+		this.sendJson(entry, "subscribe", {
+			topics: ["/"],
+			subuid: SUBSCRIPTION_ID,
+			options: { prefix: true, all: false, periodic: 0.1 },
 		});
-		socket.addEventListener("message", (event) => {
-			if (entry.socket !== socket) return;
-			this.handleMessage(entry, event.data);
+	}
+
+	protected onSocketMessage(entry: Nt4AutoEntry, data: unknown): void {
+		this.handleMessage(entry, data);
+	}
+
+	// NT4 intentionally does NOT auto-reconnect: the base's no-op default would
+	// suffice, but we override only to log. The frontend polls /sim/auto-choosers
+	// (~1s) which re-calls ensureConnected, so reconnection is poll-driven —
+	// unlike HalSimBridge, which schedules exponential backoff here.
+	protected onSocketClosed(entry: Nt4AutoEntry, event: CloseEvent): void {
+		// Code 1006 fires constantly when the sim isn't running; the frontend polls
+		// /sim/auto-choosers which re-attaches each time. Only log unexpected closes.
+		const level = event.code === 1006 ? "trace" : "debug";
+		nt4Log[level]("nt4 upstream close", {
+			workspaceId: entry.workspaceId,
+			code: event.code,
+			reason: event.reason,
 		});
-		socket.addEventListener("close", (event) => {
-			if (entry.socket !== socket) return;
-			// Code 1006 fires constantly when the sim isn't running; the frontend polls
-			// /sim/auto-choosers which re-attaches each time. Only log unexpected closes.
-			const level = event.code === 1006 ? "trace" : "debug";
-			nt4Log[level]("nt4 upstream close", {
-				workspaceId: entry.workspaceId,
-				code: event.code,
-				reason: event.reason,
-			});
-			entry.socket = null;
-			entry.connection = "disconnected";
-			entry.connected = false;
-			entry.stale = true;
-			entry.error = event.reason || null;
+	}
+
+	protected onSocketError(entry: Nt4AutoEntry): void {
+		nt4Log.trace("nt4 upstream error", {
+			workspaceId: entry.workspaceId,
+			url: entry.upstreamUrl,
 		});
-		socket.addEventListener("error", () => {
-			if (entry.socket !== socket) return;
-			nt4Log.trace("nt4 upstream error", {
-				workspaceId: entry.workspaceId,
-				url: entry.upstreamUrl,
-			});
-			entry.error = "NT4 upstream error.";
-		});
+		entry.error = "NT4 upstream error.";
 	}
 
 	private handleMessage(entry: Nt4AutoEntry, raw: unknown): void {
