@@ -6,9 +6,27 @@ title: CodeRunner
 
 # CodeRunner
 
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 CodeRunner is a self-hosted, browser-based IDE for teaching FRC robot programming. Students open a web page, log in, write Java in a real VS Code editor, click **Run**, and watch their robot simulate in real time. There is nothing to install on a student's machine and no per-laptop setup to maintain. Everything runs on a machine you control and is delivered through the browser.
 
-![The CodeRunner IDE: editor, live telemetry, and Driver Station in one browser tab](/img/screenshots/hero-overview.gif)
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  style={{
+    width: '100%',
+    height: 'auto',
+    display: 'block',
+    margin: '1.5rem 0',
+    borderRadius: '8px',
+    border: '1px solid var(--ifm-color-emphasis-200)',
+    boxShadow: 'var(--ifm-global-shadow-lw)',
+  }}
+>
+  <source src={useBaseUrl('/img/screenshots/hero-overview.mp4')} type="video/mp4" />
+</video>
 
 ## What students get
 
