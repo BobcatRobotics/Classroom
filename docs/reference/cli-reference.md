@@ -12,6 +12,7 @@ All scripts are run from the repo root with `bun run NAME`. They require Bun 1.3
 | Script | What it does |
 |--------|-------------|
 | `start` | Applies pending database migrations, then starts the control plane. The normal way to run CodeRunner in production. |
+| `demo` | Applies migrations, then starts the control plane in demo mode (`--demo`). Auth is bypassed and every visitor shares one admin workspace — for local evaluation only. See [Quick Start](../quick-start.md). |
 | `dev:control` | Starts the control plane with `--watch` so it restarts automatically when source files change. Use during backend development. |
 | `dev:web` | Starts the Vite dev server for the React web shell with HMR. Use alongside `dev:control` during frontend development. |
 
@@ -21,7 +22,9 @@ All scripts are run from the repo root with `bun run NAME`. They require Bun 1.3
 |--------|-------------|
 | `build` | Full production build: builds the React web shell, builds AdvantageScope Lite assets, then pulls the workspace Docker image from GHCR. Run this before `start` on a fresh checkout. |
 | `build:web` | Builds only the React web shell into `apps/web/dist`. |
-| `build:ascope` | Builds only the AdvantageScope Lite assets into `dist/advantagescope`. |
+| `build:ascope` | Builds only the AdvantageScope Lite assets into `dist/advantagescope`. Requires emscripten and the AdvantageScope submodule. |
+| `fetch:dist` | Downloads the prebuilt web shell (`web-dist.tar.gz`) and AdvantageScope Lite (`ascope-dist.tar.gz`) from the latest GitHub release and unpacks them into `apps/web/dist` and `dist/advantagescope`. Skips the from-source build, so no emscripten or submodule is needed. Pass `--tag vX.Y.Z` (or set `DEMO_RELEASE_TAG`) to pin a release; set `DEMO_RELEASE_REPO` to fetch from a fork. |
+| `setup:demo` | One-step demo setup: pulls the workspace image, then runs `fetch:dist`. Pair with `demo`. |
 | `clean` | Deletes built output directories (`apps/web/dist` and `dist/advantagescope`). Does not touch runtime data under `data/`. |
 
 ## Docs Site
