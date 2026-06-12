@@ -22,7 +22,16 @@
 		{
 			"name": "docs",
 			"runtimeExecutable": "npm",
-			"runtimeArgs": ["--prefix", "website", "run", "start", "--", "--port", "3000", "--no-open"],
+			"runtimeArgs": [
+				"--prefix",
+				"website",
+				"run",
+				"start",
+				"--",
+				"--port",
+				"3000",
+				"--no-open"
+			],
 			"port": 3000
 		}
 	]
