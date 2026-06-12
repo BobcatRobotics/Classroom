@@ -6,7 +6,6 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const ascopeRoot = resolve(repoRoot, "vendor", "AdvantageScope");
 const ascopeLiteStatic = resolve(ascopeRoot, "lite", "static");
 const distDir = resolve(repoRoot, "dist", "advantagescope");
-const defaultEmsdk = "D:/Documents/GitHub/emsdk";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 async function exists(path: string): Promise<boolean> {
@@ -59,11 +58,16 @@ async function ensureSubmodule(): Promise<void> {
 }
 
 async function ensureEmscripten(): Promise<string> {
-	const emsdkRoot = Bun.env.EMSDK ?? defaultEmsdk;
+	const emsdkRoot = Bun.env.EMSDK;
+	if (!emsdkRoot) {
+		throw new Error(
+			"EMSDK is not set. Install/activate emsdk 4.0.12 and set EMSDK to its root directory.",
+		);
+	}
 	const emscriptenDir = resolve(emsdkRoot, "upstream", "emscripten");
 	if (!(await exists(emscriptenDir))) {
 		throw new Error(
-			`emscripten not found at ${emscriptenDir}. Set EMSDK or install/activate emsdk 4.0.12.`,
+			`emscripten not found at ${emscriptenDir}. Install/activate emsdk 4.0.12.`,
 		);
 	}
 	return emsdkRoot;
