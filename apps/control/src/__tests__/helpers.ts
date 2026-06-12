@@ -41,7 +41,7 @@ export async function createCatalogDir(root: string): Promise<string> {
 		"public class Main {\n  public static void main(String[] a) {}\n}\n",
 		"utf8",
 	);
-	await writeFile(join(helloDir, "README.md"), "# Hello, Name\n", "utf8");
+	await writeFile(join(helloDir, "README.md"), "# Hello, World\n", "utf8");
 	await writeFile(
 		join(helloDir, ".vscode", "launch.json"),
 		'{ "version": "0.2.0", "configurations": [] }\n',
@@ -69,7 +69,7 @@ export async function createCatalogDir(root: string): Promise<string> {
 				modules: [
 					{
 						id: "hello-world",
-						title: "Hello, Name",
+						title: "Hello, World",
 						description: "Variables and stdin.",
 						subdir: "modules/hello-world",
 						kind: "plain-java",

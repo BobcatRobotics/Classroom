@@ -24,7 +24,7 @@ const MANIFEST = {
 		},
 		{
 			id: "hello-world",
-			title: "Hello, Name",
+			title: "Hello, World",
 			description: "Plain java.",
 			subdir: "modules/hello-world",
 			kind: "plain-java",

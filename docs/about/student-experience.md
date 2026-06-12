@@ -5,6 +5,8 @@ title: The Student Experience
 
 # The Student Experience
 
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 This page describes what a student sees and does from the moment they open
 CodeRunner to the moment they watch their robot simulation run. No software
 installation is required on the student's machine.
@@ -20,6 +22,8 @@ is rejected with a message telling them to ask their coach to add them.
 On first successful sign-in, CodeRunner creates the student's workspace record
 and their file directories on the server. The student is then redirected to
 their workspace.
+
+![The CodeRunner sign-in page with GitHub and Google options](/img/screenshots/sign-in-page.png)
 
 ## The workspace shell
 
@@ -42,6 +46,8 @@ automatically to leave room for the editor.
 The topbar shows the CodeRunner logo, a **Switch project** button, and the
 student's account menu.
 
+![The three-pane workspace: editor, telemetry, and Driver Station](/img/screenshots/workspace-shell-three-panes.png)
+
 ## Loading a project
 
 A new workspace starts empty: there is no code in the editor until the student
@@ -63,6 +69,8 @@ once they have authenticated with `gh auth login`.
 Either action replaces whatever was in the workspace, so the dialog shows a
 confirmation step before proceeding.
 
+![The Switch Project dialog: lesson modules and GitHub import](/img/screenshots/switch-project-dialog.png)
+
 ## The Driver Station
 
 For **robot lessons** (kind: Robot) and team imports, the full Driver Station
@@ -70,6 +78,8 @@ chrome is shown. For **console lessons** (kind: Console), the Driver Station
 and AdvantageScope panes are hidden and the editor fills the window; a hint bar
 at the bottom explains that the lesson is run from the editor's Run button
 instead.
+
+![The Driver Station Workbench tab with run controls and mode buttons](/img/screenshots/driver-station-workbench.png)
 
 When the sim panes are visible, the Driver Station panel at the bottom of the
 screen has three tabs:
@@ -112,6 +122,25 @@ simulated robot. Two modes are available:
 
 A live SVG visualizer in the Controls tab mirrors the current controller state
 in real time, regardless of which input mode is selected.
+
+
+<video
+  autoPlay
+  loop
+  muted
+  playsInline
+  style={{
+    width: '100%',
+    height: 'auto',
+    display: 'block',
+    margin: '1.5rem 0',
+    borderRadius: '8px',
+    border: '1px solid var(--ifm-color-emphasis-200)',
+    boxShadow: 'var(--ifm-global-shadow-lw)',
+  }}
+>
+  <source src={useBaseUrl('/img/screenshots/controls-visualizer.mp4')} type="video/mp4" />
+</video>
 
 ### Auto chooser
 

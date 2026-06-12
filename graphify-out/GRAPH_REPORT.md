@@ -1533,7 +1533,7 @@ Nodes (4): 010 - Gradle project cache isolation for sim and LSP, Context, Decisi
 
 ### Community 368 - "Community 368"
 Cohesion: 0.4
-Nodes (3): Bonus, Hello, Name, Steps
+Nodes (3): Bonus, Hello, World, Steps
 
 ### Community 371 - "Community 371"
 Cohesion: 0.4

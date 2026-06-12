@@ -63,7 +63,7 @@ manifest, which is a complete and valid example:
   "modules": [
     {
       "id": "hello-world",
-      "title": "Hello, Name",
+      "title": "Hello, World",
       "description": "Variables, terminal input, and printing values.",
       "subdir": "modules/hello-world",
       "kind": "plain-java",
@@ -167,6 +167,8 @@ bonus challenges.
 For example, the bundled `hello-world` README opens with the goal, lists numbered
 steps, and finishes with bonus challenges.
 
+![A loaded lesson with its README auto-opened in the editor](/img/screenshots/lesson-readme-opened.png)
+
 ## The `.vscode/` folder
 
 The module's `.vscode/` folder ships editor configuration into the workspace:
@@ -197,7 +199,7 @@ modules; your repo's modules fully replace them.
 A natural progression is to start with plain-Java fundamentals and build toward
 a working WPILib robot. One worked sequence:
 
-1. **Hello, Name** (`plain-java`): variables, terminal input, printing.
+1. **Hello, World** (`plain-java`): variables, terminal input, printing.
 2. **Number guessing game** (`plain-java`): loops, conditionals, input
    validation.
 3. **Perimeter / area** (`plain-java`): methods and arithmetic, then again

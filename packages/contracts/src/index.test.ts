@@ -156,7 +156,7 @@ describe("lesson catalog schemas", () => {
 				modules: [
 					{
 						id: "hello-world",
-						title: "Hello, Name",
+						title: "Hello, World",
 						description: "Variables and stdin.",
 						subdir: "modules/hello-world",
 						kind: "plain-java",

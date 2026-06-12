@@ -27,12 +27,14 @@ work needs to be saved in version control.
 
 1. Open the **Switch Project** menu from the editor topbar.
 2. In the **Team Import** field, paste the public GitHub URL of the repository
-   root, for example `https://github.com/frc1234/robot-2025`.
+   root, for example `https://github.com/frc1234/robot-2026`.
 3. Confirm the discard prompt. **The current workspace contents are deleted
    before the import begins.** Students should push any work they want to keep
    before switching.
 4. A progress panel streams the clone and validation steps. When it finishes,
    the editor reopens on the imported project.
+
+![Importing a team project: the clone-and-validate progress panel](/img/screenshots/team-import-progress.png)
 
 ## What URL formats are accepted
 

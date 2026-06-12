@@ -8,7 +8,7 @@ const CATALOG = {
 	modules: [
 		{
 			id: "hello-world",
-			title: "Hello, Name",
+			title: "Hello, World",
 			description: "Variables and input.",
 			subdir: "modules/hello-world",
 			kind: "plain-java",

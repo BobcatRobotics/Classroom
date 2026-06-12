@@ -7,6 +7,8 @@ title: Quick Start
 
 This is the fastest way to see CodeRunner running on your own machine. It uses **demo mode**, which skips all of the login and account setup so you can land directly in the editor and try things out. Demo mode is for evaluation only. See the caveats at the end before you put an instance in front of students.
 
+![Landing in the editor in demo mode, ready to pick a lesson](/img/screenshots/demo-mode-landing.png)
+
 ## Prerequisites
 
 - **Bun 1.3.13 or newer.** CodeRunner's control plane and tooling run on Bun. Install it from [bun.sh](https://bun.sh).

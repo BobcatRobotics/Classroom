@@ -124,6 +124,8 @@ Six pre-built dashboard JSON files are in the [`dashboards/`](https://github.com
 | `05-node-process.json` | CodeRunner — Node / Process Health |
 | `06-ops-at-a-glance.json` | CodeRunner — Ops at a Glance |
 
+![The CodeRunner "Ops at a Glance" Grafana dashboard](/img/screenshots/grafana-ops-dashboard.png)
+
 To import them, open Grafana Cloud, go to **Dashboards → Import**, and upload each JSON file. The dashboards assume a Prometheus datasource with the metrics described in [Monitoring](./monitoring.md#what-is-exposed).
 
 ## Alloy config location
