@@ -24,6 +24,13 @@ git submodule update --init --recursive
 The submodule step pulls the pinned `vendor/AdvantageScope` checkout, which the
 telemetry build (`bun run build:ascope`) depends on.
 
+:::note Windows
+On Windows the AdvantageScope step may appear to hang the first time (it stalls
+while bundling/minifying the large `hub.js` renderer, often for a minute or two).
+If it seems stuck, cancel and re-run the build. The second run usually proceeds
+quickly. Building under WSL avoids the slowdown entirely.
+:::
+
 ## Repo layout
 
 A one-line map of the top-level directories you'll touch most:

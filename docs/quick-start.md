@@ -12,6 +12,7 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 - **Bun 1.3.13 or newer.** CodeRunner's control plane and tooling run on Bun. Install it from [bun.sh](https://bun.sh).
 - **Docker**, up and running. Each workspace and the robot simulation run inside containers, so Docker is required even in demo mode.
 - **Git with submodule support.** AdvantageScope is pulled in as a Git submodule, so a plain ZIP download will not work. Clone the repository instead.
+- **A Unix-like environment is recommended.** WSL, Linux and macOS are first-class. On Windows, the build and dev loop work but performance is noticeably worse, so running inside [WSL](https://learn.microsoft.com/windows/wsl/) is recommended over native Windows. See [Platform support](#platform-support) below.
 
 ## Steps
 
@@ -35,6 +36,11 @@ Build the web shell, AdvantageScope assets, and pull the workspace image:
 bun run build
 ```
 
+:::note Windows
+The AdvantageScope build step may appear to hang. If it seems stuck,
+cancel and re-run the build (it always succeeds on the 2nd try), or build in WSL.
+:::
+
 Start CodeRunner in demo mode:
 
 ```bash
@@ -52,6 +58,15 @@ Then open [http://localhost:4000](http://localhost:4000) in your browser. You wi
 3. Pulls the workspace Docker image (`ghcr.io/mathewdunne/coderunner-workspace:latest`) from the GitHub Container Registry.
 
 That workspace image bundles a full Java/WPILib toolchain and the VS Code editor, so it is several gigabytes. The **first** build will take a while as Docker downloads it; later builds reuse the cached image and are much faster.
+
+## Platform support
+
+CodeRunner runs on Linux, macOS, and Windows, but the development experience is not equal across them:
+
+- **Linux and macOS** are first-class. The build and dev loop run at full speed with no extra setup.
+- **Native Windows** works, but performance is noticeably worse — file-heavy steps like the AdvantageScope build and the Node/Bun tooling are much slower, largely due to antivirus scanning and slower filesystem access.
+
+If you are on Windows, running CodeRunner inside [WSL](https://learn.microsoft.com/windows/wsl/) (a Linux distribution under Windows) is **recommended**. Clone the repository into the WSL filesystem (not a `/mnt/c/...` path) and run all commands from there to get Linux-level performance.
 
 ## About demo mode
 
