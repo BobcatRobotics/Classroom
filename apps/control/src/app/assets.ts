@@ -16,6 +16,7 @@ import {
 	resolve,
 	sep,
 } from "node:path";
+import { unzipSync } from "fflate";
 import { requireSession } from "../auth/middleware";
 import type { AppStorage } from "../storage";
 import { htmlResponse, jsonResponse, notFound, redirect } from "./responses";
@@ -308,22 +309,31 @@ export async function handleUploadAsset(
 	await mkdir(assetsDir, { recursive: true });
 
 	const tmpDir = resolve(tmpdir(), `frc-upload-${crypto.randomUUID()}`);
-	const zipPath = resolve(tmpDir, "upload.zip");
 	try {
 		await mkdir(tmpDir, { recursive: true });
-		await writeFile(zipPath, new Uint8Array(await file.arrayBuffer()));
 
-		// Extract and validate ZIP structure
-		const proc = Bun.spawn(["unzip", "-o", "-d", tmpDir, zipPath], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const exitCode = await proc.exited;
-		if (exitCode !== 0) {
+		// Extract and validate ZIP structure in-process (no external `unzip`
+		// binary, which is absent on Windows). zip-slip is prevented by
+		// resolving each entry inside tmpDir and rejecting escapes.
+		let entries: Record<string, Uint8Array>;
+		try {
+			entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
+		} catch {
 			return new Response("Failed to extract ZIP archive.", { status: 400 });
 		}
 
-		// Find top-level directories in the extracted content (skip the zip file itself)
+		for (const [name, data] of Object.entries(entries)) {
+			if (name.endsWith("/")) continue; // directory entry
+			const dest = resolve(tmpDir, name);
+			const rel = relative(tmpDir, dest);
+			if (rel.startsWith("..") || isAbsolute(rel)) {
+				return new Response("ZIP contains invalid paths.", { status: 400 });
+			}
+			await mkdir(dirname(dest), { recursive: true });
+			await writeFile(dest, data);
+		}
+
+		// Find top-level directories in the extracted content
 		const extractedEntries = await readdir(tmpDir, { withFileTypes: true });
 		const assetDirs = extractedEntries.filter((e) => e.isDirectory());
 

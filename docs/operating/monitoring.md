@@ -111,10 +111,6 @@ A healthy service responds HTTP 200 with:
 {"ok":true,"service":"control","version":"v2-3"}
 ```
 
-This endpoint is public and excluded from access logs and metrics to avoid
-noise. Use it for readiness checks in load balancers, deploy scripts, and
-uptime monitors.
-
 ### Container and system state
 
 ```bash
