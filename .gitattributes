@@ -6,3 +6,7 @@
 gradlew text eol=lf
 Dockerfile text eol=lf
 entrypoint.sh text eol=lf
+
+# Patch files must keep LF — git apply rejects CRLF blank context lines
+# ("corrupt patch at line N") when checked out on Windows with autocrlf.
+*.patch text eol=lf
