@@ -16,7 +16,7 @@ targeted improvements, not a rescue.
 |------|-------|----------|--------|------------|--------|
 | 001  | Document 4 missing env vars in `.env.example` | P1 | S | — | DONE |
 | 002  | Remove dead `ImportManagerOptions` parameter | P2 | S | — | DONE |
-| 003  | Add baseline security response headers | P1 | S | — | TODO |
+| 003  | Add baseline security response headers | P1 | S | — | DONE |
 | 004  | Guard stale run-job status writes | P1 | S | — | TODO |
 | 005  | Deduplicate the 4 WebSocket-upgrade blocks | P2 | S | — | TODO |
 | 006  | Apply capacity admission to container adoption | P1 | M | — | TODO |
