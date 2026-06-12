@@ -11,17 +11,16 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 
 - **Bun 1.3.13 or newer.** CodeRunner's control plane and tooling run on Bun. Install it from [bun.sh](https://bun.sh).
 - **Docker**, up and running. Each workspace and the robot simulation run inside containers, so Docker is required even in demo mode.
-- **Git with submodule support.** AdvantageScope is pulled in as a Git submodule, so a plain ZIP download will not work. Clone the repository instead.
-- **A Unix-like environment is recommended.** WSL, Linux and macOS are first-class. On Windows, the build and dev loop work but performance is noticeably worse, so running inside [WSL](https://learn.microsoft.com/windows/wsl/) is recommended over native Windows. See [Platform support](#platform-support) below.
+- **Git.** Clone the repository (a plain ZIP download is fine too, since demo mode uses prebuilt assets and does not need submodules).
+- **A Unix-like environment is recommended.** WSL, Linux and macOS are first-class. On Windows, the demo loop works fine, but the full development loop performs noticeably worse, so running inside [WSL](https://learn.microsoft.com/windows/wsl/) is recommended for development. See [Platform support](#platform-support) below.
 
 ## Steps
 
-Clone the repository and fetch its submodules:
+Clone the repository:
 
 ```bash
 git clone https://github.com/mathewdunne/CodeRunner coderunner
 cd coderunner
-git submodule update --init --recursive
 ```
 
 Install dependencies:
@@ -30,43 +29,43 @@ Install dependencies:
 bun install
 ```
 
-Build the web shell, AdvantageScope assets, and pull the workspace image:
+Fetch the prebuilt web shell and AdvantageScope assets, and pull the workspace image:
 
 ```bash
-bun run build
+bun run setup:demo
 ```
-
-:::note Windows
-The AdvantageScope build step may appear to hang. If it seems stuck,
-cancel and re-run the build (it always succeeds on the 2nd try), or build in WSL.
-:::
 
 Start CodeRunner in demo mode:
 
 ```bash
-bun run start -- --demo
+bun run demo
 ```
 
 Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run.
 
-## What `bun run build` does
+## What `bun run setup:demo` does
 
-`bun run build` does three things in sequence:
+`bun run setup:demo` does two things in sequence:
 
-1. Builds the React web shell into a static bundle.
-2. Builds the AdvantageScope assets used to render telemetry.
-3. Pulls the workspace Docker image (`ghcr.io/mathewdunne/coderunner-workspace:latest`) from the GitHub Container Registry.
+1. Pulls the workspace Docker image (`ghcr.io/mathewdunne/coderunner-workspace:latest`) from the GitHub Container Registry.
+2. Downloads the prebuilt web shell and AdvantageScope assets from the latest GitHub release and unpacks them into `apps/web/dist` and `dist/advantagescope`.
 
-That workspace image bundles a full Java/WPILib toolchain and the VS Code editor, so it is several gigabytes. The **first** build will take a while as Docker downloads it; later builds reuse the cached image and are much faster.
+Using the prebuilt release assets means the demo does **not** compile AdvantageScope from source, so you do not need emscripten or the AdvantageScope submodule — the step that makes a full source build slow (and Windows-finicky).
+
+That workspace image bundles a full Java/WPILib toolchain and the VS Code editor, so it is several gigabytes. The **first** setup will take a while as Docker downloads it; later runs reuse the cached image and are much faster.
+
+:::note Building from source instead
+If you are developing CodeRunner (not just evaluating it), build the assets from source with `bun run build` instead. That requires the AdvantageScope submodule (`git submodule update --init --recursive`) and emscripten. See [Local Deployment](./deploying/local.md).
+:::
 
 ## Platform support
 
 CodeRunner runs on Linux, macOS, and Windows, but the development experience is not equal across them:
 
 - **Linux and macOS** are first-class. The build and dev loop run at full speed with no extra setup.
-- **Native Windows** works, but performance is noticeably worse — file-heavy steps like the AdvantageScope build and the Node/Bun tooling are much slower, largely due to antivirus scanning and slower filesystem access.
+- **Native Windows** is fine for the demo, which uses prebuilt assets. For full development (building from source, the dev loop), performance is noticeably worse — file-heavy steps like the AdvantageScope build and the Node/Bun tooling are much slower, largely due to antivirus scanning and slower filesystem access.
 
-If you are on Windows, running CodeRunner inside [WSL](https://learn.microsoft.com/windows/wsl/) (a Linux distribution under Windows) is **recommended**. Clone the repository into the WSL filesystem (not a `/mnt/c/...` path) and run all commands from there to get Linux-level performance.
+If you are developing on Windows, running CodeRunner inside [WSL](https://learn.microsoft.com/windows/wsl/) (a Linux distribution under Windows) is **recommended**. Clone the repository into the WSL filesystem (not a `/mnt/c/...` path) and run all commands from there to get Linux-level performance.
 
 ## About demo mode
 
