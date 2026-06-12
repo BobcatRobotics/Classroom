@@ -19,7 +19,7 @@ targeted improvements, not a rescue.
 | 003  | Add baseline security response headers | P1 | S | — | DONE |
 | 004  | Guard stale run-job status writes | P1 | S | — | DONE |
 | 005  | Deduplicate the 4 WebSocket-upgrade blocks | P2 | S | — | DONE |
-| 006  | Apply capacity admission to container adoption | P1 | M | — | TODO |
+| 006  | Apply capacity admission to container adoption | P1 | M | — | DONE |
 | 007  | Batch `docker inspect` in `managedContainerStats` | P1 | M | — | TODO |
 | 008  | Characterization tests for the WS message router | P1 | M | — | TODO |
 | 009  | Extract a shared reconnecting-WS-bridge base | P3 | M | 008 | TODO |

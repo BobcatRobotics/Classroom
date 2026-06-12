@@ -7,6 +7,31 @@ import {
 	workspaceBySlug,
 } from "./helpers";
 
+// Find the fake container for a workspace by its `frc-sim.workspace` label.
+function fakeContainerFor(
+	fakeDocker: ReturnType<typeof createFakeDocker>,
+	workspaceId: string,
+) {
+	for (const container of fakeDocker.containers.values()) {
+		if (container.labels["frc-sim.workspace"] === workspaceId) {
+			return container;
+		}
+	}
+	return undefined;
+}
+
+// Simulate the idle sweep: stop (but do not remove) a workspace's container.
+function stopFakeContainer(
+	fakeDocker: ReturnType<typeof createFakeDocker>,
+	workspaceId: string,
+) {
+	const container = fakeContainerFor(fakeDocker, workspaceId);
+	if (!container) {
+		throw new Error(`no fake container for workspace ${workspaceId}`);
+	}
+	container.running = false;
+}
+
 describe("container concurrency cap", () => {
 	test("ensureCodeContainer throws CapacityExceededError when at cap", async () => {
 		const fakeDocker = createFakeDocker();
@@ -188,6 +213,110 @@ describe("container concurrency cap", () => {
 			{
 				dockerRunner: fakeDocker.runner,
 				maxActiveContainers: 3,
+			},
+		);
+	});
+
+	test("restarting a stopped container is rejected when at capacity", async () => {
+		const fakeDocker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				// Cap at 1. Alice starts a container, then it is stopped (idle sweep
+				// stops but does not remove). Bob then fills the only slot.
+				await login(app, "alice");
+				const alice = workspaceBySlug(app, "alice");
+				await app.containers.ensureCodeContainer(alice);
+				stopFakeContainer(fakeDocker, alice.id);
+
+				await login(app, "bob");
+				const bob = workspaceBySlug(app, "bob");
+				await app.containers.ensureCodeContainer(bob);
+
+				// Alice reconnects: adoption would `docker start` her stopped
+				// container, which must now be gated by the capacity cap.
+				try {
+					await app.containers.ensureCodeContainer(alice);
+					expect.unreachable("Should have thrown");
+				} catch (error: unknown) {
+					expect((error as Error).name).toBe("CapacityExceededError");
+				}
+				// Her container must remain stopped (not restarted past the cap).
+				expect(fakeContainerFor(fakeDocker, alice.id)?.running).toBe(false);
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				maxActiveContainers: 1,
+				simPortRange: { start: 45880, end: 45890 },
+				vscodePortRange: { start: 46880, end: 46890 },
+				halsimPortRange: { start: 47880, end: 47890 },
+			},
+		);
+	});
+
+	test("adopting an already-running container is not gated at capacity", async () => {
+		const fakeDocker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				// Cap at 1, filled by alice's running container. Re-ensuring for
+				// alice adopts her already-running (already-counted) container and
+				// must not consume a new slot or be rejected.
+				await login(app, "alice");
+				const alice = workspaceBySlug(app, "alice");
+				await app.containers.ensureCodeContainer(alice);
+
+				const again = await app.containers.ensureCodeContainer(alice);
+				expect(again.state).toBe("running");
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				maxActiveContainers: 1,
+				simPortRange: { start: 45900, end: 45910 },
+				vscodePortRange: { start: 46900, end: 46910 },
+				halsimPortRange: { start: 47900, end: 47910 },
+			},
+		);
+	});
+
+	test("a successful restart below cap releases its slot", async () => {
+		const fakeDocker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				// Cap at 2. Alice starts then is stopped, leaving 0 running.
+				await login(app, "alice");
+				const alice = workspaceBySlug(app, "alice");
+				await app.containers.ensureCodeContainer(alice);
+				stopFakeContainer(fakeDocker, alice.id);
+
+				// Restart below cap succeeds.
+				const restarted = await app.containers.ensureCodeContainer(alice);
+				expect(restarted.state).toBe("running");
+
+				// If the restart leaked a pending slot, this create would be
+				// rejected (active = 1 running + 1 leaked = 2 = cap). It must succeed.
+				await login(app, "bob");
+				const bob = workspaceBySlug(app, "bob");
+				const bobStatus = await app.containers.ensureCodeContainer(bob);
+				expect(bobStatus.state).toBe("running");
+
+				// Now genuinely at cap: a third workspace is rejected.
+				await login(app, "carol");
+				const carol = workspaceBySlug(app, "carol");
+				try {
+					await app.containers.ensureCodeContainer(carol);
+					expect.unreachable("Should have thrown");
+				} catch (error: unknown) {
+					expect((error as Error).name).toBe("CapacityExceededError");
+				}
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				maxActiveContainers: 2,
+				simPortRange: { start: 45920, end: 45940 },
+				vscodePortRange: { start: 46920, end: 46940 },
+				halsimPortRange: { start: 47920, end: 47940 },
 			},
 		);
 	});
