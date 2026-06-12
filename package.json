@@ -24,7 +24,7 @@
 		"docs:build": "bun run --cwd website build",
 		"docs:install": "bun install --cwd website",
 		"docker:build:workspace": "bun scripts/build-code-image.ts",
-		"docker:pull:workspace": "docker pull ghcr.io/mathewdunne/coderunner-workspace:latest",
+		"docker:pull:workspace": "docker pull ghcr.io/mathewdunne/coderunner-workspace:latest && docker tag ghcr.io/mathewdunne/coderunner-workspace:latest coderunner-workspace",
 		"docker:push:workspace": "bun scripts/build-code-image.ts && docker push ghcr.io/mathewdunne/coderunner-workspace:latest",
 		"docker:cleanup": "bun scripts/cleanup-containers.ts",
 		"docker:rebuild-workspaces": "bun scripts/rebuild-workspaces.ts",

@@ -5,7 +5,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'CodeRunner',
+  title: 'CodeRunner Docs',
   tagline: 'Browser-based IDE and simulator for FRC programming training',
   favicon: 'img/coderunner-icon.png',
 
