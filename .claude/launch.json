@@ -18,6 +18,12 @@
 			"runtimeExecutable": "bun",
 			"runtimeArgs": ["apps/control/src/main.ts", "--demo"],
 			"port": 4000
+		},
+		{
+			"name": "docs",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["--prefix", "website", "run", "start", "--", "--port", "3000", "--no-open"],
+			"port": 3000
 		}
 	]
 }

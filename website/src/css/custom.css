@@ -1,30 +1,65 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Docusaurus theme — styled to match the main app's dark IDE aesthetic.
+ * Primary accent: indigo, derived from the app's sidebar-primary hue
+ * (oklch 0.488 0.243 264).
  */
 
-/* You can override the default Infima variables here. */
+/* Light mode: deep indigo primary */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary: #4f46e5;
+  --ifm-color-primary-dark: #4338ca;
+  --ifm-color-primary-darker: #3730a3;
+  --ifm-color-primary-darkest: #312e81;
+  --ifm-color-primary-light: #6366f1;
+  --ifm-color-primary-lighter: #818cf8;
+  --ifm-color-primary-lightest: #a5b4fc;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* Dark mode: brighter indigo + near-black backgrounds matching the app */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6366f1;
+  --ifm-color-primary-darker: #4f46e5;
+  --ifm-color-primary-darkest: #4338ca;
+  --ifm-color-primary-light: #a5b4fc;
+  --ifm-color-primary-lighter: #c7d2fe;
+  --ifm-color-primary-lightest: #e0e7ff;
+
+  /* Near-black backgrounds — matches the app's oklch(0.145) background and
+     oklch(0.205) card/surface. */
+  --ifm-background-color: #171717;
+  --ifm-background-surface-color: #1f1f1f;
+  --ifm-navbar-background-color: #171717;
+  --ifm-footer-background-color: #111111;
+
+  /* Subtle white-overlay borders, matching the app's oklch(1 0 0 / 10%). */
+  --ifm-toc-border-color: rgba(255, 255, 255, 0.08);
+  --ifm-color-emphasis-200: rgba(255, 255, 255, 0.06);
+  --ifm-color-emphasis-300: rgba(255, 255, 255, 0.10);
+  --ifm-color-emphasis-400: rgba(255, 255, 255, 0.16);
+
+  /* Muted text — matches the app's muted-foreground oklch(0.708). */
+  --ifm-color-secondary: #a1a1a1;
+
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Navbar: replace drop shadow with a subtle bottom border, matching the
+   app's border-border separator style. */
+[data-theme='dark'] .navbar {
+  box-shadow: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Sidebar: match the app's card background (oklch 0.205). */
+[data-theme='dark'] .theme-doc-sidebar-container {
+  background-color: #1f1f1f;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Footer: remove the default banded separator, keep it flush dark. */
+[data-theme='dark'] .footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
