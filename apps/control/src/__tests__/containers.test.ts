@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type ControlAppOptions, createApp } from "../app";
+import { managedContainerStats } from "../containers/lifecycle";
 import {
 	cookieFrom,
 	createCatalogDir,
@@ -315,5 +316,94 @@ describe("code container orchestration", () => {
 				vscodePortRange: { start: 33006, end: 33007 },
 			},
 		);
+	});
+});
+
+describe("managedContainerStats", () => {
+	test("batches docker inspect into a single call and maps fields per container", async () => {
+		const fakeDocker = createFakeDocker();
+		fakeDocker.containers.set("coderunner-workspace-alice", {
+			name: "coderunner-workspace-alice",
+			running: true,
+			labels: {
+				"frc-sim.managed": "true",
+				"frc-sim.workspace": "alice",
+				"frc-sim.role": "code",
+			},
+			ports: [],
+		});
+		fakeDocker.containers.set("coderunner-workspace-bob", {
+			name: "coderunner-workspace-bob",
+			running: false,
+			labels: {
+				"frc-sim.managed": "true",
+				"frc-sim.workspace": "bob",
+				"frc-sim.role": "code",
+			},
+			ports: [],
+		});
+
+		const stats = await managedContainerStats(fakeDocker.runner);
+
+		const byName = new Map(stats.map((stat) => [stat.name, stat]));
+		expect(byName.get("coderunner-workspace-alice")).toMatchObject({
+			workspaceId: "alice",
+			role: "code",
+			state: "running",
+		});
+		expect(byName.get("coderunner-workspace-bob")).toMatchObject({
+			workspaceId: "bob",
+			role: "code",
+			state: "stopped",
+		});
+
+		// Regression guard: one inspect call for all names, not one per container.
+		const inspectCalls = fakeDocker.calls.filter(
+			(call) => call[0] === "container" && call[1] === "inspect",
+		);
+		expect(inspectCalls.length).toBe(1);
+		expect(inspectCalls[0]).toEqual([
+			"container",
+			"inspect",
+			"coderunner-workspace-alice",
+			"coderunner-workspace-bob",
+		]);
+	});
+
+	test("degrades gracefully when a container disappears between ls and inspect", async () => {
+		const fakeDocker = createFakeDocker();
+		// Present in the ls output but resolvable by inspect.
+		fakeDocker.containers.set("coderunner-workspace-alice", {
+			name: "coderunner-workspace-alice",
+			running: true,
+			labels: {
+				"frc-sim.managed": "true",
+				"frc-sim.workspace": "alice",
+				"frc-sim.role": "code",
+			},
+			ports: [],
+		});
+
+		// Wrap the runner so the ls also advertises a name that inspect can't find.
+		const runner: typeof fakeDocker.runner = async (args) => {
+			const result = await fakeDocker.runner(args);
+			if (args[0] === "container" && args[1] === "ls") {
+				return {
+					...result,
+					stdout: `${result.stdout.trim()}\ncoderunner-workspace-ghost\n`,
+				};
+			}
+			return result;
+		};
+
+		const stats = await managedContainerStats(runner);
+		const ghost = stats.find(
+			(stat) => stat.name === "coderunner-workspace-ghost",
+		);
+		expect(ghost).toMatchObject({
+			workspaceId: null,
+			role: null,
+			state: null,
+		});
 	});
 });

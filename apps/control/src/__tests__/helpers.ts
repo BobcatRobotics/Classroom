@@ -245,10 +245,23 @@ export function createFakeDocker(
 		}
 
 		if (args[0] === "container" && args[1] === "inspect") {
-			const container = containers.get(args[2] ?? "");
-			return container
-				? ok(JSON.stringify([dockerInspect(container)]))
-				: missing("No such container");
+			const requested = args.slice(2);
+			const found = requested
+				.map((name) => containers.get(name))
+				.filter((container): container is FakeContainer => Boolean(container));
+			// Mirror real docker: it prints the JSON array of resolved containers
+			// even when some names are missing, exiting non-zero in that case.
+			const allFound = found.length === requested.length;
+			const stdout = found.length
+				? JSON.stringify(found.map((container) => dockerInspect(container)))
+				: "";
+			return allFound
+				? ok(stdout)
+				: {
+						exitCode: 1,
+						stdout,
+						stderr: "Error: No such container",
+					};
 		}
 
 		if (args[0] === "container" && args[1] === "ls") {
