@@ -88,9 +88,10 @@ docker stats --filter label=frc-sim.managed=true --no-stream
 ```
 
 On the cloud VM, `container_cpu_percent` and `container_memory_percent` metrics
-(per workspace, sampled every 15 s) are shipped to Grafana Cloud and show trends
-over time. Use those to confirm that your memory cap and concurrency limit are
-well-matched to actual student behaviour.
+(per workspace, sampled every 15 s) are available as Prometheus metrics and, if
+Grafana Cloud is configured, show trends over time there (see
+[Grafana Cloud](./grafana.md)). Use those to confirm that your memory cap and
+concurrency limit are well-matched to actual student behaviour.
 
 ## Disk growth
 

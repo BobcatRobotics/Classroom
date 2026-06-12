@@ -97,6 +97,26 @@ collection, and event-loop lag gauges.
 
 ## Quick health checks
 
+### Health endpoint
+
+The control plane exposes an unauthenticated health endpoint:
+
+```bash
+curl http://localhost:4000/healthz
+```
+
+A healthy service responds HTTP 200 with:
+
+```json
+{"ok":true,"service":"control","version":"v2-3"}
+```
+
+This endpoint is public and excluded from access logs and metrics to avoid
+noise. Use it for readiness checks in load balancers, deploy scripts, and
+uptime monitors.
+
+### Container and system state
+
 ```bash
 # See all managed containers and their state
 docker ps --filter label=frc-sim.managed=true
@@ -118,71 +138,8 @@ Signs to watch for:
 - If `runs_total{terminal_status="failed"}` is rising, check for build timeouts
   or container OOMs in the logs.
 
-## Grafana Cloud (cloud VM)
+## Grafana Cloud
 
-On the Google Cloud VM, Grafana Alloy runs as the `alloy` systemd service. It
-scrapes `localhost:4000/metrics` every 30 seconds and remote-writes to Grafana
-Cloud Prometheus. It also collects host-level metrics (CPU, memory, disk,
-network) via the built-in Unix exporter, and ships control-plane logs to
-Grafana Cloud Loki.
-
-### Service management
-
-```bash
-sudo systemctl status alloy
-sudo systemctl restart alloy
-sudo journalctl -u alloy -f
-```
-
-### How logs are shipped
-
-systemd captures the control plane's JSON stdout into journald.
-`loki.source.journal` in the Alloy config tails the `coderunner.service` unit
-and ships entries to Loki. The pipeline extracts `level` and `category` as Loki
-labels; high-cardinality fields like `workspaceId` and `runId` stay in the JSON
-body and are queried with `| json` at read time.
-
-The `alloy` user must be in the `systemd-journal` group to read journald; the
-bootstrap script adds it. Without that membership, `loki.source.journal`
-produces zero entries silently.
-
-### Starter LogQL queries
-
-Find these under **Explore → Loki datasource** in Grafana Cloud:
-
-```logql
-# All logs from one student
-{unit="coderunner.service"} | json | workspaceId="alice-1"
-
-# All errors
-{unit="coderunner.service", level="error"}
-
-# Run lifecycle events with duration
-{unit="coderunner.service", category="control.runs"} | json
-  | line_format "{{.message}} {{.workspaceId}} {{.durationMs}}ms"
-
-# Container start failures
-{unit="coderunner.service", category="control.containers"} |= "failed"
-```
-
-### Alloy config location
-
-The rendered Alloy config lives at `/etc/alloy/config.alloy` on the VM. It is
-regenerated from the template at `/etc/alloy/config.alloy.tmpl` on every boot
-by `render-env.sh`, which substitutes secrets from GCP Secret Manager. Do not
-edit `config.alloy` directly; changes are overwritten on next boot. Edit the
-template instead, then run `render-env.sh` and restart `alloy`.
-
-### Suggested dashboards
-
-There is no pre-built dashboard JSON in this repo. Useful panels to build in
-Grafana Cloud:
-
-1. **Control plane**: request rate, error rate, p50/p95/p99 latency by
-   `route`, `http_requests_in_flight`, event-loop lag, heap usage.
-2. **Runs**: start rate, `run_build_duration_seconds` quantiles,
-   `run_active_duration_seconds` by `terminal_status`, failure ratio.
-3. **Containers**: `container_cpu_percent` and `container_memory_percent`
-   per workspace, `container_start_duration_seconds` histogram,
-   `active_workspaces` over time.
-4. **Host**: CPU, memory, disk usage from the Unix exporter.
+For the cloud VM deployment, Grafana Alloy can optionally ship metrics and logs
+to Grafana Cloud. See [Grafana Cloud](./grafana.md) for setup, credentials,
+LogQL queries, and pre-built dashboards.

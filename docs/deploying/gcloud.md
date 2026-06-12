@@ -145,12 +145,7 @@ The exact secret names (all prefixed `coderunner-`) are defined in
 The `render-env.sh` script on the VM reads every one of them at boot; if any
 are missing the service will not start.
 
-**Finding Grafana Cloud values:** in the Grafana Cloud portal open your stack.
-The Prometheus remote-write URL and numeric username are on the
-Prometheus/Metrics card's Details page. The Loki push URL and its separate
-numeric instance ID are on the Loki/Logs Details page. For the token, create a
-Cloud Access Policy token with both `metrics:write` and `logs:write` scopes;
-one token covers both pipelines.
+See [Grafana Cloud](../operating/grafana.md) for where to find each value in the Grafana Cloud portal.
 
 ### 6. Add a DNS A record
 
@@ -322,7 +317,7 @@ previous tag**.
 | TLS and healthz | `curl -I https://<your-domain>/healthz` returns 200 |
 | Control plane logs | `journalctl -u coderunner -n 50` via IAP SSH |
 | Workspace image present | `docker images \| grep coderunner-workspace` via IAP SSH |
-| Metrics in Grafana | In Grafana Cloud Explore: `up{instance="coderunner"}` should return three series, all `1` |
+| Metrics in Grafana | If Grafana Cloud is configured, see [Grafana Cloud](../operating/grafana.md) for the verification query |
 
 ## Cost and sizing
 

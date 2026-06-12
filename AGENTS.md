@@ -31,6 +31,7 @@ scripts/                       TypeScript utility scripts run by Bun
 patches/advantagescope/        Source-level AS Lite patches
 docs/                          Site content (Docusaurus pages) + decision logs (docs/decisions/)
 website/                       Docusaurus site config; docs/ is the content source
+dashboards/                    Pre-built Grafana dashboard JSON files (import into Grafana Cloud)
 vendor/AdvantageScope/         Pinned upstream submodule
 e2e/                           Playwright E2E tests (specs/ and fixtures/)
 data/                          Runtime data, gitignored
@@ -81,7 +82,7 @@ and `docs/decisions/029-lessons-and-modules.md`.
 
 ## Key References
 
-- `docs/` + `website/` — docs site content and Docusaurus config; run `bun run docs:dev` to browse locally, `bun run docs:build` to build.
+- `docs/` + `website/` — docs site content and Docusaurus config; published at `https://mathewdunne.ca/CodeRunner/`; run `bun run docs:dev` to browse locally, `bun run docs:build` to build.
 - `docs/decisions/` — all architecture decision logs (011–029 active; 001–010 archived under `docs/decisions/archive/`).
 - Pinned AdvantageScope submodule: `vendor/AdvantageScope` at tag `v26.0.2`.
 
