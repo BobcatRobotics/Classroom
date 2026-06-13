@@ -30,20 +30,28 @@ if (c.demo) {
 	for (const line of banner) log.warn(line);
 }
 
-const simRange = `${c.simPortRange.start}-${c.simPortRange.end}`;
-const vscodeRange = `${c.vscodePortRange.start}-${c.vscodePortRange.end}`;
-const maxStudents = Math.min(
-	c.simPortRange.end - c.simPortRange.start + 1,
-	c.vscodePortRange.end - c.vscodePortRange.start + 1,
-);
+// In network mode workspace containers publish no host ports, so the port
+// ranges do not bound concurrency — MAX_ACTIVE_CONTAINERS does.
+const maxStudents = c.containerNetwork
+	? c.maxActiveContainers
+	: Math.min(
+			c.simPortRange.end - c.simPortRange.start + 1,
+			c.vscodePortRange.end - c.vscodePortRange.start + 1,
+		);
 
 log.info("control plane configuration", {
 	logLevel: c.logLevel,
 	dataDir: c.dataDir,
+	hostDataDir: c.hostDataDir ?? "(same as dataDir)",
 	codeImage: c.codeImage,
 	codeMemoryLimit: c.codeMemoryLimit,
-	simPorts: simRange,
-	vscodePorts: vscodeRange,
+	containerNetwork: c.containerNetwork ?? "(none — loopback published ports)",
+	simPorts: c.containerNetwork
+		? "(unused in network mode)"
+		: `${c.simPortRange.start}-${c.simPortRange.end}`,
+	vscodePorts: c.containerNetwork
+		? "(unused in network mode)"
+		: `${c.vscodePortRange.start}-${c.vscodePortRange.end}`,
 	buildTimeoutSec: c.runBuildTimeoutMs / 1000,
 	simStartupSec: c.simStartupTimeoutMs / 1000,
 	idleStopMinutes: c.idleStopMinutes,

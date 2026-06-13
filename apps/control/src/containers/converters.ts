@@ -1,43 +1,87 @@
 import type { ContainerState } from "@frc-coderunner/contracts";
 import type { WorkspaceRuntime } from "../runtime";
 import type { ContainerLeaseRow, WorkspaceRow } from "../storage";
-import type { CodeContainerStatus, ManagedContainerStats } from "./types";
+import {
+	type CodeContainerStatus,
+	HALSIM_CONTAINER_PORT,
+	type ManagedContainerStats,
+	SIM_CONTAINER_PORT,
+	VSCODE_CONTAINER_PORT,
+} from "./types";
 
 export function statusFromLease(
 	image: string,
+	containerNetwork: string | null,
 	lease: ContainerLeaseRow | null,
 	state: ContainerState,
 	error: string | null = null,
 ): CodeContainerStatus {
+	// In network mode there are no published host ports; "allocated" means the
+	// container endpoint is resolvable (the container exists on the network).
+	const networkReachable =
+		containerNetwork !== null && (lease?.vscode_container ?? null) !== null;
 	return {
 		role: "code",
 		state,
 		image,
 		containerName: lease?.vscode_container ?? null,
-		simPortAllocated: (lease?.nt4_port ?? null) !== null,
-		vscodePortAllocated: (lease?.vscode_port ?? null) !== null,
-		halsimPortAllocated: (lease?.halsim_port ?? null) !== null,
+		simPortAllocated: networkReachable || (lease?.nt4_port ?? null) !== null,
+		vscodePortAllocated:
+			networkReachable || (lease?.vscode_port ?? null) !== null,
+		halsimPortAllocated:
+			networkReachable || (lease?.halsim_port ?? null) !== null,
 		lastUsedAt: lease?.last_used_at ?? null,
 		error,
 	};
 }
 
-export function runtimeFromLease(
-	image: string,
+/**
+ * Build upstream endpoints for a workspace container. Port mode (dev/host
+ * deployments) targets the loopback ports published by `docker run -p`;
+ * network mode (containerized control plane) targets the container by name on
+ * the shared Docker network using the fixed internal ports.
+ */
+export function upstreamEndpoints(
+	containerNetwork: string | null,
 	workspace: WorkspaceRow,
 	lease: ContainerLeaseRow | null,
-	state: ContainerState,
-	error: string | null = null,
-): WorkspaceRuntime {
+): Pick<WorkspaceRuntime, "ports" | "endpoints"> {
+	const basePath = `/u/${workspace.slug}/vscode/`;
+
+	if (containerNetwork !== null) {
+		const containerName = lease?.vscode_container ?? null;
+		return {
+			ports: { nt4: null, vscode: null, halsim: null },
+			endpoints: {
+				vscode:
+					containerName === null
+						? null
+						: {
+								httpBaseUrl: `http://${containerName}:${VSCODE_CONTAINER_PORT}`,
+								wsBaseUrl: `ws://${containerName}:${VSCODE_CONTAINER_PORT}`,
+								basePath,
+							},
+				nt4:
+					containerName === null
+						? null
+						: {
+								httpUrl: `http://${containerName}:${SIM_CONTAINER_PORT}/`,
+								wsUrl: `ws://${containerName}:${SIM_CONTAINER_PORT}/nt/AdvantageScopeLite`,
+							},
+				halsim:
+					containerName === null
+						? null
+						: {
+								wsUrl: `ws://${containerName}:${HALSIM_CONTAINER_PORT}/wpilibws`,
+							},
+			},
+		};
+	}
+
 	const vscodePort = lease?.vscode_port ?? null;
 	const nt4Port = lease?.nt4_port ?? null;
 	const halsimPort = lease?.halsim_port ?? null;
-	const basePath = `/u/${workspace.slug}/vscode/`;
 	return {
-		workspaceId: workspace.id,
-		state,
-		image,
-		runtimeName: lease?.vscode_container ?? null,
 		ports: {
 			nt4: nt4Port,
 			vscode: vscodePort,
@@ -66,6 +110,23 @@ export function runtimeFromLease(
 							wsUrl: `ws://127.0.0.1:${halsimPort}/wpilibws`,
 						},
 		},
+	};
+}
+
+export function runtimeFromLease(
+	image: string,
+	containerNetwork: string | null,
+	workspace: WorkspaceRow,
+	lease: ContainerLeaseRow | null,
+	state: ContainerState,
+	error: string | null = null,
+): WorkspaceRuntime {
+	return {
+		workspaceId: workspace.id,
+		state,
+		image,
+		runtimeName: lease?.vscode_container ?? null,
+		...upstreamEndpoints(containerNetwork, workspace, lease),
 		lastUsedAt: lease?.last_used_at ?? null,
 		error,
 	};

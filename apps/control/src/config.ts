@@ -26,6 +26,8 @@ export type ControlConfig = {
 	dockerPath: string;
 	codeImage: string;
 	codeMemoryLimit: string;
+	containerNetwork: string | null;
+	hostDataDir: string | null;
 	simPortRange: PortRange;
 	vscodePortRange: PortRange;
 	halsimPortRange: PortRange;
@@ -159,12 +161,54 @@ function defaultContainerUser(): string | null {
 	return null;
 }
 
+function parseHostDataDir(value: string | null): string | null {
+	if (value === null) {
+		return null;
+	}
+	const trimmed = value.trim();
+	if (trimmed === "") {
+		return null;
+	}
+	if (!trimmed.startsWith("/") && !/^[A-Za-z]:[\\/]/u.test(trimmed)) {
+		throw new Error(
+			`FRC_HOST_DATA_DIR must be an absolute path (got "${value}"). ` +
+				"It is the host-side location of the data directory, passed verbatim " +
+				"to the Docker daemon for bind mounts.",
+		);
+	}
+	return trimmed;
+}
+
 export function loadControlConfig(
 	input: ControlConfigInput = {},
 ): ControlConfig {
 	const dataDir = resolve(
 		input.dataDir ?? Bun.env.FRC_DATA_DIR ?? defaultDataDir,
 	);
+
+	const containerNetwork =
+		input.containerNetwork ?? Bun.env.FRC_CONTAINER_NETWORK ?? null;
+	const containerUser =
+		input.containerUser === undefined
+			? defaultContainerUser()
+			: input.containerUser;
+
+	// Inside a container the process usually runs as root, so the "mirror my
+	// own uid:gid" fallback would silently run workspace containers as root and
+	// root-own student files on the host data disk. Network mode is the marker
+	// for a containerized deployment, so demand an explicit user there.
+	const explicitContainerUser =
+		input.containerUser !== undefined ||
+		Boolean(Bun.env.FRC_CONTAINER_USER) ||
+		Boolean(Bun.env.FRC_UID && Bun.env.FRC_GID);
+	if (containerNetwork && containerUser === "0:0" && !explicitContainerUser) {
+		throw new Error(
+			"FRC_CONTAINER_NETWORK is set and the control plane is running as root, " +
+				"but no workspace container user is configured. Set FRC_CONTAINER_USER " +
+				"(uid:gid of the host owner of the data directory) so student files are " +
+				"not created as root.",
+		);
+	}
 
 	return {
 		logLevel: parseLogLevelOrThrow(input.logLevel ?? Bun.env.LOG_LEVEL),
@@ -213,6 +257,10 @@ export function loadControlConfig(
 		codeImage: input.codeImage ?? Bun.env.CODE_IMAGE ?? "coderunner-workspace",
 		codeMemoryLimit:
 			input.codeMemoryLimit ?? Bun.env.CODE_MEMORY_LIMIT ?? "2560m",
+		containerNetwork,
+		hostDataDir: parseHostDataDir(
+			input.hostDataDir ?? Bun.env.FRC_HOST_DATA_DIR ?? null,
+		),
 		simPortRange: parsePortRange(
 			input.simPortRange ?? Bun.env.SIM_PORT_RANGE,
 			defaultSimPortRange,
@@ -235,10 +283,7 @@ export function loadControlConfig(
 			30_000,
 			"SIM_STARTUP_TIMEOUT_MS",
 		),
-		containerUser:
-			input.containerUser === undefined
-				? defaultContainerUser()
-				: input.containerUser,
+		containerUser,
 		containerAutoStart: parseBoolean(
 			input.containerAutoStart ??
 				Bun.env.FRC_CONTAINER_AUTO_START ??

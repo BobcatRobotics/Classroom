@@ -129,11 +129,18 @@ export class AppStorage {
 				applied.length > 0 ? applied.map((m) => m.name) : undefined,
 		});
 
-		// 2. Initialize allowlist
+		// 2. Re-root persisted project paths under the current data directory.
+		// project_path is always <dataDir>/users/<id>/project by construction, but
+		// rows written by a differently-rooted deployment (host vs container, or a
+		// restored backup) carry the old prefix. Docker mounts and file APIs use
+		// the path the control plane sees now, so normalize eagerly.
+		this.normalizeWorkspaceProjectPaths();
+
+		// 3. Initialize allowlist
 		setAllowlistPath(this.config.dataDir);
 		await loadAllowlist();
 
-		// 3. Create Better Auth instance and run its migrations
+		// 4. Create Better Auth instance and run its migrations
 		this.auth = createAuth(this.db, this.config, {
 			ensureWorkspace: async (userId, slug) => {
 				await this.ensureWorkspaceForUser(userId, slug);
@@ -143,7 +150,7 @@ export class AppStorage {
 		const { runMigrations } = await getMigrations(this.auth.options);
 		await runMigrations();
 
-		// 4. Warn if no auth providers are configured (skipped in demo mode).
+		// 5. Warn if no auth providers are configured (skipped in demo mode).
 		if (!this.config.demo) {
 			const hasGitHub = Boolean(
 				this.config.githubClientId && this.config.githubClientSecret,
@@ -167,6 +174,33 @@ export class AppStorage {
 
 	close(): void {
 		this.db.close();
+	}
+
+	private normalizeWorkspaceProjectPaths(): void {
+		const rows = this.db
+			.query("SELECT id, project_path FROM workspaces")
+			.all() as Array<{ id: WorkspaceId; project_path: string }>;
+		let updated = 0;
+		for (const row of rows) {
+			const canonical = resolve(
+				this.config.dataDir,
+				"users",
+				row.id,
+				"project",
+			);
+			if (row.project_path !== canonical) {
+				this.db
+					.query("UPDATE workspaces SET project_path = ? WHERE id = ?")
+					.run(canonical, row.id);
+				updated += 1;
+			}
+		}
+		if (updated > 0) {
+			log.info("re-rooted workspace project paths", {
+				updated,
+				dataDir: this.config.dataDir,
+			});
+		}
 	}
 
 	findWorkspaceByUserId(userId: string): WorkspaceRow | null {

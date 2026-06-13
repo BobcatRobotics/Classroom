@@ -71,9 +71,12 @@ export function codeStatusFromRuntime(
 		state: runtime.state,
 		image: runtime.image,
 		containerName: runtime.runtimeName,
-		simPortAllocated: runtime.ports.nt4 !== null,
-		vscodePortAllocated: runtime.ports.vscode !== null,
-		halsimPortAllocated: runtime.ports.halsim !== null,
+		// "Allocated" means the upstream endpoint is resolvable. In port mode the
+		// endpoint exists iff a host port is leased; in network mode there are no
+		// host ports and the endpoint exists iff the container is on the network.
+		simPortAllocated: runtime.endpoints.nt4 !== null,
+		vscodePortAllocated: runtime.endpoints.vscode !== null,
+		halsimPortAllocated: runtime.endpoints.halsim !== null,
 		lastUsedAt: runtime.lastUsedAt,
 		error: runtime.error,
 	};

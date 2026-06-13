@@ -40,6 +40,7 @@ export type DockerInspectContainer = {
 			string,
 			Array<{ HostIp?: string; HostPort?: string }> | null
 		>;
+		Networks?: Record<string, unknown>;
 	};
 };
 

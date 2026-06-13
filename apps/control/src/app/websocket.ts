@@ -7,6 +7,7 @@ import {
 	type WorkspaceId,
 } from "@frc-coderunner/contracts";
 import { type CatalogSource, RemoteCatalogSource } from "../catalog";
+import { upstreamEndpoints } from "../containers/converters";
 import type { GamepadLease, GamepadSessions } from "../gamepad";
 import type { HalSimBridge } from "../halsim";
 import {
@@ -59,9 +60,16 @@ export function createWebSocketHandlers(ctx: WebSocketHandlerContext) {
 	): GamepadLease | null => {
 		const snapshot = runs.getWorkspaceSnapshot(workspaceId);
 		if (snapshot.status !== "running") return null;
+		const workspace = storage.findWorkspaceById(workspaceId);
+		if (!workspace) return null;
 		const lease = storage.getContainerLease(workspaceId);
-		if (typeof lease?.halsim_port !== "number") return null;
-		return { halsimUrl: `ws://127.0.0.1:${lease.halsim_port}/wpilibws` };
+		const { endpoints } = upstreamEndpoints(
+			storage.config.containerNetwork,
+			workspace,
+			lease,
+		);
+		if (!endpoints.halsim) return null;
+		return { halsimUrl: endpoints.halsim.wsUrl };
 	};
 
 	function openProxyUpstream(

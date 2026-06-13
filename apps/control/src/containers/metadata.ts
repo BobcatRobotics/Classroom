@@ -47,6 +47,22 @@ export function publishedPortFor(
 	};
 }
 
+export function containerAttachedToNetwork(
+	container: DockerInspectContainer,
+	networkName: string,
+): boolean {
+	return Boolean(container.NetworkSettings?.Networks?.[networkName]);
+}
+
+export function containerHasPublishedPorts(
+	container: DockerInspectContainer,
+): boolean {
+	const ports = container.NetworkSettings?.Ports ?? {};
+	return Object.values(ports).some(
+		(bindings) => Array.isArray(bindings) && bindings.length > 0,
+	);
+}
+
 export function containerRuntimeState(
 	container: DockerInspectContainer,
 ): ContainerState {
