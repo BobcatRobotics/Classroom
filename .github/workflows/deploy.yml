@@ -14,6 +14,7 @@ concurrency:
 
 env:
   WORKSPACE_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-workspace
+  CONTROL_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-control
 
 jobs:
   validate:
@@ -122,45 +123,43 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ env.TAG_SHA }}
             org.opencontainers.image.version=${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=workspace
+          cache-to: type=gha,mode=max,scope=workspace
 
-      - uses: oven-sh/setup-bun@v2
+      # The control image builds the web shell and AdvantageScope Lite (incl.
+      # the emsdk/wasm step) inside its own stages, so the runner no longer
+      # installs emsdk. It is also loaded into the local daemon so the release
+      # tarballs can be extracted from it below — one build, one source of truth.
+      - name: Build and push control image
+        uses: docker/build-push-action@v6
         with:
-          bun-version-file: package.json
+          context: .
+          file: containers/control/Dockerfile
+          push: true
+          load: true
+          tags: |
+            ${{ env.CONTROL_IMAGE }}:${{ env.TAG }}
+            ${{ env.CONTROL_IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.TAG_SHA }}
+            org.opencontainers.image.version=${{ env.TAG }}
+          cache-from: type=gha,scope=control
+          cache-to: type=gha,mode=max,scope=control
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Cache emsdk
-        id: cache-emsdk
-        uses: actions/cache@v4
-        with:
-          path: ~/emsdk
-          key: emsdk-4.0.12-${{ runner.os }}
-
-      - name: Install emsdk
+      # Extract the prebuilt dists from the control image so the GitHub release
+      # keeps shipping web-dist/ascope-dist tarballs (consumed by the
+      # deploy-cloudflare job and by scripts/fetch-dist.ts for emsdk-free dev).
+      - name: Extract release artifacts from control image
         run: |
           set -euo pipefail
-          if [ ! -d "$HOME/emsdk" ]; then
-            git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
-          fi
-          cd "$HOME/emsdk"
-          ./emsdk install 4.0.12
-          ./emsdk activate 4.0.12
-          echo "EMSDK=$HOME/emsdk" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build release artifacts
-        run: |
-          set -euo pipefail
-          bun run build:web
-          bun run build:ascope
-          tar -czf web-dist.tar.gz -C apps/web/dist .
-          tar -czf ascope-dist.tar.gz -C dist/advantagescope .
+          cid="$(docker create "$CONTROL_IMAGE:$TAG")"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          rm -rf web-dist ascope-dist
+          docker cp "$cid:/app/apps/web/dist" web-dist
+          docker cp "$cid:/app/dist/advantagescope" ascope-dist
+          tar -czf web-dist.tar.gz -C web-dist .
+          tar -czf ascope-dist.tar.gz -C ascope-dist .
 
       - name: Upload release artifacts
         run: |

@@ -1,0 +1,65 @@
+# CodeRunner — base compose file (the minimal local/self-hosted deployment).
+#
+#   docker compose up -d        → control plane on http://localhost:4000
+#
+# Overrides:
+#   docker-compose.demo.yml     demo mode (auth bypassed, shared workspace)
+#   docker-compose.prod.yml     adds Caddy (TLS) + Grafana Alloy for the
+#                               production VM; selected there via COMPOSE_FILE
+#                               in /opt/coderunner/.env
+#
+# Configuration lives in .env (see .env.example). The control plane drives the
+# HOST's Docker daemon through the bind-mounted socket, so per-student
+# workspace containers run as siblings of this one, joined to the shared
+# `coderunner` network below.
+
+name: coderunner
+
+services:
+  control:
+    image: ghcr.io/mathewdunne/coderunner-control:${CODERUNNER_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      # Loopback only: Caddy (prod) or the local browser reaches it here.
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${CODERUNNER_HOST_DATA_DIR:-${PWD}/data}:/data
+    environment:
+      # Workspace containers join this network instead of publishing host
+      # ports; the explicit network name below must match.
+      FRC_CONTAINER_NETWORK: coderunner
+      # Host-side path of the /data mount — the Docker daemon resolves the
+      # control plane's bind-mount sources against the HOST filesystem.
+      FRC_HOST_DATA_DIR: ${CODERUNNER_HOST_DATA_DIR:-${PWD}/data}
+      # uid:gid that owns the data directory on the host. Without this the
+      # control plane (root in its container) would run workspace containers
+      # as root and root-own student files.
+      FRC_CONTAINER_USER: "${CODERUNNER_WORKSPACE_UID:-1000}:${CODERUNNER_WORKSPACE_GID:-1000}"
+      CODE_IMAGE: ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}
+    env_file:
+      - path: .env
+        required: false
+    networks:
+      - coderunner
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  # Pull-only helper: the workspace image is started by the control plane via
+  # the Docker CLI, not by compose, so this stub makes `docker compose pull`
+  # and the first `up` fetch it. It exits immediately and stays stopped.
+  workspace-image:
+    image: ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}
+    entrypoint: ["/bin/true"]
+    restart: "no"
+
+networks:
+  coderunner:
+    # Explicit (non-project-prefixed) name: the control plane passes it
+    # verbatim to `docker run --network` and via FRC_CONTAINER_NETWORK.
+    name: coderunner
+    driver: bridge
