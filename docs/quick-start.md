@@ -11,10 +11,9 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 
 ## Prerequisites
 
-- **Bun 1.3.13 or newer.** CodeRunner's control plane and tooling run on Bun. Install it from [bun.sh](https://bun.sh).
-- **Docker**, up and running. Each workspace and the robot simulation run inside containers, so Docker is required even in demo mode.
-- **Git.** Clone the repository (a plain ZIP download is fine too, since demo mode uses prebuilt assets and does not need submodules).
-- **A Unix-like environment is recommended.** WSL, Linux and macOS are first-class. On Windows, the demo loop works fine, but the full development loop performs noticeably worse, so running inside [WSL](https://learn.microsoft.com/windows/wsl/) is recommended for development. See [Platform support](#platform-support) below.
+- **Docker**, up and running, with the **Compose plugin** (`docker compose version`). The control plane, each workspace, and the robot simulation all run inside containers, so Docker is the only hard requirement for the demo.
+- **Git.** Clone the repository (a plain ZIP download is fine too — the demo pulls prebuilt images and does not need submodules or Bun).
+- **A Unix-like environment is recommended.** WSL2, Linux and macOS are first-class. On Windows, run inside [WSL2](https://learn.microsoft.com/windows/wsl/). See [Platform support](#platform-support) below.
 
 ## Steps
 
@@ -25,39 +24,25 @@ git clone https://github.com/mathewdunne/CodeRunner coderunner
 cd coderunner
 ```
 
-Install dependencies:
-
-```bash
-bun install
-```
-
-Fetch the prebuilt web shell and AdvantageScope assets, and pull the workspace image:
-
-```bash
-bun run setup:demo
-```
-
 Start CodeRunner in demo mode:
 
 ```bash
-bun run demo
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up
 ```
 
-Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run.
+(Equivalently, `bun run demo:docker`.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
 
-## What `bun run setup:demo` does
+## What that command does
 
-`bun run setup:demo` does two things in sequence:
+`docker compose ... up` pulls two images from the GitHub Container Registry and starts the stack:
 
-1. Pulls the workspace Docker image (`ghcr.io/mathewdunne/coderunner-workspace:latest`) from the GitHub Container Registry.
-2. Downloads the prebuilt web shell and AdvantageScope assets from the latest GitHub release and unpacks them into `apps/web/dist` and `dist/advantagescope`.
+1. **`coderunner-control`** — the control plane. It already contains the web shell and the prebuilt AdvantageScope Lite assets, so there is nothing to compile and no emscripten or AdvantageScope submodule needed. On start it migrates its SQLite database (under `./data`) and serves on port 4000.
+2. **`coderunner-workspace`** — the per-student image with the full Java/WPILib toolchain and the VS Code editor. It is several gigabytes, so the **first** pull takes a while; later runs reuse the cached image.
 
-Using the prebuilt release assets means the demo does **not** compile AdvantageScope from source, so you do not need emscripten or the AdvantageScope submodule — the step that makes a full source build slow (and Windows-finicky).
+Student data (the SQLite DB and per-workspace projects) lives in `./data` in the checkout. Delete that directory to reset the demo.
 
-That workspace image bundles a full Java/WPILib toolchain and the VS Code editor, so it is several gigabytes. The **first** setup will take a while as Docker downloads it; later runs reuse the cached image and are much faster.
-
-:::note Building from source instead
-If you are developing CodeRunner (not just evaluating it), build the assets from source with `bun run build` instead. That requires the AdvantageScope submodule (`git submodule update --init --recursive`) and emscripten. See [Local Deployment](./deploying/local.md).
+:::note Running from source instead
+If you are developing CodeRunner (not just evaluating it), you can run the control plane directly on the host with `bun run dev:control` / `bun run dev:web`, or build a production bundle with `bun run build`. The host path needs Bun and — for a from-source AdvantageScope build — the submodule (`git submodule update --init --recursive`) and emscripten; `bun run setup:demo` downloads prebuilt assets to skip emscripten. See [Local Deployment](./deploying/local.md) and [Development Servers](./development/dev-servers.md).
 :::
 
 ## Platform support

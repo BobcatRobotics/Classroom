@@ -190,9 +190,9 @@ long-lived service account keys.
 
 ### 9. Deploy for the first time
 
-After `terraform apply` the web assets are not yet on the VM (`apps/web/dist`
-is empty; `/` returns 404 until the first deploy). Run the workflow against a
-valid release tag to populate them:
+On first boot the VM fetches the compose files and pulls the `:latest` images,
+so it can come up before any deploy. Run the workflow against a valid release tag
+to pin a specific version:
 
 ```bash
 gh workflow run "Deploy to GCE" --ref main -f tag=v2.0.0
@@ -205,14 +205,14 @@ yourself via IAP SSH:
 
 ```bash
 gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
-  --command='cd /opt/coderunner/app && sudo -u coderunner bun run users:promote <your-email>'
+  --command='cd /opt/coderunner && sudo docker compose exec -T control bun scripts/users.ts promote <your-email>'
 ```
 
-You also need to allowlist emails before anyone can sign in. Do this from the
-same IAP SSH session or run it locally if the DB is accessible:
+You also need to allowlist emails before anyone can sign in. From the same IAP
+SSH session:
 
 ```bash
-bun run allowlist:add coach@frcteam.org
+sudo docker compose exec -T control bun scripts/allowlist.ts add coach@frcteam.org
 ```
 
 See [OAuth Credentials](./oauth-credentials.md) for the full allowlist and admin
@@ -220,16 +220,22 @@ bootstrap flow.
 
 ## Runtime shape on the VM
 
-Once bootstrapped, the VM runs three systemd services:
+The host installs only Docker + the Compose plugin. Once bootstrapped, the VM
+runs a docker compose stack (`/opt/coderunner`, with
+`COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` set in `.env`):
 
-- **`coderunner`**: the Bun control plane, reading
-  `/opt/coderunner/.env` for all configuration
+- **`control`**: the control plane container, reading `/opt/coderunner/.env`
+  for configuration, with the host Docker socket and `/var/lib/coderunner/data`
+  bind-mounted. Per-student workspace containers are started by it as siblings
+  on the `coderunner` network.
 - **`caddy`**: terminates TLS for `<your-domain>` and `origin.<your-domain>`,
-  reverse-proxies to `localhost:4000`
-- **`alloy`**: scrapes `/metrics` and ships to Grafana Cloud
+  reverse-proxies to `control:4000` over the compose network.
+- **`alloy`**: scrapes `control:4000/metrics`, collects host metrics, and ships
+  the control container's logs (via the Docker API) to Grafana Cloud.
 
 `render-env.sh` runs on every boot (via `metadata_startup_script`) to
-re-materialize `/opt/coderunner/.env` from Secret Manager. Hand-edits to `.env`
+re-materialize `/opt/coderunner/.env` from Secret Manager (preserving the
+deployed `CODERUNNER_TAG`) and then `docker compose up -d`. Hand-edits to `.env`
 on the VM do not survive a reboot.
 
 For monitoring details (Prometheus metrics, Loki log shipping, and Grafana
@@ -248,20 +254,23 @@ The **Deploy to GCE** workflow (defined in `.github/workflows/deploy.yml`):
 
 1. Validates the tag format and that it is reachable from `main`
 2. Runs `bun run verify` (Biome, typecheck, unit tests, E2E)
-3. Builds and pushes `ghcr.io/<owner>/coderunner-workspace:<tag>` and `:latest`
-   to GHCR
-4. Builds the web shell and AdvantageScope Lite, uploads
-   `web-dist.tar.gz` + `ascope-dist.tar.gz` to the GitHub Release
-5. SSHes into the VM via IAP, checks out the tag, runs `bun install`, fetches
-   the prebuilt tarballs, pulls the workspace image, removes managed workspace
-   containers (student data is preserved; only containers are removed), and
-   starts `coderunner`
+3. Builds and pushes `ghcr.io/<owner>/coderunner-workspace:<tag>` and
+   `ghcr.io/<owner>/coderunner-control:<tag>` (both `:latest` too) to GHCR. The
+   control image builds the web shell and AdvantageScope Lite (emsdk runs inside
+   a build stage), so nothing is compiled on a plain runner.
+4. Extracts `web-dist.tar.gz` + `ascope-dist.tar.gz` from the built control
+   image and uploads them to the GitHub Release (consumed by the Cloudflare job
+   and by `scripts/fetch-dist.ts`)
+5. `scp`s the compose files to the VM, pins `CODERUNNER_TAG=<tag>` in
+   `/opt/coderunner/.env`, runs `docker compose pull` + `up -d`, then recycles
+   managed workspace containers (student data is preserved; only containers are
+   removed) via `docker compose exec control bun scripts/rebuild-workspaces.ts`
 6. Polls `/healthz` until the service is healthy
 
-Nothing is built on the VM; emsdk and Node are not installed there.
+Nothing is built on the VM; emsdk, Node, and Bun are not installed there.
 
-Migrations apply automatically because `bun run start` runs
-`bun run migrate` first (see `package.json`).
+Migrations apply automatically — the control image's entrypoint runs them before
+serving.
 
 ## Changing env vars
 
@@ -275,17 +284,17 @@ Cloud values): update the secret version, then re-render:
 ```bash
 printf '<new-value>' | gcloud secrets versions add coderunner-<name> --data-file=-
 gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
-  --command="sudo /opt/coderunner/render-env.sh && sudo systemctl restart coderunner alloy"
+  --command="sudo /opt/coderunner/render-env.sh && cd /opt/coderunner && sudo docker compose up -d"
 ```
 
-**B. Non-secret defaults in the template** (`PORT`, `LOG_LEVEL`, `CODE_IMAGE`,
-`CODE_MEMORY_LIMIT`, `IDLE_STOP_MINUTES`, etc.): edit the relevant `echo` line
-in the `render-env.sh` block inside
+**B. Non-secret defaults in the template** (`LOG_LEVEL`, `CODE_MEMORY_LIMIT`,
+`IDLE_STOP_MINUTES`, etc.): edit the relevant `echo` line in the `render-env.sh`
+block inside
 [`deploy/cloud-init/user-data.yaml`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/cloud-init/user-data.yaml),
 commit, then on the VM:
 
 ```bash
-sudo /opt/coderunner/render-env.sh && sudo systemctl restart coderunner
+sudo /opt/coderunner/render-env.sh && cd /opt/coderunner && sudo docker compose up -d
 ```
 
 Note that `render-env.sh` on the VM is a frozen copy from first boot. The
@@ -315,8 +324,9 @@ previous tag**.
 | --- | --- |
 | Cloud-init finished | `gcloud compute instances get-serial-port-output coderunner \| grep "bootstrap complete"` |
 | TLS and healthz | `curl -I https://<your-domain>/healthz` returns 200 |
-| Control plane logs | `journalctl -u coderunner -n 50` via IAP SSH |
-| Workspace image present | `docker images \| grep coderunner-workspace` via IAP SSH |
+| Stack running | `cd /opt/coderunner && sudo docker compose ps` (control "healthy") via IAP SSH |
+| Control plane logs | `cd /opt/coderunner && sudo docker compose logs --tail 50 control` via IAP SSH |
+| Images present | `docker images \| grep coderunner` via IAP SSH |
 | Metrics in Grafana | If Grafana Cloud is configured, see [Grafana Cloud](../operating/grafana.md) for the verification query |
 
 ## Cost and sizing
