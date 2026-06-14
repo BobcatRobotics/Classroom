@@ -20,13 +20,13 @@ that workspace.
 docker info
 
 # Check whether the workspace image exists
-docker images coderunner-workspace
+docker images | grep coderunner-workspace
 
-# If missing, pull the pre-built image
-bun run docker:pull:workspace
+# If missing, pull both images (control + workspace)
+docker compose pull
 
-# Or rebuild it locally (takes 5–15 min on first build)
-bun run docker:build:workspace
+# From-source host checkout: pull or build the workspace image directly
+bun run docker:pull:workspace    # or docker:build:workspace to build locally
 ```
 
 Check for port conflicts: if all ports in `SIM_PORT_RANGE` or
@@ -180,22 +180,17 @@ bun run backup
 
 ## Control plane crashes or becomes unresponsive
 
-**Symptom.** The browser shows disconnected. The `coderunner.service` systemd
-unit shows `failed` or logs a fatal error.
+**Symptom.** The browser shows disconnected. `docker compose ps` shows the
+`control` container unhealthy or restarting, or its logs show a fatal error.
 
 **Cause.** An unhandled exception, OOM on the host, or a corrupt database.
 
-**Fix.** On a local deployment, restart the control plane:
+**Fix.** Restart the control plane and check its logs (prefix with
+`cd /opt/coderunner && sudo` on the VM):
 
 ```bash
-bun run start
-```
-
-On the cloud VM:
-
-```bash
-sudo systemctl restart coderunner
-sudo journalctl -u coderunner -n 100
+docker compose restart control
+docker compose logs --tail 100 control
 ```
 
 On startup the control plane reconnects to existing containers via Docker

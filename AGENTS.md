@@ -61,6 +61,19 @@ imports keep `.git` for push. The per-import backup/restore flow was removed
 (pure discard + git). See [`docs/lessons/overview.md`](./docs/lessons/overview.md)
 and `docs/decisions/029-lessons-and-modules.md`.
 
+**Containerized control plane (post-V2):** the control plane ships as a Docker
+image (`containers/control/Dockerfile` → `ghcr.io/mathewdunne/coderunner-control`)
+and is deployed with docker compose (`docker-compose.yml` base +
+`docker-compose.prod.yml` for Caddy/Alloy + `docker-compose.demo.yml`). It runs
+the host Docker daemon over the bind-mounted socket and manages workspace
+containers as siblings. Two modes via env: **port mode** (default;
+`FRC_CONTAINER_NETWORK` unset) publishes loopback ports and is what
+`bun run dev:control` uses; **network mode** (`FRC_CONTAINER_NETWORK=coderunner`,
+set by compose) joins a shared Docker network with no published ports and needs
+`FRC_HOST_DATA_DIR` to translate bind-mount paths. The image build runs the
+emsdk/AdvantageScope compile in a build stage. See
+`docs/decisions/031-containerized-control-plane.md`.
+
 ## Working Principles
 
 - Prefer boring, explicit TypeScript over clever abstractions.
@@ -99,11 +112,13 @@ and `docs/decisions/029-lessons-and-modules.md`.
 - Run E2E tests (Playwright, mocked tier): `bun run e2e`
 - Run E2E security tests: `bun run e2e:security`
 - Build workspace image locally: `bun run docker:build:workspace`
+- Build control image locally: `bun run docker:build:control`
 - Pull workspace image from GHCR: `bun run docker:pull:workspace`
 - Apply/check migrations: `bun run migrate`, `bun run migrate:status`
 - Start control plane (dev, `--watch`): `bun run dev:control`
 - Start web shell with HMR: `bun run dev:web`
-- Start prod (migrates then serves): `bun run start`
+- Start prod from source (migrates then serves): `bun run start`
+- Run the containerized demo stack: `bun run demo:docker` (or `docker compose -f docker-compose.yml -f docker-compose.demo.yml up`)
 - Prod build (web + ascope + image pull): `bun run build`
 - Backup projects: `bun run backup`
 - Restore projects: `bun run restore -- <backup-dir>`

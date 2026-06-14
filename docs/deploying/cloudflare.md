@@ -66,14 +66,14 @@ add the origin vhost manually via IAP SSH:
 
 ```bash
 gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap --command='
-sudo tee -a /etc/caddy/Caddyfile <<EOF
+sudo tee -a /opt/coderunner/caddy/Caddyfile <<EOF
 
 origin.YOUR_DOMAIN {
-  reverse_proxy localhost:4000
+  reverse_proxy control:4000
   encode gzip
 }
 EOF
-sudo systemctl reload caddy'
+cd /opt/coderunner && sudo docker compose restart caddy'
 ```
 
 New VMs get both vhosts automatically from cloud-init.

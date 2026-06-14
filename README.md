@@ -4,20 +4,17 @@ A self-hosted, browser-based IDE for learning FRC robot programming. Students ge
 
 ## Quick Start
 
-Try CodeRunner locally in demo mode — no OAuth, no allowlist, no configuration required:
+Try CodeRunner locally in demo mode — no OAuth, no allowlist, no configuration required. Just Docker:
 
 ```bash
 git clone https://github.com/mathewdunne/CodeRunner coderunner
 cd coderunner
-git submodule update --init --recursive
-bun install
-bun run build
-bun run start -- --demo
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up
 ```
 
 Open [http://localhost:4000](http://localhost:4000). You land directly in the IDE as a single seeded admin user.
 
-**Prerequisites:** Bun 1.3.13+, Docker (running), Git with submodule support.
+**Prerequisites:** Docker with the Compose plugin (running). No Bun, submodules, or emscripten needed — the control image ships the web shell and AdvantageScope assets prebuilt.
 
 > **Warning:** Demo mode bypasses authentication entirely. Every visitor shares the same admin user and workspace. Do not expose a demo instance to the public internet. See [docs/quick-start.md](docs/quick-start.md) for full details and next steps.
 

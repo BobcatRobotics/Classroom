@@ -67,7 +67,7 @@ resource "google_project_iam_member" "deployer_iap" {
 resource "google_project_iam_member" "deployer_oslogin" {
   project = var.project_id
   # Admin variant grants sudo on the VM — required because the deploy script
-  # runs `sudo systemctl restart coderunner` and `sudo -u coderunner ...`.
+  # runs `sudo docker compose ...` (pull/up/exec) in /opt/coderunner.
   role   = "roles/compute.osAdminLogin"
   member = "serviceAccount:${google_service_account.deployer.email}"
 }

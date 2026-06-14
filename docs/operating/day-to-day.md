@@ -9,35 +9,39 @@ This page covers the routine tasks a mentor performs during an active season:
 starting and stopping the app, managing who can sign in, and keeping an eye on
 what the system is doing.
 
+:::note Running ops commands
+The maintenance scripts in this page (`allowlist`, `users`, `audit-prune`,
+`backup`, `restore`) run **inside the control container**:
+
+```bash
+docker compose exec control bun scripts/<name>.ts <args>
+```
+
+On the Google Cloud VM the compose project lives in `/opt/coderunner` and needs
+`sudo` (`cd /opt/coderunner && sudo docker compose exec -T control …`). On a
+from-source host checkout with Bun you can instead use the `bun run <name>`
+aliases shown in `package.json`. The examples below use the `bun run` short form;
+substitute the `docker compose exec` form for a containerized deployment.
+:::
+
 ## Starting and stopping
 
-### Local deployment
-
-Start the control plane from the repo root:
-
-```bash
-bun run start
-```
-
-This applies any pending database migrations and then serves the control plane.
-Students connect to `http://<host-ip>:4000/` in their browsers. Stop with
-`Ctrl+C`. The student workspace containers keep running after the control plane
-stops and are reconciled automatically when it starts again.
-
-### Google Cloud VM deployment
-
-On the cloud VM the control plane runs as a systemd service named
-`coderunner.service`. Standard systemd commands apply:
+Both the local and Google Cloud deployments run the control plane as a docker
+compose service. From the compose directory (the repo root locally, or
+`/opt/coderunner` on the VM):
 
 ```bash
-sudo systemctl start coderunner
-sudo systemctl stop coderunner
-sudo systemctl restart coderunner
-sudo systemctl status coderunner
+docker compose up -d        # start (runs DB migrations first, then serves)
+docker compose stop         # stop the control plane
+docker compose restart control
+docker compose ps           # status — control should be "healthy"
+docker compose logs -f control
 ```
 
-The service is configured to start automatically on boot and to restart on
-failure.
+Students connect to `http://<host-ip>:4000/` (or `https://<your-domain>/` behind
+Caddy on the VM). Student workspace containers keep running after the control
+plane stops and are reconciled automatically when it starts again. `restart:
+unless-stopped` brings the stack back after a host reboot.
 
 ### Stopping workspace containers
 

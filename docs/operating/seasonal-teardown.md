@@ -18,8 +18,8 @@ snapshot before deletion.
 
 :::note Local deployments
 This procedure is for the Google Cloud VM. For a local classroom machine,
-simply stop the control plane (`sudo systemctl stop coderunner` or `Ctrl+C`)
-and optionally run `bun run backup` to archive student work.
+simply stop the stack (`docker compose stop`) and optionally archive student
+work with `docker compose exec control bun scripts/backup.ts`.
 :::
 
 ## Why stopping the VM is not enough
