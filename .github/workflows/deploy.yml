@@ -248,54 +248,63 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT }}
 
+      # Ship the deployed tag's compose files to the VM so they version with the
+      # release (they pin nothing themselves — images come from the .env tag).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - name: Copy compose files to VM
+        run: |
+          set -euo pipefail
+          gcloud compute scp \
+            --zone="$GCP_ZONE" \
+            --tunnel-through-iap \
+            --quiet \
+            docker-compose.yml docker-compose.prod.yml \
+            "$VM_NAME":/tmp/
+
       - name: Roll service on VM
-        env:
-          GITHUB_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
           read -r -d '' DEPLOY_SCRIPT <<EOF || true
           set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
 
+          # Wait for first-boot provisioning to finish (compose files, .env).
           for _ in \$(seq 1 60); do
             test -f /var/log/coderunner-bootstrap-done && break
             sleep 2
           done
           test -f /var/log/coderunner-bootstrap-done
 
-          sudo systemctl stop coderunner
+          sudo install -o root -g root -m 644 /tmp/docker-compose.yml /opt/coderunner/docker-compose.yml
+          sudo install -o root -g root -m 644 /tmp/docker-compose.prod.yml /opt/coderunner/docker-compose.prod.yml
+          rm -f /tmp/docker-compose.yml /tmp/docker-compose.prod.yml
 
-          cd /opt/coderunner/app
-          sudo -u coderunner git fetch --tags --depth=1 origin tag $TAG
-          sudo -u coderunner git checkout $TAG
-          sudo -u coderunner bun install --frozen-lockfile
+          # Pin the deployed tag. render-env.sh preserves CODERUNNER_TAG across
+          # reboots; compose interpolates it into the control + workspace images.
+          sudo sed -i '/^CODERUNNER_TAG=/d' /opt/coderunner/.env
+          echo "CODERUNNER_TAG=$TAG" | sudo tee -a /opt/coderunner/.env >/dev/null
 
-          RELEASE_URL="https://github.com/$GITHUB_REPO/releases/download/$TAG"
-          sudo -u coderunner curl -fsSL -o /tmp/web.tgz "\$RELEASE_URL/web-dist.tar.gz"
-          sudo -u coderunner curl -fsSL -o /tmp/ascope.tgz "\$RELEASE_URL/ascope-dist.tar.gz"
-          sudo -u coderunner rm -rf apps/web/dist && sudo -u coderunner mkdir -p apps/web/dist
-          sudo -u coderunner tar -xzf /tmp/web.tgz -C apps/web/dist
-          sudo -u coderunner rm -rf dist/advantagescope && sudo -u coderunner mkdir -p dist/advantagescope
-          sudo -u coderunner tar -xzf /tmp/ascope.tgz -C dist/advantagescope
-          sudo -u coderunner rm -f /tmp/web.tgz /tmp/ascope.tgz
+          cd /opt/coderunner
+          sudo docker compose pull
+          sudo docker compose up -d --remove-orphans
 
-          sudo -u coderunner docker pull $WORKSPACE_IMAGE:$TAG
-          sudo -u coderunner docker tag $WORKSPACE_IMAGE:$TAG $WORKSPACE_IMAGE:latest
+          # New workspace image: recycle student containers so the next access
+          # recreates them on the new image. Projects/homes are bind-mounted, so
+          # only disposable containers are removed.
+          sudo docker compose exec -T control bun scripts/rebuild-workspaces.ts
 
-          sudo -u coderunner bash -lc 'set -a; source /opt/coderunner/.env; set +a; bun run docker:rebuild-workspaces'
-
-          sudo systemctl start coderunner
-
-          for _ in \$(seq 1 30); do
+          for _ in \$(seq 1 60); do
             if curl -sf http://localhost:4000/healthz >/dev/null; then
               echo "healthz OK"
               exit 0
             fi
             sleep 1
           done
-          echo "healthz did not respond within 30s"
-          sudo journalctl -u coderunner -n 80 --no-pager || true
+          echo "healthz did not respond within 60s"
+          sudo docker compose logs --tail 80 control || true
           exit 1
           EOF
 
