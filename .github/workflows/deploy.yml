@@ -128,15 +128,13 @@ jobs:
 
       # The control image builds the web shell and AdvantageScope Lite (incl.
       # the emsdk/wasm step) inside its own stages, so the runner no longer
-      # installs emsdk. It is also loaded into the local daemon so the release
-      # tarballs can be extracted from it below — one build, one source of truth.
+      # installs emsdk — one build, one source of truth.
       - name: Build and push control image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: containers/control/Dockerfile
           push: true
-          load: true
           tags: |
             ${{ env.CONTROL_IMAGE }}:${{ env.TAG }}
             ${{ env.CONTROL_IMAGE }}:latest
@@ -147,19 +145,26 @@ jobs:
           cache-from: type=gha,scope=control
           cache-to: type=gha,mode=max,scope=control
 
-      # Extract the prebuilt dists from the control image so the GitHub release
-      # keeps shipping web-dist/ascope-dist tarballs (consumed by the
-      # deploy-cloudflare job and by scripts/fetch-dist.ts for emsdk-free dev).
-      - name: Extract release artifacts from control image
+      # Harvest the prebuilt dists straight from the build cache via the
+      # dist-export stage, so the GitHub release keeps shipping
+      # web-dist/ascope-dist tarballs (consumed by the deploy-cloudflare job and
+      # by scripts/fetch-dist.ts for emsdk-free dev). This shares every upstream
+      # layer with the push above, so it's a near-instant cache hit — and it
+      # avoids loading the full multi-hundred-MB runtime image into the daemon.
+      - name: Export release artifacts from build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/control/Dockerfile
+          target: dist-export
+          outputs: type=local,dest=dist-out
+          cache-from: type=gha,scope=control
+
+      - name: Package release artifacts
         run: |
           set -euo pipefail
-          cid="$(docker create "$CONTROL_IMAGE:$TAG")"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          rm -rf web-dist ascope-dist
-          docker cp "$cid:/app/apps/web/dist" web-dist
-          docker cp "$cid:/app/dist/advantagescope" ascope-dist
-          tar -czf web-dist.tar.gz -C web-dist .
-          tar -czf ascope-dist.tar.gz -C ascope-dist .
+          tar -czf web-dist.tar.gz -C dist-out/web-dist .
+          tar -czf ascope-dist.tar.gz -C dist-out/ascope-dist .
 
       - name: Upload release artifacts
         run: |

@@ -60,7 +60,19 @@ RUN git config --global --add safe.directory '*'
 # the wasm step re-prepends the emsdk paths itself (envWithEmsdk).
 RUN PATH="/usr/bin:${PATH}" bun scripts/build-ascope-lite.ts
 
-# ── Stage 3: runtime ───────────────────────────────────────────────────
+# ── Stage 3: dist export (CI only) ─────────────────────────────────────
+# A filesystem-only stage holding just the built web shell + AdvantageScope
+# Lite dists. CI builds this with `--target dist-export --output type=local`
+# to harvest the release tarballs (web-dist/ascope-dist) straight from the
+# build cache — no need to load the full runtime image into the daemon. It
+# shares every upstream layer with the runtime stage, so with a warm cache it
+# costs ~nothing. Not referenced by a plain `docker build` (runtime is the
+# default last stage), so local builds are unaffected.
+FROM scratch AS dist-export
+COPY --from=web-build /repo/apps/web/dist /web-dist
+COPY --from=ascope-build /repo/dist/advantagescope /ascope-dist
+
+# ── Stage 4: runtime (default build target) ────────────────────────────
 FROM oven/bun:${BUN_VERSION}
 
 # Docker CLI only — the daemon is the host's, reached through the bind-mounted
