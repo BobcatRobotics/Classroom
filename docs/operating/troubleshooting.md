@@ -113,6 +113,10 @@ bun run allowlist:add student@gmail.com
 bun run allowlist:add yourteam.org
 ```
 
+On a containerized deployment run these inside the control container instead
+(`cd /opt/coderunner && sudo` on the VM):
+`docker compose exec control bun scripts/allowlist.ts list|add <email-or-domain>`.
+
 **Cause: empty allowlist.** If the allowlist is empty, everyone is blocked.
 Confirm with `bun run allowlist:list` and add at least one entry.
 

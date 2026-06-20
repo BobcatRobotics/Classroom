@@ -89,6 +89,21 @@ set. Where these values live depends on the deployment:
 OAuth establishes *who* a person is; CodeRunner separately controls *whether*
 they may sign in (the allowlist) and *whether* they are an admin (the role).
 
+:::note Running these commands
+On a containerized deployment (the default) the `allowlist` and `users`
+commands run **inside the control container**:
+
+```bash
+docker compose exec control bun scripts/allowlist.ts add coach@frcteam.org
+docker compose exec control bun scripts/users.ts promote coach@frcteam.org
+```
+
+On the Google Cloud VM the compose project lives in `/opt/coderunner` and needs
+`sudo` (`cd /opt/coderunner && sudo docker compose exec -T control …`). The
+`bun run …` short forms shown below are equivalent and apply to a from-source
+host checkout with Bun.
+:::
+
 ### 1. Allowlist the emails that may sign in
 
 The allowlist gates every OAuth login. Until an email or domain is added,

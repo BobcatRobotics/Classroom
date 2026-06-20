@@ -19,7 +19,7 @@ These are simultaneous-use numbers: if only half your team codes at once, you ca
 
 After initial setup it mostly can. The bundled lesson catalog (baked into the workspace Docker image at `/opt/frc-catalog`) and the Gradle/WPILib dependency cache (primed during the image build) are all local, so students can open lessons, edit code, and run simulations without any network access.
 
-What does require internet: pulling the workspace Docker image for the first time (`bun run build` downloads several gigabytes), and OAuth sign-in. GitHub and Google OAuth redirect students to external servers to authenticate, so login does not work without internet. For a fully offline evaluation you can use demo mode (`--demo`), which bypasses authentication entirely.
+What does require internet: pulling the control and workspace Docker images for the first time (the first `docker compose pull`/`up` downloads several gigabytes), and OAuth sign-in. GitHub and Google OAuth redirect students to external servers to authenticate, so login does not work without internet. For a fully offline evaluation you can use demo mode (`--demo`), which bypasses authentication entirely.
 
 ### Can students accidentally break each other's work?
 
@@ -37,7 +37,7 @@ The workspace image bundles **GradleRIO 2026.1.1** (the 2026 FRC season), Java *
 
 For a real team deployment, students sign in with GitHub or Google, whichever OAuth provider you configure. You control who is allowed in via an email/domain allowlist. No accounts are created in advance; students sign in with their existing provider accounts, and their workspace is created automatically on first login.
 
-For a solo evaluation or demo, run with the `--demo` flag (`bun run start -- --demo`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
+For a solo evaluation or demo, start the demo stack (`docker compose -f docker-compose.yml -f docker-compose.demo.yml up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
 
 ### What happens to a student's work when they switch lessons?
 
@@ -59,6 +59,6 @@ The reference deployment uses a `c4-standard-4` VM (4 vCPU, 15 GB RAM) on Google
 
 Two separate warm-up steps happen on first use:
 
-1. **Docker image pull.** `bun run build` downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles a full JDK, WPILib, and VS Code). This only happens once per machine; subsequent builds use Docker's cached layers.
+1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles a full JDK, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
 
 2. **Gradle cache warm-up.** The workspace image primes the Gradle and WPILib dependency cache during its build by running a full `./gradlew build` against the bundled `robot-starter` module. This cache is stored at `/opt/frc-gradle-cache` inside the image and copied into each student's container on first start. Despite this priming, the very first build in a fresh container still runs the Java language server index and compiles the project from scratch. After that first run, incremental builds are much faster.
