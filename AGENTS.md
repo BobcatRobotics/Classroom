@@ -82,7 +82,7 @@ and `docs/decisions/029-lessons-and-modules.md`.
 
 ## Key References
 
-- `docs/` + `website/` — docs site content and Docusaurus config; published at `https://mathewdunne.ca/CodeRunner/`; run `bun run docs:dev` to browse locally, `bun run docs:build` to build.
+- `docs/` + `website/` — docs site content and Docusaurus config; published at `https://mathewdunne.github.io/CodeRunner/`; run `bun run docs:dev` to browse locally, `bun run docs:build` to build.
 - `docs/decisions/` — all architecture decision logs (011–029 active; 001–010 archived under `docs/decisions/archive/`).
 - Pinned AdvantageScope submodule: `vendor/AdvantageScope` at tag `v26.0.2`.
 
