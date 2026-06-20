@@ -48,9 +48,36 @@ import type {
 	HttpFetch,
 	ImportSocketData,
 	LessonLoadSocketData,
+	SocketData,
 } from "./types";
 
 const log = getLogger("workspace");
+
+// Single entry point for every WebSocket upgrade in this file. It bakes in the
+// origin/CSRF check so a new WS route cannot silently skip it — reviewers should
+// reject any `server.upgrade(` call outside this helper.
+function upgradeWebSocket(
+	request: Request,
+	server: BunUpgradeServer | undefined,
+	baseUrl: string,
+	data: SocketData,
+): Response {
+	if (
+		!server ||
+		request.headers.get("upgrade")?.toLowerCase() !== "websocket"
+	) {
+		return new Response("Expected WebSocket upgrade.", { status: 426 });
+	}
+	const originError = requireWebSocketOrigin(request, baseUrl);
+	if (originError) {
+		return originError;
+	}
+	const upgraded = server.upgrade(request, { data });
+	if (!upgraded) {
+		return new Response("WebSocket upgrade failed.", { status: 400 });
+	}
+	return undefined as unknown as Response;
+}
 
 export type WorkspaceRouteContext = {
 	storage: AppStorage;
@@ -130,49 +157,17 @@ export async function handleWorkspaceRoute(
 	}
 
 	if (suffix === "/ws/run" && request.method === "GET") {
-		if (
-			!server ||
-			request.headers.get("upgrade")?.toLowerCase() !== "websocket"
-		) {
-			return new Response("Expected WebSocket upgrade.", { status: 426 });
-		}
-		const originError = requireWebSocketOrigin(request, storage.config.baseUrl);
-		if (originError) {
-			return originError;
-		}
-		const upgraded = server.upgrade(request, {
-			data: {
-				kind: "run",
-				workspace: auth.workspace,
-			},
+		return upgradeWebSocket(request, server, storage.config.baseUrl, {
+			kind: "run",
+			workspace: auth.workspace,
 		});
-		if (!upgraded) {
-			return new Response("WebSocket upgrade failed.", { status: 400 });
-		}
-		return undefined as unknown as Response;
 	}
 
 	if (suffix === "/ws/gamepad" && request.method === "GET") {
-		if (
-			!server ||
-			request.headers.get("upgrade")?.toLowerCase() !== "websocket"
-		) {
-			return new Response("Expected WebSocket upgrade.", { status: 426 });
-		}
-		const originError = requireWebSocketOrigin(request, storage.config.baseUrl);
-		if (originError) {
-			return originError;
-		}
-		const upgraded = server.upgrade(request, {
-			data: {
-				kind: "gamepad",
-				workspace: auth.workspace,
-			},
+		return upgradeWebSocket(request, server, storage.config.baseUrl, {
+			kind: "gamepad",
+			workspace: auth.workspace,
 		});
-		if (!upgraded) {
-			return new Response("WebSocket upgrade failed.", { status: 400 });
-		}
-		return undefined as unknown as Response;
 	}
 
 	if (suffix === "/sim/alive" && request.method === "GET") {
@@ -484,27 +479,11 @@ export async function handleWorkspaceRoute(
 	}
 
 	if (suffix === "/ws/lesson-load" && request.method === "GET") {
-		if (
-			!server ||
-			request.headers.get("upgrade")?.toLowerCase() !== "websocket"
-		) {
-			return new Response("Expected WebSocket upgrade.", { status: 426 });
-		}
-		const originError = requireWebSocketOrigin(request, storage.config.baseUrl);
-		if (originError) {
-			return originError;
-		}
-		const upgraded = server.upgrade(request, {
-			data: {
-				kind: "lesson-load",
-				workspace: auth.workspace,
-				userId: auth.user.id,
-			} satisfies LessonLoadSocketData,
-		});
-		if (!upgraded) {
-			return new Response("WebSocket upgrade failed.", { status: 400 });
-		}
-		return undefined as unknown as Response;
+		return upgradeWebSocket(request, server, storage.config.baseUrl, {
+			kind: "lesson-load",
+			workspace: auth.workspace,
+			userId: auth.user.id,
+		} satisfies LessonLoadSocketData);
 	}
 
 	// --- Import endpoints ---
@@ -529,27 +508,11 @@ export async function handleWorkspaceRoute(
 	}
 
 	if (suffix === "/ws/import" && request.method === "GET") {
-		if (
-			!server ||
-			request.headers.get("upgrade")?.toLowerCase() !== "websocket"
-		) {
-			return new Response("Expected WebSocket upgrade.", { status: 426 });
-		}
-		const originError = requireWebSocketOrigin(request, storage.config.baseUrl);
-		if (originError) {
-			return originError;
-		}
-		const upgraded = server.upgrade(request, {
-			data: {
-				kind: "import",
-				workspace: auth.workspace,
-				userId: auth.user.id,
-			} satisfies ImportSocketData,
-		});
-		if (!upgraded) {
-			return new Response("WebSocket upgrade failed.", { status: 400 });
-		}
-		return undefined as unknown as Response;
+		return upgradeWebSocket(request, server, storage.config.baseUrl, {
+			kind: "import",
+			workspace: auth.workspace,
+			userId: auth.user.id,
+		} satisfies ImportSocketData);
 	}
 
 	if (suffix === "/api/heartbeat" && request.method === "POST") {

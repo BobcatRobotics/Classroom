@@ -4,7 +4,7 @@ Record active architecture decisions here.
 
 ## Active (V2 and post-V2)
 
-011–029 are the current decision logs (see files in this directory).
+011–030 are the current decision logs (see files in this directory).
 
 ## Archive
 

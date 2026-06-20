@@ -439,39 +439,49 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			return statusFromLease(this.storage.config.codeImage, lease, "running");
 		}
 
-		const start = await this.runDocker(["start", name], true);
-		if (start.exitCode !== 0) {
-			await this.runDocker(["rm", "-f", name], true);
-			return null;
-		}
-
-		const restarted = await this.inspectContainer(name);
-		if (!restarted || !v2LabelsMatch(restarted, workspace.id)) {
-			await this.runDocker(["rm", "-f", name], true);
-			return null;
-		}
-
-		const rSim = publishedPortFor(restarted, SIM_CONTAINER_PORT);
-		const rVscode = publishedPortFor(restarted, VSCODE_CONTAINER_PORT);
-		const rHalsim = publishedPortFor(restarted, HALSIM_CONTAINER_PORT);
-		if (!rSim?.loopback || !rVscode?.loopback || !rHalsim?.loopback) {
-			await this.runDocker(["rm", "-f", name], true);
-			return null;
-		}
-
-		const lease = this.storage.upsertCodeContainerLease({
-			workspaceId: workspace.id,
-			containerName: name,
-			simPort: rSim.port,
-			vscodePort: rVscode.port,
-			halsimPort: rHalsim.port,
-			state: containerRuntimeState(restarted),
+		// Restarting a stopped container consumes a capacity slot, exactly like a
+		// fresh create. Without this, a reconnect storm after an idle sweep (which
+		// stops but does not remove containers) can exceed MAX_ACTIVE_CONTAINERS.
+		await this.withAdmissionLock(async () => {
+			await this.checkCapacity();
 		});
-		return statusFromLease(
-			this.storage.config.codeImage,
-			lease,
-			lease.code_state,
-		);
+		try {
+			const start = await this.runDocker(["start", name], true);
+			if (start.exitCode !== 0) {
+				await this.runDocker(["rm", "-f", name], true);
+				return null;
+			}
+
+			const restarted = await this.inspectContainer(name);
+			if (!restarted || !v2LabelsMatch(restarted, workspace.id)) {
+				await this.runDocker(["rm", "-f", name], true);
+				return null;
+			}
+
+			const rSim = publishedPortFor(restarted, SIM_CONTAINER_PORT);
+			const rVscode = publishedPortFor(restarted, VSCODE_CONTAINER_PORT);
+			const rHalsim = publishedPortFor(restarted, HALSIM_CONTAINER_PORT);
+			if (!rSim?.loopback || !rVscode?.loopback || !rHalsim?.loopback) {
+				await this.runDocker(["rm", "-f", name], true);
+				return null;
+			}
+
+			const lease = this.storage.upsertCodeContainerLease({
+				workspaceId: workspace.id,
+				containerName: name,
+				simPort: rSim.port,
+				vscodePort: rVscode.port,
+				halsimPort: rHalsim.port,
+				state: containerRuntimeState(restarted),
+			});
+			return statusFromLease(
+				this.storage.config.codeImage,
+				lease,
+				lease.code_state,
+			);
+		} finally {
+			this.pendingCreates = Math.max(0, this.pendingCreates - 1);
+		}
 	}
 
 	private async createCodeContainer(

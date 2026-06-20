@@ -99,3 +99,33 @@ export async function inspectContainer(
 	const parsed = JSON.parse(result.stdout) as DockerInspectContainer[];
 	return parsed[0] ?? null;
 }
+
+export async function inspectContainers(
+	dockerRunner: DockerRunner,
+	names: string[],
+): Promise<Map<string, DockerInspectContainer>> {
+	const byName = new Map<string, DockerInspectContainer>();
+	if (names.length === 0) {
+		return byName;
+	}
+	const result = await runDocker(
+		dockerRunner,
+		["container", "inspect", ...names],
+		true,
+	);
+	// On partial/failed inspect, Docker still prints a JSON array for the names
+	// it could resolve. Parse whatever we got; callers tolerate a missing entry
+	// (null labels/state). Guard against non-JSON stdout (e.g. all names gone).
+	try {
+		const parsed = JSON.parse(result.stdout) as DockerInspectContainer[];
+		for (const container of parsed) {
+			const key = (container.Name ?? "").replace(/^\//u, "");
+			if (key) {
+				byName.set(key, container);
+			}
+		}
+	} catch {
+		// stdout wasn't valid JSON; return what we have (possibly empty).
+	}
+	return byName;
+}

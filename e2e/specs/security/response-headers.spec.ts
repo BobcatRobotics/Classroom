@@ -38,16 +38,16 @@ test("/healthz response does not include sensitive cache headers", async ({
 	expect(resp.headers.get("set-cookie")).toBeNull();
 });
 
-test("X-Content-Type-Options nosniff is present on text/* responses (when configured)", async ({
+test("X-Content-Type-Options nosniff is set on responses", async ({ app }) => {
+	const baseUrl = app.storage.config.baseUrl;
+	const resp = await app.fetch(new Request(`${baseUrl}/healthz`));
+	expect(resp.headers.get("x-content-type-options")).toMatch(/nosniff/i);
+});
+
+test("X-Frame-Options is set to SAMEORIGIN on the web shell", async ({
 	app,
 }) => {
 	const baseUrl = app.storage.config.baseUrl;
-	const resp = await app.fetch(new Request(`${baseUrl}/healthz`));
-	const nosniff = resp.headers.get("x-content-type-options");
-	// Note: as of now, the control plane may not set this header. The test
-	// documents the expected hardening; mark the assertion as informational so
-	// it surfaces a gap without failing the whole suite.
-	if (nosniff !== null) {
-		expect(nosniff).toMatch(/nosniff/i);
-	}
+	const resp = await app.fetch(new Request(`${baseUrl}/login`));
+	expect(resp.headers.get("x-frame-options")).toMatch(/sameorigin/i);
 });

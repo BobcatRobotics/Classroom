@@ -151,8 +151,6 @@ export type CatalogLoadContext = {
 
 export type ImportContext = GithubImportContext | CatalogLoadContext;
 
-export type ImportManagerOptions = Record<string, never>;
-
 export class ImportManager {
 	private readonly rateLimiter = new ImportRateLimiter();
 	private readonly activeImports = new Map<WorkspaceId, string>();
@@ -160,7 +158,6 @@ export class ImportManager {
 	constructor(
 		readonly _storage: AppStorage,
 		private readonly runtimeProvider: WorkspaceRuntimeProvider,
-		readonly _options: ImportManagerOptions = {},
 	) {}
 
 	isImporting(workspaceId: WorkspaceId): boolean {

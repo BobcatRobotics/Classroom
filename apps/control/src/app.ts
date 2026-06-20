@@ -80,6 +80,28 @@ async function authorizeMetrics(
 	return null;
 }
 
+function applySecurityHeaders(response: Response): Response {
+	const headers = response.headers;
+	if (!headers.has("x-content-type-options")) {
+		headers.set("x-content-type-options", "nosniff");
+	}
+	if (!headers.has("x-frame-options")) {
+		// SAMEORIGIN, not DENY: the IDE shell iframes its own same-origin editor
+		// and AdvantageScope surfaces.
+		headers.set("x-frame-options", "SAMEORIGIN");
+	}
+	if (!headers.has("referrer-policy")) {
+		headers.set("referrer-policy", "strict-origin-when-cross-origin");
+	}
+	if (!headers.has("strict-transport-security")) {
+		headers.set(
+			"strict-transport-security",
+			"max-age=31536000; includeSubDomains",
+		);
+	}
+	return response;
+}
+
 export { stripHopByHopHeaders } from "./app/proxy";
 export type {
 	AppSocket,
@@ -172,7 +194,7 @@ export async function createApp(
 		let response: Response;
 		let observedStatus: number;
 		try {
-			response = await dispatch(request, server, url);
+			response = applySecurityHeaders(await dispatch(request, server, url));
 			observedStatus = response.status;
 		} catch (err) {
 			httpRequestsInFlight.dec();

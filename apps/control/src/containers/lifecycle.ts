@@ -2,7 +2,11 @@ import type { WorkspaceId } from "@frc-coderunner/contracts";
 import { getLogger } from "../logging";
 import type { AppStorage } from "../storage";
 import { parseDockerStatsLine } from "./converters";
-import { inspectContainer, runDocker } from "./docker-client";
+import {
+	inspectContainer,
+	inspectContainers,
+	runDocker,
+} from "./docker-client";
 import { codeContainerName, containerRuntimeState } from "./metadata";
 import type { DockerRunner, ManagedContainerStats } from "./types";
 
@@ -197,9 +201,11 @@ export async function managedContainerStats(
 		}
 	}
 
+	const inspectedByName = await inspectContainers(dockerRunner, names);
+
 	const output: ManagedContainerStats[] = [];
 	for (const name of names) {
-		const inspected = await inspectContainer(dockerRunner, name);
+		const inspected = inspectedByName.get(name) ?? null;
 		const labels = inspected?.Config?.Labels ?? {};
 		const runtime = inspected ? containerRuntimeState(inspected) : null;
 		const stat = statsByName.get(name);

@@ -557,7 +557,9 @@ export class RunManager {
 			update.exitCode = flags.exitCode;
 		}
 		this.storage.updateRunJob(update);
-		this.rememberStatus(job, state);
+		if (this.isCurrentJob(job)) {
+			this.rememberStatus(job, state);
+		}
 	}
 
 	private finishJob(
@@ -572,7 +574,9 @@ export class RunManager {
 		job.finished = true;
 		this.releaseBuildSlot(job);
 		this.setJobState(job, state, { finished: true, exitCode: code });
-		this.rememberStatus(job, state);
+		if (this.isCurrentJob(job)) {
+			this.rememberStatus(job, state);
+		}
 		this.broadcast(job, { type: "status", status: state });
 		this.broadcast(job, { type: "exit", code, signal });
 		const terminalStatus = job.canceled ? "canceled" : state;
@@ -583,7 +587,7 @@ export class RunManager {
 				(performance.now() - job.runningSinceMs) / 1000,
 			);
 		}
-		if (this.jobsByWorkspace.get(job.workspace.id)?.id === job.id) {
+		if (this.isCurrentJob(job)) {
 			this.jobsByWorkspace.delete(job.workspace.id);
 		}
 	}
@@ -596,6 +600,10 @@ export class RunManager {
 		for (const client of job.clients) {
 			client.send(message);
 		}
+	}
+
+	private isCurrentJob(job: RunJob): boolean {
+		return this.jobsByWorkspace.get(job.workspace.id)?.id === job.id;
 	}
 
 	private rememberStatus(job: RunJob, status: SimRunStatus): void {

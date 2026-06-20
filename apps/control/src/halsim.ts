@@ -6,6 +6,7 @@ import type {
 	WorkspaceId,
 } from "@frc-coderunner/contracts";
 import { getLogger } from "./logging";
+import { type BridgeEntryBase, ReconnectingWsBridge } from "./ws-bridge";
 
 const log = getLogger("halsim");
 
@@ -33,14 +34,12 @@ export type HalSimBridgeSnapshot = {
 
 export type HalSimWebSocketFactory = (url: string) => WebSocket;
 
-type BridgeEntry = HalSimBridgeSnapshot & {
-	workspaceId: WorkspaceId;
-	upstreamUrl: string;
-	socket: WebSocket | null;
-	reconnectTimer: ReturnType<typeof setTimeout> | null;
-	reconnectBackoffMs: number;
-	shouldReconnect: boolean;
-};
+type BridgeEntry = HalSimBridgeSnapshot &
+	BridgeEntryBase<WorkspaceId> & {
+		reconnectTimer: ReturnType<typeof setTimeout> | null;
+		reconnectBackoffMs: number;
+		shouldReconnect: boolean;
+	};
 
 type HalSimBridgeOptions = {
 	webSocketFactory?: HalSimWebSocketFactory;
@@ -130,13 +129,35 @@ function defaultSnapshot(): HalSimBridgeSnapshot {
 	};
 }
 
-export class HalSimBridge {
+export class HalSimBridge extends ReconnectingWsBridge<
+	WorkspaceId,
+	BridgeEntry
+> {
 	private readonly webSocketFactory: HalSimWebSocketFactory;
-	private readonly entries = new Map<WorkspaceId, BridgeEntry>();
 
 	constructor(options: HalSimBridgeOptions = {}) {
+		super();
 		this.webSocketFactory =
 			options.webSocketFactory ?? ((url) => new WebSocket(url));
+	}
+
+	protected createEntry(
+		workspaceId: WorkspaceId,
+		upstreamUrl: string,
+	): BridgeEntry {
+		return {
+			...defaultSnapshot(),
+			workspaceId,
+			upstreamUrl,
+			socket: null,
+			reconnectTimer: null,
+			reconnectBackoffMs: DEFAULT_BACKOFF_MS,
+			shouldReconnect: true,
+		};
+	}
+
+	protected createSocket(entry: BridgeEntry): WebSocket {
+		return this.webSocketFactory(entry.upstreamUrl);
 	}
 
 	getSnapshot(workspaceId: WorkspaceId): HalSimBridgeSnapshot {
@@ -152,23 +173,7 @@ export class HalSimBridge {
 		target: string | number,
 	): HalSimBridgeSnapshot {
 		const upstreamUrl = upstreamUrlFor(target);
-		let entry = this.entries.get(workspaceId);
-		if (entry && entry.upstreamUrl !== upstreamUrl) {
-			this.disconnect(workspaceId);
-			entry = undefined;
-		}
-		if (!entry) {
-			entry = {
-				...defaultSnapshot(),
-				workspaceId,
-				upstreamUrl,
-				socket: null,
-				reconnectTimer: null,
-				reconnectBackoffMs: DEFAULT_BACKOFF_MS,
-				shouldReconnect: true,
-			};
-			this.entries.set(workspaceId, entry);
-		}
+		const entry = this.ensureEntry(workspaceId, upstreamUrl);
 
 		entry.shouldReconnect = true;
 		if (!entry.socket && !entry.reconnectTimer) {
@@ -322,84 +327,57 @@ export class HalSimBridge {
 			clearTimeout(entry.reconnectTimer);
 			entry.reconnectTimer = null;
 		}
-		const socket = entry.socket;
-		entry.socket = null;
-		entry.connection = "disconnected";
-		entry.connected = false;
-		entry.stale = true;
-		if (socket && socket.readyState !== WebSocket.CLOSED) {
-			socket.close();
-		}
+		super.disconnect(workspaceId);
 	}
 
-	close(): void {
-		for (const workspaceId of this.entries.keys()) {
-			this.disconnect(workspaceId);
-		}
-		this.entries.clear();
-	}
-
-	private open(entry: BridgeEntry): void {
-		entry.connection = "reconnecting";
-		entry.connected = false;
-		entry.stale = entry.lastMessageAt !== null;
+	protected onSocketOpen(entry: BridgeEntry): void {
+		// HALSim's reconnect loop can race a disconnect; honor shouldReconnect so a
+		// late open from a torn-down attach doesn't re-arm the bridge.
+		if (!entry.shouldReconnect) return;
+		log.debug("halsim upstream open", {
+			workspaceId: entry.workspaceId,
+			url: entry.upstreamUrl,
+		});
+		entry.connection = "connected";
+		entry.connected = true;
+		entry.stale = false;
 		entry.error = null;
+		entry.reconnectBackoffMs = DEFAULT_BACKOFF_MS;
+		this.sendDs(entry, { ">ds": true, ">fms": false, ">new_data": true });
+	}
 
-		const socket = this.webSocketFactory(entry.upstreamUrl);
-		entry.socket = socket;
+	protected onSocketMessage(entry: BridgeEntry, data: unknown): void {
+		if (!entry.shouldReconnect) return;
+		const raw = typeof data === "string" ? data : "";
+		this.handleMessage(entry, raw);
+	}
 
-		socket.addEventListener("open", () => {
-			if (entry.socket !== socket || !entry.shouldReconnect) return;
-			log.debug("halsim upstream open", {
-				workspaceId: entry.workspaceId,
-				url: entry.upstreamUrl,
-			});
-			entry.connection = "connected";
-			entry.connected = true;
-			entry.stale = false;
-			entry.error = null;
-			entry.reconnectBackoffMs = DEFAULT_BACKOFF_MS;
-			this.sendDs(entry, { ">ds": true, ">fms": false, ">new_data": true });
+	protected onSocketClosed(entry: BridgeEntry, event: CloseEvent): void {
+		// 1006 fires when the sim isn't running and the reconnect loop keeps retrying.
+		const level = event.code === 1006 ? "trace" : "debug";
+		log[level]("halsim upstream close", {
+			workspaceId: entry.workspaceId,
+			code: event.code,
+			reason: event.reason,
+			willReconnect: entry.shouldReconnect,
 		});
+		// The base already set disconnected/error=reason||null; HALSim auto-reconnects,
+		// so override the connection state and schedule backoff when still attached.
+		entry.connection = entry.shouldReconnect ? "reconnecting" : "disconnected";
+		entry.error =
+			event.reason ||
+			(entry.shouldReconnect ? "HALSim upstream closed." : null);
+		if (entry.shouldReconnect) {
+			this.scheduleReconnect(entry);
+		}
+	}
 
-		socket.addEventListener("message", (event) => {
-			if (entry.socket !== socket || !entry.shouldReconnect) return;
-			const raw = typeof event.data === "string" ? event.data : "";
-			this.handleMessage(entry, raw);
+	protected onSocketError(entry: BridgeEntry): void {
+		log.trace("halsim upstream error", {
+			workspaceId: entry.workspaceId,
+			url: entry.upstreamUrl,
 		});
-
-		socket.addEventListener("close", (event) => {
-			if (entry.socket !== socket) return;
-			// 1006 fires when the sim isn't running and the reconnect loop keeps retrying.
-			const level = event.code === 1006 ? "trace" : "debug";
-			log[level]("halsim upstream close", {
-				workspaceId: entry.workspaceId,
-				code: event.code,
-				reason: event.reason,
-				willReconnect: entry.shouldReconnect,
-			});
-			entry.socket = null;
-			entry.connection = entry.shouldReconnect
-				? "reconnecting"
-				: "disconnected";
-			entry.connected = false;
-			entry.stale = true;
-			entry.error =
-				event.reason ||
-				(entry.shouldReconnect ? "HALSim upstream closed." : null);
-			if (entry.shouldReconnect) {
-				this.scheduleReconnect(entry);
-			}
-		});
-
-		socket.addEventListener("error", () => {
-			if (entry.socket !== socket) return;
-			log.trace("halsim upstream error", {
-				workspaceId: entry.workspaceId,
-				url: entry.upstreamUrl,
-			});
-			entry.error = "HALSim upstream error.";
-		});
+		entry.error = "HALSim upstream error.";
 	}
 
 	private scheduleReconnect(entry: BridgeEntry): void {

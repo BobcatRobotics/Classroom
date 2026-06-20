@@ -17,7 +17,8 @@ import {
 } from "./helpers";
 
 describe("run lifecycle and log streaming", () => {
-	function createControlledRunCommands() {
+	function createControlledRunCommands(options: { exitOnKill?: boolean } = {}) {
+		const exitOnKill = options.exitOnKill ?? true;
 		const encoder = new TextEncoder();
 		const commands: Array<{
 			context: Parameters<RunCommandFactory>[0];
@@ -77,7 +78,9 @@ describe("run lifecycle and log streaming", () => {
 				exited,
 				kill() {
 					command.killed = true;
-					command.exit(null, "SIGTERM");
+					if (exitOnKill) {
+						command.exit(null, "SIGTERM");
+					}
 				},
 			};
 		};
@@ -243,6 +246,68 @@ describe("run lifecycle and log streaming", () => {
 				codeImage: "coderunner-workspace:test",
 				simPortRange: { start: 25830, end: 25839 },
 				vscodePortRange: { start: 33030, end: 33039 },
+			},
+		);
+	});
+
+	test("a superseded run does not overwrite the current run's status", async () => {
+		const fakeDocker = createFakeDocker();
+		// kill() must NOT auto-resolve `exited`, so we can defer the old run's
+		// terminal `finishJob` until after the new run has fully finished. That is
+		// the race this guard protects against.
+		const controlled = createControlledRunCommands({ exitOnKill: false });
+
+		await withApp(
+			async (app) => {
+				expect((await login(app, "alice")).status).toBe(303);
+				const workspace = workspaceBySlug(app, "alice");
+				const connection = app.runs.connect(workspace, () => {});
+
+				// Run A: started, command created, but its exit is held open.
+				const runA = app.runs.start(workspace, connection);
+				await waitFor(() => controlled.commands.length === 1);
+
+				// Run B supersedes A on the same workspace. cancelWorkspace marks A
+				// canceled and "kills" command 0 (no exit yet), then registers B.
+				const runB = app.runs.start(workspace, connection);
+				await waitFor(() => controlled.commands.length === 2);
+				expect(runA).not.toBe(runB);
+				expect(controlled.commands[0]?.killed).toBe(true);
+
+				// Drive B to running, then stop it so B reaches its own terminal
+				// status and leaves jobsByWorkspace with the correct snapshot.
+				controlled.commands[1]?.writeStdout("NT4 listening on 5810");
+				await waitFor(
+					() =>
+						app.runs.getWorkspaceSnapshot(workspace.id).status === "running",
+				);
+				app.runs.stopWorkspace(workspace.id);
+				controlled.commands[1]?.exit(0, "SIGTERM");
+				await waitFor(() => app.storage.getRunJob(runB)?.state === "stopped");
+				expect(app.runs.getWorkspaceSnapshot(workspace.id)).toMatchObject({
+					status: "stopped",
+					runId: runB,
+				});
+
+				// Now the old run A finally exits. Its terminal finishJob must NOT
+				// clobber the workspace snapshot that now belongs to run B.
+				controlled.commands[0]?.exit(null, "SIGTERM");
+				await waitFor(() => app.storage.getRunJob(runA)?.state === "stopped");
+
+				// A's per-job row is still recorded as stopped (unguarded), but the
+				// shared snapshot keeps B's identity.
+				expect(app.storage.getRunJob(runA)).toMatchObject({ state: "stopped" });
+				expect(app.runs.getWorkspaceSnapshot(workspace.id)).toMatchObject({
+					status: "stopped",
+					runId: runB,
+				});
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				runCommandFactory: controlled.commandFactory,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 25860, end: 25869 },
+				vscodePortRange: { start: 33060, end: 33069 },
 			},
 		);
 	});
