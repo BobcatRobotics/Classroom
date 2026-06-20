@@ -82,7 +82,7 @@ sudo docker compose logs -f alloy
 
 **Metrics:** Alloy scrapes `control:4000/metrics` (over the compose network) every 30 seconds and remote-writes to Grafana Cloud Prometheus. It also collects host-level metrics (CPU, memory, disk, network) via the built-in Unix exporter — it reads the host's `/proc`, `/sys`, and `/` through bind mounts since Alloy is containerized — labeled with the `instance` value from `instance_label` in `terraform.tfvars`.
 
-**Logs:** the control plane writes JSON to stdout, captured by Docker's json-file log driver. Alloy's `discovery.docker` finds the `control` container and `loki.source.docker` ships its log lines to Loki. The pipeline extracts `level` and `category` as Loki labels; high-cardinality fields like `workspaceId` and `runId` stay in the JSON body and are queried with `| json` at read time. The compose `service` name is copied into a `unit` label so existing queries keep working.
+**Logs:** the control plane writes JSON to stdout, captured by Docker's json-file log driver. Alloy's `discovery.docker` finds the `control` container and `loki.source.docker` ships its log lines to Loki. The pipeline extracts `level` and `category` as Loki labels; high-cardinality fields like `workspaceId` and `runId` stay in the JSON body and are queried with `| json` at read time. The compose `service` name is also copied into a `unit` label (its value is now `control`, not the old `coderunner.service` — update any saved queries accordingly).
 
 ## Starter LogQL queries
 

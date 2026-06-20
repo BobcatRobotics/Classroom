@@ -252,7 +252,7 @@ write_files:
         targets = discovery.docker.containers.targets
         rule {
           source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-          regex         = "control"
+          regex         = "^control$"
           action        = "keep"
         }
         rule {
