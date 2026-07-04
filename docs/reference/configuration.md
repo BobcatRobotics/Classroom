@@ -113,6 +113,7 @@ The idle manager periodically checks active containers and stops those that have
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `ADMIN_TOKEN` | none | Bearer token accepted by `/admin/*` endpoints as an alternative to an admin user session. Useful as a break-glass bootstrap token before any admin user has signed in. Leave unset to require a signed-in admin session. |
+| `METRICS_TOKEN` | none | Bearer token accepted for scraping `GET /metrics`. When set, scrapers send `Authorization: Bearer <token>`. Leave unset to require an admin user session instead. |
 | `MAX_ACTIVE_CONTAINERS` | `10` | Hard cap on simultaneously running workspace containers. New workspace requests beyond this limit are rejected until a slot is freed. |
 
 See [Monitoring](../operating/monitoring.md) for the `/metrics` Prometheus endpoint.
@@ -144,9 +145,10 @@ On a cloud VM the `.env` file is regenerated on every boot by `render-env.sh`, s
 
 ## Notes on .env.example vs config.ts
 
-Two variables appear in `.env.example` but are not in `config.ts`'s `ControlConfig` struct because they are read outside of it:
+Three variables appear in `.env.example` but are not in `config.ts`'s `ControlConfig` struct because they are read outside of it:
 
 - `PORT`: read directly by `apps/control/src/main.ts` as the listen port; also feeds the `BETTER_AUTH_URL` default in `config.ts`.
 - `LOG_FORMAT`: read directly by `apps/control/src/logging.ts`; not part of `ControlConfig`.
+- `METRICS_TOKEN`: read directly by `apps/control/src/app.ts` to gate the `/metrics` endpoint; not part of `ControlConfig`.
 
-Both are real, documented, and functional; they are just not stored in the config object.
+All three are real, documented, and functional; they are just not stored in the config object.
