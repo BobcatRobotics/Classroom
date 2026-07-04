@@ -87,6 +87,16 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		return this.storage.config.containerNetwork;
 	}
 
+	/**
+	 * The control plane's compose project, propagated onto workspace containers
+	 * so they nest under it in tools that group by `com.docker.compose.project`
+	 * (Portainer, `docker compose ls`). Null on the host / when unread, in which
+	 * case no compose label is stamped.
+	 */
+	private get composeProject(): string | null {
+		return this.storage.config.composeProject;
+	}
+
 	startWorkspaceContainers(workspace: WorkspaceRow): void {
 		if (!this.storage.config.containerAutoStart) {
 			return;
@@ -573,6 +583,14 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			"--mount",
 			`type=bind,src=${toHostPath(config, homePath)},dst=/config`,
 		];
+
+		// Nest workspace containers under the control plane's compose project in
+		// Portainer / `docker compose ls`. Note this makes `docker compose down
+		// --remove-orphans` (or a Portainer "remove stack") select them too;
+		// their real lifecycle owner is still the frc-sim.managed reconciler.
+		if (this.composeProject !== null) {
+			args.push("--label", `com.docker.compose.project=${this.composeProject}`);
+		}
 
 		if (this.containerNetwork !== null) {
 			args.push("--network", this.containerNetwork);

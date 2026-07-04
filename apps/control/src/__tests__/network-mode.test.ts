@@ -168,6 +168,52 @@ describe("network mode container orchestration", () => {
 		);
 	});
 
+	test("stamps the compose project label so workspaces nest under the control plane", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				await login(app, "alice");
+				const workspace = workspaceBySlug(app, "alice");
+				await app.containers.ensureCodeContainer(workspace);
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				expect(runCall).toContain("--label");
+				expect(runCall).toContain("com.docker.compose.project=coderunner");
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				containerNetwork: "coderunner",
+				composeProject: "coderunner",
+			},
+		);
+	});
+
+	test("omits the compose project label when none is configured", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				await login(app, "alice");
+				const workspace = workspaceBySlug(app, "alice");
+				await app.containers.ensureCodeContainer(workspace);
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				expect(
+					runCall?.some((arg) => arg.startsWith("com.docker.compose.project=")),
+				).toBe(false);
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				containerNetwork: "coderunner",
+			},
+		);
+	});
+
 	test("adopts a running container already attached to the network", async () => {
 		const fakeDocker = createFakeDocker();
 

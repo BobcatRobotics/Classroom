@@ -70,6 +70,14 @@ export type SelfInspectResult = {
 	containerNetwork: string | null;
 	/** undefined when root-owned — left to the config root-guard to reject. */
 	containerUser: string | undefined;
+	/**
+	 * The `com.docker.compose.project` label of this container, so workspace
+	 * containers can carry the same label and nest under the control plane's
+	 * compose project in tools that group by it (Portainer, `docker compose ls`).
+	 * Null on the host, and null when every field is env-overridden (we skip the
+	 * inspect entirely in that path, so the label is never read).
+	 */
+	composeProject: string | null;
 	/** Which fields came from inspection (vs. an explicit env override). */
 	autoDetected: {
 		hostDataDir: boolean;
@@ -136,6 +144,7 @@ export async function selfInspect(
 		hostDataDir,
 		containerNetwork,
 		containerUser,
+		composeProject: deriveComposeProject(container),
 		autoDetected: {
 			hostDataDir: needHostDataDir,
 			containerNetwork: needNetwork,
@@ -161,6 +170,7 @@ function notDerived(
 		hostDataDir,
 		containerNetwork,
 		containerUser: containerUser ?? undefined,
+		composeProject: null,
 		autoDetected: {
 			hostDataDir: false,
 			containerNetwork: false,
@@ -204,6 +214,13 @@ function deriveNetwork(container: DockerInspectContainer): string {
 			`one user-defined network attached to this container, found ${found}. Set ` +
 			`FRC_CONTAINER_NETWORK to the network workspace containers should join.`,
 	);
+}
+
+function deriveComposeProject(
+	container: DockerInspectContainer,
+): string | null {
+	const project = container.Config?.Labels?.["com.docker.compose.project"];
+	return project ? project : null;
 }
 
 function deriveContainerUser(

@@ -158,7 +158,19 @@ docker compose down      # stop and remove the control container + network
 ```
 
 Student containers are managed by the control plane (not compose), so they
-survive `docker compose stop`. To force them all to recreate (for example
+survive `docker compose stop`.
+
+:::warning `--remove-orphans` also removes student containers
+Student containers carry the control plane's `com.docker.compose.project`
+label so they group under the stack in tools like Portainer. A side effect is
+that `docker compose down --remove-orphans` (and a Portainer "remove stack")
+select them too and will stop **live student workspaces**. Plain
+`docker compose down` only warns about them; add `--remove-orphans` only when
+no students are active. Their real lifecycle owner is still the control plane,
+not compose.
+:::
+
+To force them all to recreate (for example
 after a workspace-image update), recycle them with
 `docker compose exec control coderunner rebuild-workspaces` while the control
 plane is up, or `bun run docker:rebuild-workspaces` from a from-source

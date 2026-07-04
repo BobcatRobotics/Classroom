@@ -27,6 +27,7 @@ export type ControlConfig = {
 	codeImage: string;
 	codeMemoryLimit: string;
 	containerNetwork: string | null;
+	composeProject: string | null;
 	hostDataDir: string | null;
 	simPortRange: PortRange;
 	vscodePortRange: PortRange;
@@ -284,6 +285,7 @@ export function loadControlConfig(
 		codeMemoryLimit:
 			input.codeMemoryLimit ?? Bun.env.CODE_MEMORY_LIMIT ?? "2560m",
 		containerNetwork,
+		composeProject: input.composeProject ?? null,
 		hostDataDir: parseHostDataDir(
 			input.hostDataDir ?? Bun.env.FRC_HOST_DATA_DIR ?? null,
 		),

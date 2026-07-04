@@ -6,7 +6,11 @@ import type { DockerInspectContainer } from "../containers/types";
 type Mount = { Type?: string; Source?: string; Destination?: string };
 
 function fakeInspect(
-	options: { mounts?: Mount[]; networks?: string[] } = {},
+	options: {
+		mounts?: Mount[];
+		networks?: string[];
+		labels?: Record<string, string>;
+	} = {},
 ): DockerInspectContainer {
 	const networks: Record<string, unknown> = {};
 	for (const name of options.networks ?? []) {
@@ -15,7 +19,7 @@ function fakeInspect(
 	return {
 		Name: "/coderunner-control-1",
 		State: { Running: true, Status: "running" },
-		Config: { Labels: {} },
+		Config: { Labels: options.labels ?? {} },
 		Mounts: options.mounts ?? [],
 		NetworkSettings: { Ports: {}, Networks: networks },
 	};
@@ -34,6 +38,7 @@ function containerizedFixture(): DockerInspectContainer {
 		],
 		// bridge is a default network and must be filtered out.
 		networks: ["bridge", "coderunner"],
+		labels: { "com.docker.compose.project": "coderunner" },
 	});
 }
 
@@ -62,6 +67,7 @@ describe("selfInspect — host (not containerized)", () => {
 			hostDataDir: null,
 			containerNetwork: null,
 			containerUser: undefined,
+			composeProject: null,
 			autoDetected: {
 				hostDataDir: false,
 				containerNetwork: false,
@@ -94,6 +100,7 @@ describe("selfInspect — containerized derivation", () => {
 			hostDataDir: "/srv/coderunner/data",
 			containerNetwork: "coderunner",
 			containerUser: "1000:1000",
+			composeProject: "coderunner",
 			autoDetected: {
 				hostDataDir: true,
 				containerNetwork: true,
@@ -121,6 +128,46 @@ describe("selfInspect — containerized derivation", () => {
 		expect(result.hostDataDir).toBe("/srv/coderunner/data");
 		expect(result.containerNetwork).toBe("coderunner");
 	});
+
+	test("derives the compose project label so workspaces can nest under it", async () => {
+		const result = await selfInspect({
+			dataDir: "/data",
+			envHostDataDir: null,
+			envContainerNetwork: null,
+			envContainerUser: null,
+			dockerenvExists: () => true,
+			hostname: () => "abc123",
+			inspect: async () =>
+				fakeInspect({
+					mounts: [{ Source: "/srv/data", Destination: "/data" }],
+					networks: ["coderunner"],
+					labels: { "com.docker.compose.project": "my-stack" },
+				}),
+			stat: () => ({ uid: 1000, gid: 1000 }),
+		});
+
+		expect(result.composeProject).toBe("my-stack");
+	});
+
+	test("compose project is null when the container carries no compose label", async () => {
+		const result = await selfInspect({
+			dataDir: "/data",
+			envHostDataDir: null,
+			envContainerNetwork: null,
+			envContainerUser: null,
+			dockerenvExists: () => true,
+			hostname: () => "abc123",
+			inspect: async () =>
+				fakeInspect({
+					mounts: [{ Source: "/srv/data", Destination: "/data" }],
+					networks: ["coderunner"],
+					// No labels (e.g. `docker run` outside compose).
+				}),
+			stat: () => ({ uid: 1000, gid: 1000 }),
+		});
+
+		expect(result.composeProject).toBeNull();
+	});
 });
 
 describe("selfInspect — env overrides win", () => {
@@ -147,6 +194,8 @@ describe("selfInspect — env overrides win", () => {
 			hostDataDir: "/explicit/data",
 			containerNetwork: "explicit-net",
 			containerUser: "500:500",
+			// All fields env-overridden → inspect skipped → label never read.
+			composeProject: null,
 			autoDetected: {
 				hostDataDir: false,
 				containerNetwork: false,

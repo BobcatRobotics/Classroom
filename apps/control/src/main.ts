@@ -55,6 +55,9 @@ if (demoFlag) {
 if (inspection.containerized) {
 	configInput.hostDataDir = inspection.hostDataDir;
 	configInput.containerNetwork = inspection.containerNetwork;
+	// Stamp workspace containers with the control plane's compose project so they
+	// group under it in Portainer / `docker compose ls`. Null when unread.
+	configInput.composeProject = inspection.composeProject;
 	// Leave containerUser absent when the data dir is root-owned (undefined) so
 	// loadControlConfig's root-guard fires instead of silently running
 	// workspaces as root.
@@ -102,6 +105,7 @@ log.info("control plane configuration", {
 			? `${c.containerNetwork} (auto-detected)`
 			: c.containerNetwork
 		: "(none — loopback published ports)",
+	composeProject: c.composeProject ?? "(none; workspaces ungrouped)",
 	simPorts: c.containerNetwork
 		? "(unused in network mode)"
 		: `${c.simPortRange.start}-${c.simPortRange.end}`,
