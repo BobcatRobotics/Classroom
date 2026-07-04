@@ -63,7 +63,7 @@ See [OAuth credentials](../deploying/oauth-credentials.md) for step-by-step regi
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `FRC_DOCKER_PATH` | `docker` | Path to the Docker CLI binary. Override if Docker is not on `PATH`. |
-| `CODE_IMAGE` | `coderunner-workspace` | Docker image name for student workspace containers. |
+| `CODE_IMAGE` | `${CODERUNNER_IMAGE_NS}/coderunner-workspace:${CODERUNNER_TAG}` | Docker image name for student workspace containers. Set it to override the canonical name entirely. |
 | `CODE_MEMORY_LIMIT` | `2560m` | Memory cap applied to each workspace container via Docker `--memory`. Lower to `2048m` if the host is RAM-constrained. |
 | `SIM_PORT_RANGE` | `25810-25899` | Loopback port range allocated for HALSim NT4 connections. Format: `start-end`. |
 | `VSCODE_PORT_RANGE` | `33000-33099` | Loopback port range for openvscode-server instances. Format: `start-end`. |
@@ -84,6 +84,7 @@ These variables are consumed by `docker compose` itself (interpolated into `dock
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `CODERUNNER_TAG` | `latest` | Image tag to run for both the control and workspace images (a release tag like `v2.5.0`, or `latest`). |
+| `CODERUNNER_IMAGE_NS` | `ghcr.io/mathewdunne` | Registry + owner for both coderunner images. Forks publishing their own images set this once. Unlike the other variables in this table it is also read by the control plane and the image build/pull script, so the same `.env` line covers every consumer. |
 | `CODERUNNER_HOST_DATA_DIR` | `./data` (in the checkout) | Host path of the data directory, bind-mounted into the control container at `/data`. Compose resolves `./data` against the project directory. Set this to relocate the data directory (for example, onto a mounted disk); the control plane derives the matching `FRC_HOST_DATA_DIR` itself by inspecting its own container, so this variable does not need to be passed through by hand. |
 | `COMPOSE_FILE` | none | Production VM only: selects the prod stack (`docker-compose.yml:docker-compose.prod.yml`) so a plain `docker compose up -d` runs Caddy + Alloy too. |
 

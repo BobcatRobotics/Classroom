@@ -8,7 +8,7 @@
 #
 # Build context is the repo root (like containers/code/Dockerfile) and needs
 # the vendor/AdvantageScope submodule initialized:
-#   docker build -f containers/control/Dockerfile -t coderunner-control .
+#   bun run docker:build:control
 #
 # See docs/decisions/031-containerized-control-plane.md.
 

@@ -29,7 +29,9 @@ The runtime seeds conservative memory defaults for classroom density:
 bun run docker:build:workspace
 ```
 
-Tags the image as `coderunner-workspace` by default. Override with `CODE_IMAGE` env var.
+Tags the image as `${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}` —
+the same name docker compose and the control plane resolve, so a local build is
+used directly. Override the full name with the `CODE_IMAGE` env var.
 
 ## Runtime Contract
 
@@ -91,7 +93,7 @@ docker run -d \
   -e PGID=$(id -g) \
   -e VSCODE_BASE_PATH=/u/<slug>/vscode/ \
   --memory=2560m \
-  coderunner-workspace
+  ghcr.io/mathewdunne/coderunner-workspace:latest
 ```
 
 ## s6-overlay Services

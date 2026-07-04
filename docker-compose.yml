@@ -26,7 +26,7 @@ services:
     # the control plane's self-inspection (docker inspect $HOSTNAME) is
     # unaffected; the service name still resolves on the network for Caddy.
     container_name: control
-    image: ghcr.io/mathewdunne/coderunner-control:${CODERUNNER_TAG:-latest}
+    image: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-control:${CODERUNNER_TAG:-latest}
     restart: unless-stopped
     ports:
       # Loopback only: Caddy (prod) or the local browser reaches it here.
@@ -37,7 +37,7 @@ services:
       # CODERUNNER_HOST_DATA_DIR to relocate the data dir (e.g. a mounted disk).
       - ${CODERUNNER_HOST_DATA_DIR:-./data}:/data
     environment:
-      CODE_IMAGE: ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}
+      CODE_IMAGE: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}
       # Demo mode: auth bypassed, everyone shares one admin workspace. Unset
       # (or any falsy value) keeps normal auth. Never expose a demo instance
       # publicly.
@@ -61,7 +61,7 @@ services:
   # not a running service.
   workspace-template:
     container_name: workspace-template
-    image: ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}
+    image: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}
     entrypoint: ["/bin/true"]
     restart: "no"
 

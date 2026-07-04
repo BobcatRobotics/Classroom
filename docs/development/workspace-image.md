@@ -5,7 +5,8 @@ title: Workspace Image
 
 # Workspace Image
 
-The `coderunner-workspace` image is the per-student container that runs
+The workspace image (`ghcr.io/mathewdunne/coderunner-workspace`) is the
+per-student container that runs
 openvscode-server, Java 17, and the WPILib simulation stack in a single
 Docker image. The [workspace container overview](../about/workspace-container.md)
 explains the runtime contract from the application's perspective; the
@@ -29,14 +30,19 @@ the container take seconds rather than minutes.
 bun run docker:build:workspace
 ```
 
-This runs `scripts/build-code-image.ts`, which calls:
+This runs `scripts/image.ts`, which calls:
 
 ```
-docker build -f containers/code/Dockerfile -t coderunner-workspace .
+docker build -f containers/code/Dockerfile -t ghcr.io/mathewdunne/coderunner-workspace:latest .
 ```
 
-The build context is the repo root. The image is tagged `coderunner-workspace`
-by default; override the tag with the `CODE_IMAGE` environment variable.
+The build context is the repo root. The image is tagged with its canonical
+name — `${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}` —
+the same name docker compose and the control plane's `CODE_IMAGE` default
+resolve to, so a local build is picked up directly by `docker compose up` or
+`bun run dev:control` with no re-tagging. Forks set `CODERUNNER_IMAGE_NS` (in
+`.env`) to their own registry/owner; `CODE_IMAGE` overrides the full image
+name outright.
 
 ## Pulling from GHCR
 
@@ -47,17 +53,12 @@ image instead of building:
 bun run docker:pull:workspace
 ```
 
-This pulls `ghcr.io/mathewdunne/coderunner-workspace:latest`. The same pull
-runs as part of `bun run build` (the production build step).
+This pulls the same canonical name. The same pull runs as part of
+`bun run build` (the production build step). Note a pull overwrites the
+`latest` tag, so it replaces any locally built image of the same name.
 
-## Pushing a new image
-
-```bash
-bun run docker:push:workspace
-```
-
-This builds the image via `scripts/build-code-image.ts` and then pushes it
-to GHCR. You need write access to the package registry.
+Publishing images to GHCR is done exclusively by CI (the release workflow in
+`.github/workflows/deploy.yml`), not from a developer machine.
 
 ## When to rebuild
 

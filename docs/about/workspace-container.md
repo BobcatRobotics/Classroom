@@ -16,7 +16,8 @@ published ports, labels, environment variables, and first-run behavior) is the
 
 ## What is inside the image
 
-The image (`coderunner-workspace` by default, overridden via `CODE_IMAGE`) is
+The image (`ghcr.io/mathewdunne/coderunner-workspace:latest` by default,
+overridden via `CODE_IMAGE`) is
 built on [linuxserver/openvscode-server](https://github.com/linuxserver/docker-openvscode-server)
 (Ubuntu 24.04 with s6-overlay process supervision) and adds the following on
 top:

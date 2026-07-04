@@ -281,7 +281,10 @@ export function loadControlConfig(
 		googleClientSecret:
 			input.googleClientSecret ?? Bun.env.GOOGLE_CLIENT_SECRET ?? null,
 		dockerPath: input.dockerPath ?? Bun.env.FRC_DOCKER_PATH ?? "docker",
-		codeImage: input.codeImage ?? Bun.env.CODE_IMAGE ?? "coderunner-workspace",
+		codeImage:
+			input.codeImage ??
+			Bun.env.CODE_IMAGE ??
+			`${Bun.env.CODERUNNER_IMAGE_NS ?? "ghcr.io/mathewdunne"}/coderunner-workspace:${Bun.env.CODERUNNER_TAG ?? "latest"}`,
 		codeMemoryLimit:
 			input.codeMemoryLimit ?? Bun.env.CODE_MEMORY_LIMIT ?? "2560m",
 		containerNetwork,
