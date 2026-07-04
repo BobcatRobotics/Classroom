@@ -250,20 +250,25 @@ hook (`auth.ts`) sets `role: "admin"` at signup for any address in
 - **No emsdk anywhere but the build stage.** `fetch-dist.ts`/`setup:demo`
   remain for emsdk-free host development, fed by tarballs extracted from the
   image.
-- **The control container runs as root and mounts the Docker socket.** This is
-  the same trust level as the prior setup (the `coderunner` host user was in the
-  `docker` group), but a control-plane RCE is now container-escape-trivial. The
-  socket is the only writable host mount besides `/data`. Because the control
-  plane is root in-container, **network mode refuses to start without a
-  resolvable workspace user** — either an explicit `FRC_CONTAINER_USER` or a
-  non-root `stat()` of the data dir — otherwise workspace containers (and the
-  student files they create on the host) would be root-owned. This is also why
-  `data/.gitkeep` is tracked (`.gitignore` now keeps `data/*` ignored but
-  excepts `data/.gitkeep`): if Docker itself created a missing `./data` on
-  first `up`, it would be root-owned and the control plane would refuse to
-  start, telling the operator to `chown` it (or set `FRC_CONTAINER_USER`) —
-  a tracked placeholder file means a fresh `git clone` already owns `./data`
-  as the cloning user, so the common path never hits that guard.
+- **The control container runs as a non-root uid:gid (the data-dir owner) and
+  mounts the Docker socket.** See the [non-root addendum](#addendum--non-root-control-container)
+  below for the mechanics. The socket is still the only writable host mount
+  besides `/data`, so a control-plane RCE remains a serious escape surface —
+  running non-root narrows the blast radius but does not eliminate it (the same
+  trust level as the prior bare-metal setup, where the `coderunner` host user
+  was in the `docker` group). The **workspace** user is still derived
+  independently by `stat()`ing the data dir, and **network mode still refuses
+  to start without a resolvable non-root workspace user** — either an explicit
+  `FRC_CONTAINER_USER` or a non-root `stat()` of the data dir — so workspace
+  containers (and the student files they create on the host) can't be
+  root-owned. That guard is now defense-in-depth rather than the reason the
+  control process itself isn't root. This is also why `data/.gitkeep` is tracked
+  (`.gitignore` keeps `data/*` ignored but excepts `data/.gitkeep`): if Docker
+  created a missing `./data` on first `up` it would be root-owned, which both
+  trips the workspace-user guard and leaves the now-non-root control process
+  unable to write it — a tracked placeholder means a fresh `git clone` already
+  owns `./data` as the cloning user, so the common path never hits either
+  failure.
 - **First cutover on the live VM** must recreate the existing port-mode
   containers (they fail network-mode adoption and are recreated lazily;
   `rebuild-workspaces` does it eagerly). The Alloy log pipeline changes from
@@ -275,3 +280,39 @@ hook (`auth.ts`) sets `role: "admin"` at signup for any address in
   daemon's view of host paths doesn't always match what a WSL2 shell sees).
   `FRC_HOST_DATA_DIR` remains available as an override when inspection can't
   resolve it. The dev loop is untouched.
+
+## Addendum — non-root control container
+
+The control container originally ran as **root** (the image had no `USER`
+directive). Every file it wrote to the bind-mounted `./data` (`app.db`,
+`allowlist.json`, `users/…`) landed `root:root` on the host, so dropping into
+the host dev loop (`bun run dev:control`, uid 1000) hit `SQLITE_READONLY` on the
+first write to `app.db` — and, per the consequence above, a control-plane RCE
+was container-escape-trivial.
+
+The image now defaults to **`USER bun`** (uid 1000, the base image's stock user)
+with a world-writable `HOME=/home/app` so any override uid can write its runtime
+cache. `docker-compose.yml` overrides the identity per deployment:
+
+```yaml
+user: "${CODERUNNER_UID:-1000}:${CODERUNNER_GID:-1000}"
+group_add:
+  - "${CODERUNNER_DOCKER_GID:-1001}"
+```
+
+`CODERUNNER_UID`/`GID` are the owner of the data dir (so `./data` stays
+host-owned across the container↔host handoff), and `CODERUNNER_DOCKER_GID` is
+the host `docker` group gid — added as a supplementary group so the non-root
+process can still reach the bind-mounted socket (the docker CLI is how the
+control plane drives the daemon). The numeric gid works even without a matching
+named group inside the container, and the same `user:`/`group_add:` pair applies
+to `docker compose run --rm control <subcommand>`, so the ops CLI runs non-root
+too. These vars are distinct from the `FRC_*` vars that govern the workspace
+siblings. On the VM, `render-env.sh` (fresh boot) and the cutover runbook emit
+all three from the `APP_USER` that already owns the data disk, so no host is
+hardcoded to uid 1000.
+
+The `stat()`-based **workspace**-user derivation and the network-mode root-guard
+are unchanged — they guard the derived workspace user, independent of the
+control process's own uid, and now stand as defense-in-depth. See
+[security model → control plane container privileges](../about/security-model.md#control-plane-container-privileges).

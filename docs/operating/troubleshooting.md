@@ -43,6 +43,65 @@ start on their next workspace open.
 
 ---
 
+## Control plane can't reach the Docker socket (permission denied)
+
+**Symptom.** The `control` container starts but the logs show
+`permission denied` while connecting to `/var/run/docker.sock` (often
+`Got permission denied while trying to connect to the Docker daemon socket`),
+and no workspace containers ever start.
+
+**Cause.** The control container runs as a non-root user and needs the host
+`docker` group gid added as a supplementary group to reach the bind-mounted
+socket. `CODERUNNER_DOCKER_GID` does not match the host's actual docker group
+gid — the `1001` default does not match many distributions (Debian/Ubuntu often
+use `999`/`998`).
+
+**Fix.** Look up the real gid and set it in `.env`, then recreate the container:
+
+```bash
+stat -c '%g' /var/run/docker.sock     # e.g. 999
+```
+
+```bash
+# in .env
+CODERUNNER_DOCKER_GID=999
+```
+
+```bash
+docker compose up -d control          # recreate with the corrected group_add
+```
+
+---
+
+## Control plane can't write /data (SQLITE_READONLY / read-only data dir)
+
+**Symptom.** The `control` container fails at startup (or on the first write)
+with `SQLITE_READONLY: attempt to write a readonly database`, or logs an error
+about being unable to write under `/data`.
+
+**Cause.** The bind-mounted `./data` (or files inside it) is not owned by the
+`CODERUNNER_UID:CODERUNNER_GID` the control container runs as. This is typically
+leftover `root:root` files from a pre-non-root deployment that ran the control
+plane as root, or a `./data` that Docker recreated root-owned after the
+directory was deleted.
+
+**Fix.** Confirm the ownership matches the configured uid:gid (default
+`1000:1000`), then reclaim it on the host:
+
+```bash
+ls -ln data                           # check the owner uid/gid
+stat -c '%g' /var/run/docker.sock     # (for the docker gid, if also affected)
+
+# Reclaim the data dir for the control container's uid:gid (adjust to yours)
+sudo chown -R 1000:1000 data
+```
+
+Then restart the control plane (`docker compose up -d control`). Never delete
+the `./data` directory itself — Docker would recreate it root-owned and this
+failure would return.
+
+---
+
 ## Build times out
 
 **Symptom.** A run shows "failed" after approximately 90 seconds with no

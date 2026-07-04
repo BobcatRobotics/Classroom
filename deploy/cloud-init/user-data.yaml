@@ -131,6 +131,12 @@ write_files:
         # Grafana Cloud Loki. Don't change without updating that pipeline below.
         echo "LOG_FORMAT=json"
         echo "LESSONS_CATALOG_REPO=mathewdunne/CodeRunner-Lessons"
+        # Run the control container as the APP_USER that owns DATA_DIR (chowned
+        # above), not root, so /data writes and the derived workspace uid line
+        # up. The docker group gid lets the non-root process reach the socket.
+        echo "CODERUNNER_UID=$(id -u "$${APP_USER}")"
+        echo "CODERUNNER_GID=$(id -g "$${APP_USER}")"
+        echo "CODERUNNER_DOCKER_GID=$(getent group docker | cut -d: -f3)"
         # Add new control-plane env vars above this line.
       } > "$tmp"
       install -o "$${APP_USER}" -g "$${APP_USER}" -m 600 "$tmp" "$${COMPOSE_DIR}/.env"

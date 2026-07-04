@@ -127,6 +127,9 @@ sudo bash -c "cat >> /opt/coderunner/.env <<EOF
 CODERUNNER_TAG=${TAG}
 CODERUNNER_HOST_DATA_DIR=${DATA_DIR}
 COMPOSE_FILE=docker-compose.yml
+CODERUNNER_UID=$(id -u "$APP_USER")
+CODERUNNER_GID=$(id -g "$APP_USER")
+CODERUNNER_DOCKER_GID=$(getent group docker | cut -d: -f3)
 EOF"
 sudo chown "$APP_USER:$APP_USER" /opt/coderunner/.env
 sudo chmod 600 /opt/coderunner/.env
@@ -197,6 +200,16 @@ gcloud compute ssh "$VM" --zone="$ZONE" --tunnel-through-iap --quiet --command="
   cd /opt/coderunner && sudo docker compose ps
 "
 # Expect: service 'control' STATUS = Up ... (healthy). 'workspace-template' Exited (0) is normal.
+```
+
+**Control container runs non-root as the `APP_USER`:**
+
+```bash
+gcloud compute ssh "$VM" --zone="$ZONE" --tunnel-through-iap --quiet --command="
+  cd /opt/coderunner && sudo docker compose exec control id
+"
+# Expect: uid/gid = the coderunner APP_USER (NOT uid=0 root), and the host
+# docker group gid among 'groups=' (so the process can reach the socket).
 ```
 
 **Public HTTPS still works through the existing Caddy:**

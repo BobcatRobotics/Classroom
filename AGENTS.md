@@ -68,7 +68,11 @@ and is deployed with docker compose (`docker-compose.yml` base +
 `docker-compose.prod.yml` for Caddy/Alloy; demo mode is `CODERUNNER_DEMO_MODE=1
 docker compose up`, an env passthrough rather than an override file). It runs
 the host Docker daemon over the bind-mounted socket and manages workspace
-containers as siblings. Two modes via env: **port mode** (default;
+containers as siblings. The control container runs **non-root** as the data-dir
+owner (image default `USER bun`; compose overrides via
+`user: ${CODERUNNER_UID}:${CODERUNNER_GID}` with `group_add:
+${CODERUNNER_DOCKER_GID}` for socket access), so `./data` stays host-owned, not
+root-owned. Two modes via env: **port mode** (default;
 `FRC_CONTAINER_NETWORK` unset) publishes loopback ports and is what
 `bun run dev:control` uses; **network mode** (`FRC_CONTAINER_NETWORK=coderunner`)
 joins a shared Docker network with no published ports and needs

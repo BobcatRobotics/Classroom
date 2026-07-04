@@ -117,5 +117,16 @@ EXPOSE 4000
 # <subcommand>` reaches it directly on PATH since `exec` bypasses ENTRYPOINT.
 COPY containers/control/entrypoint.sh /usr/local/bin/coderunner
 RUN chmod +x /usr/local/bin/coderunner
+
+# Non-root by default; compose overrides the uid:gid to the data-dir owner.
+# HOME must be writable by whatever uid runs us (bun runtime cache, etc.), so
+# use a world-writable dir rather than the base image's /root. No chown of /app
+# is needed — the earlier COPY/install layers are world-readable (umask 0022).
+# USER bun (uid 1000) matches the base image's stock user and the typical
+# single-host dev user; compose overrides it per deployment.
+RUN install -d -m 0777 /home/app
+ENV HOME=/home/app
+USER bun
+
 ENTRYPOINT ["coderunner"]
 CMD ["serve"]

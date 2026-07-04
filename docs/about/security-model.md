@@ -75,14 +75,21 @@ modes.
 
 In the standard `docker compose` deployment, the control plane runs as a
 container and needs the host Docker socket bind-mounted so it can manage
-per-student containers as siblings. That container runs as root and the
-socket grants it full control of the host's Docker daemon, so a remote-code-
-execution bug in the control plane is effectively a container escape — the
-socket is the only writable host mount besides the data directory. This is
-the same trust level as the pre-containerized deployment (the host user
-running the control plane process was a member of the `docker` group), just
-repackaged. Operators evaluating CodeRunner for a shared network should weigh
-this alongside the [demo mode](#demo-mode) warning below. See
+per-student containers as siblings. That container runs as a **non-root**
+uid:gid — the user that owns the bind-mounted data directory (`CODERUNNER_UID`
+/ `CODERUNNER_GID`, defaulting to `1000:1000`), with the host `docker` group
+gid added as a supplementary group (`CODERUNNER_DOCKER_GID`) so the non-root
+process can still reach the socket. Running non-root keeps the data directory
+host-owned rather than root-owned and reduces the blast radius of a compromise.
+
+It does **not** eliminate it: the mounted socket still grants full control of
+the host's Docker daemon, so a remote-code-execution bug in the control plane
+remains effectively a container escape — the socket is the primary privilege
+surface and the only writable host mount besides the data directory. This is
+the same trust level as the pre-containerized deployment (the host user running
+the control plane process was a member of the `docker` group), just repackaged.
+Operators evaluating CodeRunner for a shared network should weigh this alongside
+the [demo mode](#demo-mode) warning below. See
 [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md) for the full
 rationale.
 

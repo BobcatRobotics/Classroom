@@ -28,6 +28,18 @@ services:
     container_name: control
     image: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-control:${CODERUNNER_TAG:-latest}
     restart: unless-stopped
+    # Run as the host owner of the data dir (keeps ./data host-owned, drops
+    # root). group_add grants the non-root process access to the bind-mounted
+    # Docker socket (host `docker` group gid). Find the gid with:
+    #   stat -c '%g' /var/run/docker.sock
+    # The defaults (1000:1000, docker gid 1001) match this host; prod overrides
+    # via .env. The numeric socket gid works even without a matching named group
+    # inside the container, and the same identity applies to
+    # `docker compose run --rm control <subcommand>`, so ops commands run
+    # non-root too.
+    user: "${CODERUNNER_UID:-1000}:${CODERUNNER_GID:-1000}"
+    group_add:
+      - "${CODERUNNER_DOCKER_GID:-1001}"
     ports:
       # Loopback only: Caddy (prod) or the local browser reaches it here.
       - "127.0.0.1:4000:4000"

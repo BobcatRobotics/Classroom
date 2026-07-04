@@ -82,6 +82,32 @@ figures out the corresponding in-container mapping itself by inspecting its
 own container at startup, so you don't need to keep the two paths in sync by
 hand.
 
+The control container runs as a **non-root** user so the files it writes to
+`./data` stay owned by a real host user rather than root. Three variables
+govern that identity (all default to values that work on a typical single-user
+Linux host):
+
+- `CODERUNNER_UID` / `CODERUNNER_GID` (default `1000:1000`) — the uid:gid the
+  control container runs as. These must match the user who owns `./data`;
+  `1000:1000` is correct for the first user created on most single-user hosts.
+- `CODERUNNER_DOCKER_GID` (default `1001`) — the host `docker` group gid, added
+  as a supplementary group so the non-root process can reach the Docker socket.
+  The `1001` default does **not** match many distributions (Debian/Ubuntu often
+  use `999` or `998`), so look yours up first:
+
+  ```bash
+  stat -c '%g' /var/run/docker.sock
+  ```
+
+  Set `CODERUNNER_DOCKER_GID` in `.env` to whatever that prints if it isn't
+  `1001`, or the control plane won't be able to start or manage containers.
+
+`./data` ships in the checkout (as `data/.gitkeep`), so it's already owned by
+whoever cloned the repo — leave the directory in place. **Never delete the
+directory itself**: if you remove it, Docker recreates it root-owned on the next
+`up`, and the non-root control plane then can't write it. Delete only its
+*contents* (`rm -rf data/*`) if you need to reset.
+
 The full list of environment variables and their defaults is in `.env.example`.
 
 ## 3. Start the app
