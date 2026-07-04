@@ -10,18 +10,22 @@ starting and stopping the app, managing who can sign in, and keeping an eye on
 what the system is doing.
 
 :::note Running ops commands
-The maintenance scripts in this page (`allowlist`, `users`, `audit-prune`,
-`backup`, `restore`) run **inside the control container**:
+The maintenance commands in this page (`allowlist`, `users`, `audit-prune`,
+`backup`, `restore`) run **inside the control container** via the `coderunner`
+CLI:
 
 ```bash
-docker compose exec control bun scripts/<name>.ts <args>
+docker compose exec control coderunner <subcommand> <args>
 ```
 
-On the Google Cloud VM the compose project lives in `/opt/coderunner` and needs
+Use `docker compose run --rm control <subcommand> <args>` instead for a
+one-off command while the control plane is stopped (e.g. `restore`). On the
+Google Cloud VM the compose project lives in `/opt/coderunner` and needs
 `sudo` (`cd /opt/coderunner && sudo docker compose exec -T control …`). On a
 from-source host checkout with Bun you can instead use the `bun run <name>`
 aliases shown in `package.json`. The examples below use the `bun run` short form;
-substitute the `docker compose exec` form for a containerized deployment.
+substitute the `docker compose exec control coderunner <subcommand>` form for a
+containerized deployment.
 :::
 
 ## Starting and stopping
@@ -107,6 +111,13 @@ Changes take effect immediately; the running control plane watches
 ---
 
 ## Managing user roles
+
+The **first** admin is best bootstrapped without any exec step: set
+`CODERUNNER_ADMIN_EMAIL` (comma-separated) in `.env` before the first startup
+and those accounts are allowlisted and granted the admin role on first sign-in
+(an existing account is promoted at the next startup). See
+[OAuth Credentials](../deploying/oauth-credentials.md). The commands here are for
+ongoing role changes after that.
 
 After a coach or mentor signs in for the first time they are a regular user.
 Promote them to admin so they can access the admin panel and use the admin API:

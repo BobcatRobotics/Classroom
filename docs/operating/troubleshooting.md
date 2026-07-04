@@ -29,10 +29,14 @@ docker compose pull
 bun run docker:pull:workspace    # or docker:build:workspace to build locally
 ```
 
-Check for port conflicts: if all ports in `SIM_PORT_RANGE` or
-`VSCODE_PORT_RANGE` are in use, container startup fails. Verify the ranges are
-not overlapping with other services on the host. Defaults are `25810–25899`
-(sim NT4) and `33000–33099` (openvscode-server).
+In **port mode** (the host dev loop, or a `docker compose` deployment with
+`FRC_CONTAINER_NETWORK` explicitly unset), check for port conflicts: if all
+ports in `SIM_PORT_RANGE` or `VSCODE_PORT_RANGE` are in use, container startup
+fails. Verify the ranges are not overlapping with other services on the host.
+Defaults are `25810–25899` (sim NT4) and `33000–33099` (openvscode-server).
+This does not apply to **network mode** — the default for `docker compose`
+deployments — where workspace containers publish no host ports at all; see
+[decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md).
 
 After the image is present and Docker is healthy, the student's container will
 start on their next workspace open.
@@ -83,7 +87,9 @@ docker logs coderunner-workspace-<workspaceId> --tail 100
 
 Look for the simulator failing to bind its HALSim port. If `HALSIM_PORT_RANGE`
 ports are exhausted, restart the control plane or stop idle containers to free
-leases.
+leases. This only applies in port mode — network-mode deployments don't lease
+host ports for workspace containers, so exhaustion here means
+`MAX_ACTIVE_CONTAINERS` instead (see below).
 
 ---
 
@@ -115,7 +121,7 @@ bun run allowlist:add yourteam.org
 
 On a containerized deployment run these inside the control container instead
 (`cd /opt/coderunner && sudo` on the VM):
-`docker compose exec control bun scripts/allowlist.ts list|add <email-or-domain>`.
+`docker compose exec control coderunner allowlist list|add <email-or-domain>`.
 
 **Cause: empty allowlist.** If the allowlist is empty, everyone is blocked.
 Confirm with `bun run allowlist:list` and add at least one entry.
@@ -123,6 +129,12 @@ Confirm with `bun run allowlist:list` and add at least one entry.
 ---
 
 ## Port range exhausted
+
+This applies to **port mode** only (the host dev loop, or a `docker compose`
+deployment with `FRC_CONTAINER_NETWORK` explicitly unset). Network mode — the
+default for `docker compose` deployments — never leases host ports for
+workspace containers, so it can't hit this failure; its concurrency limit is
+`MAX_ACTIVE_CONTAINERS` alone (see [Capacity](./capacity.md)).
 
 **Symptom.** Container startup fails with a log message about no free ports, or
 many students get "server at capacity" even when the concurrency cap has not

@@ -108,6 +108,14 @@ ENV FRC_DATA_DIR=/data \
 
 EXPOSE 4000
 
-# Migrate-then-serve, with exec so the control plane is PID 1 and receives
-# docker stop's SIGTERM directly.
-ENTRYPOINT ["/bin/sh", "-c", "bun apps/control/src/migrate.ts apply && exec bun apps/control/src/main.ts"]
+# `coderunner` is a dispatching CLI (containers/control/entrypoint.sh) so ops
+# commands read as `coderunner <subcommand>` instead of exposing the script
+# paths. With CMD=["serve"] the default `docker compose up` migrates then
+# execs the server as PID 1, so it receives docker stop's SIGTERM directly;
+# `docker compose run --rm control <subcommand>` (allowlist, backup, restore,
+# ...) reuses the same entrypoint, and `docker compose exec control coderunner
+# <subcommand>` reaches it directly on PATH since `exec` bypasses ENTRYPOINT.
+COPY containers/control/entrypoint.sh /usr/local/bin/coderunner
+RUN chmod +x /usr/local/bin/coderunner
+ENTRYPOINT ["coderunner"]
+CMD ["serve"]

@@ -19,7 +19,7 @@ snapshot before deletion.
 :::note Local deployments
 This procedure is for the Google Cloud VM. For a local classroom machine,
 simply stop the stack (`docker compose stop`) and optionally archive student
-work with `docker compose exec control bun scripts/backup.ts`.
+work with `docker compose exec control coderunner backup`.
 :::
 
 ## Why stopping the VM is not enough

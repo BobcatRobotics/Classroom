@@ -1,3 +1,6 @@
+import { resolve } from "node:path";
+import type { ControlAppOptions } from "./app";
+import { selfInspect } from "./containers/self-inspect";
 import {
 	configureLogging,
 	defaultLogFormat,
@@ -16,7 +19,51 @@ const { createApp } = await import("./app");
 const demoFlag = Bun.argv.includes("--demo");
 
 const port = Number(Bun.env.PORT ?? 4000);
-const app = await createApp(demoFlag ? { demo: true } : {});
+
+// Explicit workspace-user override from the environment, mirroring the env
+// portion of config's defaultContainerUser(). Passing it (or an inspected
+// value) as an explicit input keeps the merge below in the right direction.
+function envContainerUser(): string | null {
+	if (Bun.env.FRC_CONTAINER_USER) {
+		return Bun.env.FRC_CONTAINER_USER;
+	}
+	if (Bun.env.FRC_UID && Bun.env.FRC_GID) {
+		return `${Bun.env.FRC_UID}:${Bun.env.FRC_GID}`;
+	}
+	return null;
+}
+
+// Zero-config containerized mode: inside a container we inspect ourselves to
+// derive the host data path, workspace network, and data-dir owner. On the host
+// this is a no-op (no /.dockerenv → no Docker calls, nothing derived).
+//
+// Precedence: loadControlConfig resolves each field as `input.X ?? Bun.env.X`,
+// so passing a derived value as input would beat an explicit env override —
+// wrong direction. selfInspect takes the explicit env values and returns the
+// finals (env wins, inspection fills the gaps); we pass those finals as input.
+const inspection = await selfInspect({
+	dataDir: resolve(Bun.env.FRC_DATA_DIR ?? "data"),
+	envHostDataDir: Bun.env.FRC_HOST_DATA_DIR ?? null,
+	envContainerNetwork: Bun.env.FRC_CONTAINER_NETWORK ?? null,
+	envContainerUser: envContainerUser(),
+});
+
+const configInput: ControlAppOptions = {};
+if (demoFlag) {
+	configInput.demo = true;
+}
+if (inspection.containerized) {
+	configInput.hostDataDir = inspection.hostDataDir;
+	configInput.containerNetwork = inspection.containerNetwork;
+	// Leave containerUser absent when the data dir is root-owned (undefined) so
+	// loadControlConfig's root-guard fires instead of silently running
+	// workspaces as root.
+	if (inspection.containerUser !== undefined) {
+		configInput.containerUser = inspection.containerUser;
+	}
+}
+
+const app = await createApp(configInput);
 const c = app.storage.config;
 
 if (c.demo) {
@@ -39,13 +86,22 @@ const maxStudents = c.containerNetwork
 			c.vscodePortRange.end - c.vscodePortRange.start + 1,
 		);
 
+const detected = inspection.autoDetected;
 log.info("control plane configuration", {
 	logLevel: c.logLevel,
 	dataDir: c.dataDir,
-	hostDataDir: c.hostDataDir ?? "(same as dataDir)",
+	hostDataDir: c.hostDataDir
+		? detected.hostDataDir
+			? `${c.hostDataDir} (auto-detected)`
+			: c.hostDataDir
+		: "(same as dataDir)",
 	codeImage: c.codeImage,
 	codeMemoryLimit: c.codeMemoryLimit,
-	containerNetwork: c.containerNetwork ?? "(none — loopback published ports)",
+	containerNetwork: c.containerNetwork
+		? detected.containerNetwork
+			? `${c.containerNetwork} (auto-detected)`
+			: c.containerNetwork
+		: "(none — loopback published ports)",
 	simPorts: c.containerNetwork
 		? "(unused in network mode)"
 		: `${c.simPortRange.start}-${c.simPortRange.end}`,
@@ -56,7 +112,11 @@ log.info("control plane configuration", {
 	simStartupSec: c.simStartupTimeoutMs / 1000,
 	idleStopMinutes: c.idleStopMinutes,
 	idleCheckSec: c.idleCheckIntervalMs / 1000,
-	containerUser: c.containerUser ?? "(auto)",
+	containerUser: c.containerUser
+		? detected.containerUser
+			? `${c.containerUser} (auto-detected)`
+			: c.containerUser
+		: "(auto)",
 	containerAutoStart: c.containerAutoStart,
 	adminAuth: c.demo
 		? "demo mode (auth bypassed)"

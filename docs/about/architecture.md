@@ -37,7 +37,8 @@ At a high level there are three moving parts:
    │  ├─ Run pipeline (build + simulate)             │
    │  └─ SQLite (users, sessions, leases, audit)     │
    └───────────────────────────────────────────────┘
-                        │  loopback only (127.0.0.1)
+                        │  loopback ports, or a private Docker network
+                        │  with no published ports (deployment-dependent)
         ┌───────────────┼───────────────┐
         ▼               ▼               ▼
    ┌─────────┐    ┌─────────┐     ┌─────────┐
@@ -46,6 +47,12 @@ At a high level there are three moving parts:
    └─────────┘    └─────────┘     └─────────┘
      editor + JDK + Gradle + WPILib + simulator
 ```
+
+The control plane itself typically runs as a container too — the standard
+deploy is `docker compose up`, with the control image managing per-student
+containers as Docker siblings over the bind-mounted host socket. See
+[decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md) for that
+packaging and the two ways it reaches student containers, below.
 
 ## The single front door
 
@@ -64,8 +71,12 @@ The control plane is a single Bun process. Its responsibilities:
   cookie. See the [Security Model](./security-model.md) for details.
 - **Workspace orchestration.** On a student's first sign-in the control plane
   creates their workspace and, when they open it, starts their Docker
-  container. It allocates host ports, applies management labels, enforces a
-  per-container memory cap, and stops idle containers automatically.
+  container. Depending on deployment mode it either publishes loopback host
+  ports for that container (**port mode**, the host dev loop) or joins it to a
+  shared Docker network with no published ports and proxies to it by container
+  name (**network mode**, the default for `docker compose` deployments). Either
+  way it applies management labels, enforces a per-container memory cap, and
+  stops idle containers automatically.
 - **Authenticated proxying.** All editor traffic, the simulator's control
   channel, and the NetworkTables telemetry stream are reverse-proxied through
   authenticated routes scoped to the signing-in user's own workspace. A student

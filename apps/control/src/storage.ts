@@ -9,7 +9,11 @@ import type {
 	WorkspaceId,
 	WorkspaceSlug,
 } from "@frc-coderunner/contracts";
-import { loadAllowlist, setAllowlistPath } from "./auth/allowlist";
+import {
+	addAllowlistEntry,
+	loadAllowlist,
+	setAllowlistPath,
+} from "./auth/allowlist";
 import { type Auth, createAuth } from "./auth/auth";
 import type { ControlConfig, ControlConfigInput } from "./config";
 import { loadControlConfig } from "./config";
@@ -150,7 +154,13 @@ export class AppStorage {
 		const { runMigrations } = await getMigrations(this.auth.options);
 		await runMigrations();
 
-		// 5. Warn if no auth providers are configured (skipped in demo mode).
+		// 5. Bootstrap admins from CODERUNNER_ADMIN_EMAIL. Runs after the allowlist
+		// is loaded and the better-auth `user` table exists, so it can both seed
+		// allowlist entries and promote an account that signed in before the env
+		// was set. New accounts get the admin role via the user.create hook.
+		await this.seedBootstrapAdmins();
+
+		// 6. Warn if no auth providers are configured (skipped in demo mode).
 		if (!this.config.demo) {
 			const hasGitHub = Boolean(
 				this.config.githubClientId && this.config.githubClientSecret,
@@ -174,6 +184,28 @@ export class AppStorage {
 
 	close(): void {
 		this.db.close();
+	}
+
+	/**
+	 * Seed the accounts named in CODERUNNER_ADMIN_EMAIL so a fresh deployment
+	 * needs zero exec steps: each email is added to the allowlist (idempotent),
+	 * and any existing non-admin account with that email is promoted. Accounts
+	 * that have not signed in yet get the admin role from the user.create hook.
+	 */
+	private async seedBootstrapAdmins(): Promise<void> {
+		for (const email of this.config.adminEmails) {
+			await addAllowlistEntry("email", email);
+
+			const user = this.db
+				.query("SELECT id, role FROM user WHERE email = ?")
+				.get(email) as { id: string; role: string | null } | null;
+			if (user && user.role !== "admin") {
+				this.db
+					.query("UPDATE user SET role = ?, updatedAt = ? WHERE id = ?")
+					.run("admin", nowIso(), user.id);
+				log.info("bootstrap admin promoted", { email });
+			}
+		}
 	}
 
 	private normalizeWorkspaceProjectPaths(): void {

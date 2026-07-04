@@ -63,6 +63,10 @@ GITHUB_CLIENT_ID=<your-github-client-id>
 GITHUB_CLIENT_SECRET=<your-github-client-secret>
 # GOOGLE_CLIENT_ID=<your-google-client-id>
 # GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+
+# Your email(s) — bootstraps admin access with zero exec steps. Comma-separated.
+# Each is added to the allowlist at startup and made an admin on first sign-in.
+CODERUNNER_ADMIN_EMAIL=you@yourteam.org
 ```
 
 `BETTER_AUTH_SECRET` defaults to a hardcoded dev placeholder; always change it
@@ -70,11 +74,13 @@ in any non-demo deployment. `BETTER_AUTH_URL` defaults to
 `http://localhost:4000`, which works for single-machine use but must be updated
 to the LAN IP if students are on other devices (OAuth callbacks must match).
 
-Also set `CODERUNNER_HOST_DATA_DIR` to an **absolute** path where student data
-should live (the SQLite DB and per-workspace projects). The Docker daemon
-resolves the workspace bind mounts against the host, so this must be the
-host-side path. For a single-machine setup the checkout's `./data` is fine —
-set it explicitly to its absolute path, e.g. `CODERUNNER_HOST_DATA_DIR=$PWD/data`.
+Student data (the SQLite DB and per-workspace projects) defaults to `./data` in
+the checkout — no env var needed for a single-machine setup. Set
+`CODERUNNER_HOST_DATA_DIR` to an **absolute** host path only if you want to
+relocate it, for example onto a larger or separate disk. The control plane
+figures out the corresponding in-container mapping itself by inspecting its
+own container at startup, so you don't need to keep the two paths in sync by
+hand.
 
 The full list of environment variables and their defaults is in `.env.example`.
 
@@ -102,36 +108,46 @@ Students open `http://<your-LAN-IP>:4000/` in their browsers.
 To pull a newer release later, set `CODERUNNER_TAG` in `.env` (or leave it at
 `latest`) and run `docker compose pull && docker compose up -d`.
 
-## 4. Allowlist who can sign in
+## 4. Sign in as the first admin
 
-Ops commands run inside the control container with `docker compose exec`. The
-allowlist controls which email addresses (or entire domains) may complete OAuth
-login. **No one can sign in until at least one entry is added.**
+If you set `CODERUNNER_ADMIN_EMAIL` in `.env` before `docker compose up`, there
+are **no exec steps to reach the admin panel**. On startup the control plane
+adds each listed email to the allowlist and, on first OAuth sign-in, creates the
+account with the admin role (an account that already exists is promoted at the
+next startup). Just open the app, sign in with that email, and you land as an
+admin who can manage workspaces, adjust the container cap, and view the audit
+log.
+
+If you would rather bootstrap by hand — or you need to add students and make
+later changes — the ops commands run inside the control container via the
+`coderunner` CLI, either with `docker compose exec` (control plane already up)
+or `docker compose run --rm control <subcommand>` (works even while it's
+stopped).
+
+The allowlist controls which email addresses (or entire domains) may complete
+OAuth login. **No one can sign in until they match an allowlist entry** (the
+`CODERUNNER_ADMIN_EMAIL` accounts are added automatically):
 
 ```bash
-# Allow a specific email
-docker compose exec control bun scripts/allowlist.ts add coach@frcteam.org
+# Allow a specific student email
+docker compose exec control coderunner allowlist add student@frcteam.org
 
 # Or allow every address at a domain
-docker compose exec control bun scripts/allowlist.ts add frcteam.org
+docker compose exec control coderunner allowlist add frcteam.org
 ```
 
-Other commands: `... allowlist.ts list`, `... allowlist.ts remove`.
+Other allowlist commands: `... coderunner allowlist list`,
+`... coderunner allowlist remove`.
 
-## 5. Promote the first admin
-
-The first time a coach signs in via OAuth, their account is created as a regular
-user. After signing in once, promote them to admin:
+To promote another coach to admin after they have signed in once:
 
 ```bash
-docker compose exec control bun scripts/users.ts promote coach@frcteam.org
+docker compose exec control coderunner users promote coach@frcteam.org
 ```
 
-Admins can manage workspaces, adjust the container cap, and view the audit log
-from the admin panel. See [OAuth Credentials](./oauth-credentials.md) for more
-on the allowlist and admin bootstrap flow.
-
-Other user commands: `... users.ts list`, `... users.ts demote`.
+Other user commands: `... coderunner users list`, `... coderunner users demote`.
+See [OAuth Credentials](./oauth-credentials.md) for more on the allowlist and
+admin bootstrap flow.
 
 ## Stopping and restarting
 
@@ -142,9 +158,12 @@ docker compose down      # stop and remove the control container + network
 ```
 
 Student containers are managed by the control plane (not compose), so they
-survive `docker compose stop`. To remove them too, recycle them with
-`docker compose exec control bun scripts/rebuild-workspaces.ts` while the control
-plane is up, or `bun run docker:cleanup` from a checkout with Bun.
+survive `docker compose stop`. To force them all to recreate (for example
+after a workspace-image update), recycle them with
+`docker compose exec control coderunner rebuild-workspaces` while the control
+plane is up, or `bun run docker:rebuild-workspaces` from a from-source
+checkout. To just remove already-stopped ones without forcing a recreate, use
+`coderunner cleanup` / `bun run docker:cleanup` instead.
 
 ## A note on plain HTTP
 

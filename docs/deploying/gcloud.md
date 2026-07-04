@@ -198,21 +198,30 @@ to pin a specific version:
 gh workflow run "Deploy to GCE" --ref main -f tag=v2.0.0
 ```
 
-### 10. Promote yourself to admin
+### 10. Become the first admin
 
-The first user to sign in is a regular user. After signing in once, promote
-yourself via IAP SSH:
+The easiest path is to set `CODERUNNER_ADMIN_EMAIL` in `/opt/coderunner/.env`
+(comma-separated for multiple coaches) before you first sign in. On startup the
+control plane allowlists each listed email and grants it the admin role at first
+OAuth sign-in — no exec steps. Add the line and restart the stack:
 
 ```bash
 gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
-  --command='cd /opt/coderunner && sudo docker compose exec -T control bun scripts/users.ts promote <your-email>'
+  --command='cd /opt/coderunner && echo "CODERUNNER_ADMIN_EMAIL=<your-email>" | sudo tee -a .env && sudo docker compose up -d'
 ```
 
-You also need to allowlist emails before anyone can sign in. From the same IAP
-SSH session:
+Otherwise, promote yourself by hand after signing in once, via IAP SSH:
 
 ```bash
-sudo docker compose exec -T control bun scripts/allowlist.ts add coach@frcteam.org
+gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
+  --command='cd /opt/coderunner && sudo docker compose exec -T control coderunner users promote <your-email>'
+```
+
+Either way you also need to allowlist your students' emails before they can sign
+in. From an IAP SSH session:
+
+```bash
+sudo docker compose exec -T control coderunner allowlist add coach@frcteam.org
 ```
 
 See [OAuth Credentials](./oauth-credentials.md) for the full allowlist and admin
@@ -264,7 +273,7 @@ The **Deploy to GCE** workflow (defined in `.github/workflows/deploy.yml`):
 5. `scp`s the compose files to the VM, pins `CODERUNNER_TAG=<tag>` in
    `/opt/coderunner/.env`, runs `docker compose pull` + `up -d`, then recycles
    managed workspace containers (student data is preserved; only containers are
-   removed) via `docker compose exec control bun scripts/rebuild-workspaces.ts`
+   removed) via `docker compose exec control coderunner rebuild-workspaces`
 6. Polls `/healthz` until the service is healthy
 
 Nothing is built on the VM; emsdk, Node, and Bun are not installed there.

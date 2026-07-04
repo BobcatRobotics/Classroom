@@ -59,10 +59,32 @@ The control plane is the only process that listens on a public port (default
 commands, telemetry, gamepad input) enters through that one port and is
 authenticated before any proxying takes place.
 
-Container ports are bound to `127.0.0.1` only. No container port is reachable
-from outside the host, even if the host firewall is misconfigured. This means
-there is no way for a student to connect to another student's container
-directly from a browser.
+How workspace container ports are exposed depends on deployment mode. In
+**port mode** (the host dev loop, `bun run dev:control`) each container's
+ports are bound to `127.0.0.1` only. In **network mode** (the default for
+`docker compose` deployments) workspace containers publish no host ports at
+all — they join a private Docker network and the control plane reaches them
+by container name over Docker's internal DNS. Either way, no container port is
+reachable from outside the host, even if the host firewall is misconfigured,
+and there is no way for a student to connect to another student's container
+directly from a browser. See
+[decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md) for the two
+modes.
+
+## Control plane container privileges
+
+In the standard `docker compose` deployment, the control plane runs as a
+container and needs the host Docker socket bind-mounted so it can manage
+per-student containers as siblings. That container runs as root and the
+socket grants it full control of the host's Docker daemon, so a remote-code-
+execution bug in the control plane is effectively a container escape — the
+socket is the only writable host mount besides the data directory. This is
+the same trust level as the pre-containerized deployment (the host user
+running the control plane process was a member of the `docker` group), just
+repackaged. Operators evaluating CodeRunner for a shared network should weigh
+this alongside the [demo mode](#demo-mode) warning below. See
+[decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md) for the full
+rationale.
 
 ## Per-workspace access enforcement
 
@@ -82,13 +104,18 @@ to reach another student's editor, simulator, or files through normal routes.
 
 Each student's container:
 
-- Runs under the host UID/GID of the control plane process, so container files
-  are owned by a non-root user.
+- Runs under a non-root host UID/GID, so container files are owned by a real
+  user rather than root. On the host dev loop this is the control plane
+  process's own UID/GID; in containerized (`docker compose`) deployments the
+  control plane derives it by `stat()`ing the bind-mounted data directory
+  (or an explicit `FRC_CONTAINER_USER` override) and refuses to start if that
+  resolves to root — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md).
 - Has a hard memory cap enforced by Docker's cgroup limit (default `2560m`,
   set by `CODE_MEMORY_LIMIT`). A runaway robot program cannot exhaust host
   memory.
-- Has its three ports bound on `127.0.0.1` only; it has no inbound network
-  exposure beyond the loopback interface.
+- Has its three ports bound on `127.0.0.1` only in port mode, or published
+  nowhere at all in network mode; either way it has no inbound network
+  exposure beyond what the control plane itself proxies.
 
 The `MAX_ACTIVE_CONTAINERS` limit (default `10`) prevents a single deployment
 from spinning up more containers than the host can sustain, reducing the blast

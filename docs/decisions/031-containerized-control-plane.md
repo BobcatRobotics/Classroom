@@ -81,7 +81,9 @@ to `localhost:<port>`. That doesn't work cleanly from inside a container, so a
   change — the `container_leases` unique indexes are already partial on
   non-NULL). Adoption requires the container to be attached to the network and
   to publish no ports, so a leftover from the other mode is recreated rather
-  than adopted (self-healing cutover).
+  than adopted (self-healing cutover). Inside a container `FRC_CONTAINER_NETWORK`
+  is normally derived automatically rather than set — see **Self-inspection**
+  below.
 
 Upstream URLs are built in one place (`converters.ts:upstreamEndpoints`, also
 used by `app/websocket.ts`), branching on the mode.
@@ -94,14 +96,71 @@ container), but `docker run --mount src=` is resolved by the daemon against the
 `containers/paths.ts:toHostPath` rewrites mount sources (a no-op when unset).
 Persisted `workspaces.project_path` rows are re-rooted under the current
 `dataDir` at startup (`storage.ts`), which also self-heals restored backups and
-host↔container moves.
+host↔container moves. Inside a container `FRC_HOST_DATA_DIR` is normally
+derived automatically rather than set — see **Self-inspection** below.
+
+### Self-inspection: zero-config containerized mode
+
+`FRC_HOST_DATA_DIR`, `FRC_CONTAINER_NETWORK`, and `FRC_CONTAINER_USER` were
+originally required env plumbing that `docker-compose.yml` supplied
+(`CODERUNNER_WORKSPACE_UID`/`GID` for the user, `${PWD}/data` interpolated into
+both the bind-mount source and `FRC_HOST_DATA_DIR`). All three are things the
+control plane can determine about itself, because it already has the host
+Docker socket bind-mounted. `apps/control/src/containers/self-inspect.ts`
+`docker inspect`s its own container (`docker inspect $(hostname)` — compose's
+default hostname is the container ID) and derives:
+
+- **hostDataDir** — the `Source` of the `Mounts[]` entry whose `Destination`
+  matches the resolved data dir (`/data` in the image). This is *more* correct
+  than a hand-supplied path on Docker Desktop/WSL2, since inspect reports the
+  daemon-side path directly rather than whatever path is visible inside a
+  WSL2/dev-container shell.
+- **containerNetwork** — the single non-default (`bridge`/`host`/`none`) key
+  under `NetworkSettings.Networks`. Zero or more than one user-defined network
+  is a hard error naming `FRC_CONTAINER_NETWORK`.
+- **containerUser** — `uid:gid` from `stat()`ing the data dir. A `0:0` stat
+  (root-owned) is deliberately **not** derived — see the root-guard
+  interaction in Consequences.
+
+**Env always wins; inspection only fills gaps.** Each field is resolved
+independently: an explicit `FRC_HOST_DATA_DIR` / `FRC_CONTAINER_NETWORK` /
+`FRC_CONTAINER_USER` (or `FRC_UID`+`FRC_GID`) is used as-is and that field is
+never inspected. `main.ts` reads the env value for each field first, calls
+`selfInspect()` with those as input, and passes its output (env-or-derived) as
+the `ControlAppOptions` given to `loadControlConfig`. This ordering matters:
+`loadControlConfig` resolves `input.X ?? Bun.env.X`, so passing a derived value
+straight through as `Bun.env` would look like it, but passing it as `input`
+*before* checking `Bun.env` would let a derived value silently outrank an
+explicit env override — the merge has to happen in `main.ts`, ahead of config,
+not inside `loadControlConfig` itself.
+
+**Activation is `/.dockerenv`-gated, and there is no fallback to port mode.**
+On the host (`/.dockerenv` absent — the dev loop) `selfInspect` returns
+immediately having made zero Docker calls, so `bun run dev:control` stays
+byte-identical to before this branch: port mode, no new log lines. Inside a
+container, every failure to derive a still-needed field (inspect fails, no
+matching mount, zero or multiple user-defined networks) is a hard startup
+error naming the env var that fixes it — silently falling back to port mode
+would boot a deployment that publishes host loopback ports the containerized
+control plane can't reach.
+
+The startup config log (`main.ts`) tags each of the three values with
+`(auto-detected)` when it came from inspection, so `docker compose logs
+control` shows at a glance whether a setting was derived or came from an
+explicit override.
 
 ### docker compose is the run surface
 
 - `docker-compose.yml` — base stack: the control service (socket + `/data`
   mounts, the `coderunner` network with an explicit name so it matches
   `docker run --network`, loopback `:4000`) plus a pull-only `workspace-image`
-  stub so `docker compose pull` fetches both images.
+  stub so `docker compose pull` fetches both images. The `environment:` block
+  is down to `CODE_IMAGE` and a `CODERUNNER_DEMO_MODE` passthrough — the
+  `FRC_HOST_DATA_DIR`/`FRC_CONTAINER_NETWORK`/`FRC_CONTAINER_USER` plumbing is
+  gone now that self-inspection derives it (see above). The volume mount is
+  `${CODERUNNER_HOST_DATA_DIR:-./data}:/data`; compose resolves `./` against
+  the project directory, so the old `${CODERUNNER_HOST_DATA_DIR:-${PWD}/data}`
+  double-interpolation is gone too.
 - `docker-compose.prod.yml` — adds **Caddy** (TLS, `reverse_proxy control:4000`)
   and **Grafana Alloy** as containers. Alloy scrapes `control:4000/metrics`,
   reads host metrics through bind-mounted `/proc`/`/sys`/`/`, and ships the
@@ -109,7 +168,16 @@ host↔container moves.
   `loki.source.docker`) — replacing the old journald pipeline. The control
   plane still logs NDJSON, so the `level`/`category` label extraction is
   unchanged.
-- `docker-compose.demo.yml` — flips `CODERUNNER_DEMO_MODE`.
+- Demo mode is a plain env-var passthrough, not an override file:
+  `docker-compose.yml` passes `CODERUNNER_DEMO_MODE: ${CODERUNNER_DEMO_MODE:-}`
+  into the control service, so `CODERUNNER_DEMO_MODE=1 docker compose up` (or a
+  `.env` entry) flips it with no extra `-f`. This needed a bug fix first:
+  `parseBoolean` (`config.ts`) treated `""` as truthy — only `0`/`false`/`no`/
+  `off` were in the falsy list — and `${VAR:-}` renders as an empty string
+  (not "absent") when the variable is unset, so every deployment without the
+  var set would have silently booted into demo mode. Fixed by normalizing and
+  returning `fallback` for the empty string before the falsy-list check.
+  `docker-compose.demo.yml` is deleted.
 
 On the VM, `/opt/coderunner/.env` sets
 `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` so a plain
@@ -118,18 +186,67 @@ On the VM, `/opt/coderunner/.env` sets
 `CODERUNNER_TAG` across reboots) plus the Alloy config. The bare-metal
 bun/systemd/host-Caddy/host-Alloy path is gone.
 
-### Ops scripts via `docker compose exec`
+### `coderunner` — a dispatching CLI, not raw scripts
 
-Backups, allowlist/user management, audit pruning, and container rebuilds run as
-`docker compose exec control bun scripts/<name>.ts` (the scripts are baked into
-the image and inherit `FRC_DATA_DIR=/data`). `restore` takes a backup directory
-**inside** `/data`.
+Ops commands used to read `docker compose exec control bun scripts/<name>.ts`,
+exposing script filenames as the operator-facing interface.
+`containers/control/entrypoint.sh` is now installed at
+`/usr/local/bin/coderunner` and set as the image `ENTRYPOINT` (`CMD ["serve"]`),
+dispatching by subcommand to the same underlying scripts (which are still
+baked into the image and inherit `FRC_DATA_DIR=/data`): `serve` (default;
+migrate then exec the server, unchanged PID-1/SIGTERM semantics), `backup`,
+`restore` (takes a backup directory **inside** `/data`), `allowlist`, `users`,
+`audit-prune`, `rebuild-workspaces`, `cleanup`, `migrate`, `help`, and a
+passthrough for anything else (e.g. `coderunner bash` for a shell).
+
+Two invocation styles both work from this one script, for different reasons:
+
+- `docker compose run --rm control <subcommand>` — `run` replaces `CMD`, so
+  the entrypoint dispatches; the one-off container still shares the socket and
+  `/data` mounts from the service definition. This is the form to use while
+  the control plane itself is stopped (e.g. `restore`).
+- `docker compose exec control coderunner <subcommand>` — `exec` bypasses the
+  image `ENTRYPOINT` entirely and runs a command inside the *already-running*
+  container, so this form only works because `coderunner` is also installed
+  as a normal executable on `PATH` — not because it's the entrypoint.
+
+The `bun run <name>` aliases in `package.json` remain the equivalent for a
+from-source host checkout.
+
+### Admin bootstrap: `CODERUNNER_ADMIN_EMAIL`
+
+A real deployment previously needed two exec steps before anyone could reach
+the admin panel: allowlist an email, then `users promote` it after that
+person's first sign-in. `CODERUNNER_ADMIN_EMAIL` (comma-separated) collapses
+that to zero exec steps. At startup (`AppStorage.seedBootstrapAdmins`,
+`storage.ts`), once the allowlist and better-auth's `user` table are ready,
+each configured email is:
+
+1. Added to the allowlist (`addAllowlistEntry`, made idempotent as part of
+   this — no duplicate entries across repeat startups).
+2. Promoted to `admin` if a `user` row with that email already exists and
+   isn't already admin, via the same `UPDATE` `scripts/users.ts promote` runs.
+   This rescues a coach who signed in as a plain student before the env var
+   was set.
+
+For an email with no existing account, `createAuth`'s `user.create.before`
+hook (`auth.ts`) sets `role: "admin"` at signup for any address in
+`config.adminEmails`, instead of always defaulting new users to `"student"`.
 
 ## Consequences
 
-- **Deploy is "pull and up."** `docker compose pull && docker compose up -d`,
-  then recycle student containers with `rebuild-workspaces`. No checkout, no
-  bun install, no tarball juggling.
+- **Deploy is "pull and up," including the first admin.** `docker compose
+  pull && docker compose up -d`, then recycle student containers with
+  `coderunner rebuild-workspaces`. No checkout, no bun install, no tarball
+  juggling — and, with `CODERUNNER_ADMIN_EMAIL` set before first boot, no exec
+  step to reach the admin panel either.
+- **The compose file's `environment:` block is down to `CODE_IMAGE` and the
+  demo passthrough.** The workspace network name, host data path, and
+  workspace uid:gid are derived at container startup instead of hand-wired;
+  the matching `FRC_*` env vars are now overrides for setups self-inspection
+  can't resolve (multiple user-defined networks, an unusual bind-mount
+  layout), not required configuration. `CODERUNNER_WORKSPACE_UID`/`GID` no
+  longer exist anywhere — the workspace user comes from `stat()`ing `/data`.
 - **No emsdk anywhere but the build stage.** `fetch-dist.ts`/`setup:demo`
   remain for emsdk-free host development, fed by tarballs extracted from the
   image.
@@ -137,13 +254,24 @@ the image and inherit `FRC_DATA_DIR=/data`). `restore` takes a backup directory
   the same trust level as the prior setup (the `coderunner` host user was in the
   `docker` group), but a control-plane RCE is now container-escape-trivial. The
   socket is the only writable host mount besides `/data`. Because the control
-  plane is root in-container, **network mode refuses to start without an
-  explicit `FRC_CONTAINER_USER`** — otherwise workspace containers (and the
-  student files they create on the host) would be root-owned.
+  plane is root in-container, **network mode refuses to start without a
+  resolvable workspace user** — either an explicit `FRC_CONTAINER_USER` or a
+  non-root `stat()` of the data dir — otherwise workspace containers (and the
+  student files they create on the host) would be root-owned. This is also why
+  `data/.gitkeep` is tracked (`.gitignore` now keeps `data/*` ignored but
+  excepts `data/.gitkeep`): if Docker itself created a missing `./data` on
+  first `up`, it would be root-owned and the control plane would refuse to
+  start, telling the operator to `chown` it (or set `FRC_CONTAINER_USER`) —
+  a tracked placeholder file means a fresh `git clone` already owns `./data`
+  as the cloning user, so the common path never hits that guard.
 - **First cutover on the live VM** must recreate the existing port-mode
   containers (they fail network-mode adoption and are recreated lazily;
   `rebuild-workspaces` does it eagerly). The Alloy log pipeline changes from
   journald to the Docker API — verify logs still flow after cutover (metrics
   failing is obvious; logs silently stopping is not).
-- **WSL2 / Docker Desktop:** `FRC_HOST_DATA_DIR` must be the path the daemon
-  sees. The dev loop is untouched.
+- **WSL2 / Docker Desktop:** self-inspection derives `hostDataDir` from
+  `docker inspect`'s own report of the bind-mount source, which is more
+  reliable than a hand-supplied `FRC_HOST_DATA_DIR` in these environments (the
+  daemon's view of host paths doesn't always match what a WSL2 shell sees).
+  `FRC_HOST_DATA_DIR` remains available as an override when inspection can't
+  resolve it. The dev loop is untouched.

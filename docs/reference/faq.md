@@ -37,7 +37,7 @@ The workspace image bundles **GradleRIO 2026.1.1** (the 2026 FRC season), Java *
 
 For a real team deployment, students sign in with GitHub or Google, whichever OAuth provider you configure. You control who is allowed in via an email/domain allowlist. No accounts are created in advance; students sign in with their existing provider accounts, and their workspace is created automatically on first login.
 
-For a solo evaluation or demo, start the demo stack (`docker compose -f docker-compose.yml -f docker-compose.demo.yml up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
+For a solo evaluation or demo, start the demo stack (`CODERUNNER_DEMO_MODE=1 docker compose up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
 
 ### What happens to a student's work when they switch lessons?
 

@@ -1,9 +1,10 @@
 # CodeRunner — base compose file (the minimal local/self-hosted deployment).
 #
 #   docker compose up -d        → control plane on http://localhost:4000
+#   CODERUNNER_DEMO_MODE=1 docker compose up -d
+#                                → demo mode (auth bypassed, shared workspace)
 #
 # Overrides:
-#   docker-compose.demo.yml     demo mode (auth bypassed, shared workspace)
 #   docker-compose.prod.yml     adds Caddy (TLS) + Grafana Alloy for the
 #                               production VM; selected there via COMPOSE_FILE
 #                               in /opt/coderunner/.env
@@ -11,7 +12,10 @@
 # Configuration lives in .env (see .env.example). The control plane drives the
 # HOST's Docker daemon through the bind-mounted socket, so per-student
 # workspace containers run as siblings of this one, joined to the shared
-# `coderunner` network below.
+# `coderunner` network below. It inspects its own container at startup to
+# auto-detect the workspace network, the host-side data path, and the uid:gid
+# that owns the data dir, so those need no env plumbing here (the matching
+# FRC_* env vars remain optional overrides).
 
 name: coderunner
 
@@ -24,19 +28,15 @@ services:
       - "127.0.0.1:4000:4000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${CODERUNNER_HOST_DATA_DIR:-${PWD}/data}:/data
+      # Compose resolves ./ against the project directory. Set
+      # CODERUNNER_HOST_DATA_DIR to relocate the data dir (e.g. a mounted disk).
+      - ${CODERUNNER_HOST_DATA_DIR:-./data}:/data
     environment:
-      # Workspace containers join this network instead of publishing host
-      # ports; the explicit network name below must match.
-      FRC_CONTAINER_NETWORK: coderunner
-      # Host-side path of the /data mount — the Docker daemon resolves the
-      # control plane's bind-mount sources against the HOST filesystem.
-      FRC_HOST_DATA_DIR: ${CODERUNNER_HOST_DATA_DIR:-${PWD}/data}
-      # uid:gid that owns the data directory on the host. Without this the
-      # control plane (root in its container) would run workspace containers
-      # as root and root-own student files.
-      FRC_CONTAINER_USER: "${CODERUNNER_WORKSPACE_UID:-1000}:${CODERUNNER_WORKSPACE_GID:-1000}"
       CODE_IMAGE: ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}
+      # Demo mode: auth bypassed, everyone shares one admin workspace. Unset
+      # (or any falsy value) keeps normal auth. Never expose a demo instance
+      # publicly.
+      CODERUNNER_DEMO_MODE: ${CODERUNNER_DEMO_MODE:-}
     env_file:
       - path: .env
         required: false
@@ -59,7 +59,8 @@ services:
 
 networks:
   coderunner:
-    # Explicit (non-project-prefixed) name: the control plane passes it
-    # verbatim to `docker run --network` and via FRC_CONTAINER_NETWORK.
+    # Explicit (non-project-prefixed) name so the control plane can pass it
+    # verbatim to `docker run --network`. Self-inspection reads it back from
+    # this container's own network attachment at startup.
     name: coderunner
     driver: bridge

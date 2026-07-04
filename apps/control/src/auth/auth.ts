@@ -97,12 +97,15 @@ export function createAuth(
 							});
 						}
 						const slug = slugFromEmail(user.email);
-						log.info("creating new user", { email: user.email, slug });
+						const role = config.adminEmails.includes(user.email.toLowerCase())
+							? "admin"
+							: "student";
+						log.info("creating new user", { email: user.email, slug, role });
 						return {
 							data: {
 								...user,
 								slug,
-								role: "student",
+								role,
 							},
 						};
 					},

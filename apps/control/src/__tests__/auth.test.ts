@@ -1,14 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createApp } from "../app";
 import {
 	addAllowlistEntry,
 	isEmailAllowed,
 	loadAllowlist,
 	setAllowlistPath,
 } from "../auth/allowlist";
-import { cookieFrom, exists, login, withApp } from "./helpers";
+import {
+	cookieFrom,
+	createAdvantageScopeDist,
+	createCatalogDir,
+	createWebDist,
+	exists,
+	login,
+	withApp,
+} from "./helpers";
 
 describe("session login and ownership", () => {
 	test("new login creates a user, workspace, session, and an empty project dir", async () => {
@@ -194,6 +203,126 @@ describe("allowlist enforcement", () => {
 
 			await addAllowlistEntry("email", "coach@other.test");
 			expect(isEmailAllowed("coach@other.test")).toBe(true);
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("bootstrap admin (CODERUNNER_ADMIN_EMAIL)", () => {
+	type CreateBeforeHook = (user: {
+		email: string;
+		name: string;
+	}) => Promise<{ data: { role: string; slug: string } } | undefined>;
+
+	test("user.create hook grants admin to listed emails and student to others", async () => {
+		await withApp(
+			async (app) => {
+				// The student email must be on the allowlist so the hook's roster gate
+				// passes; the admin email was seeded into the allowlist at startup.
+				await addAllowlistEntry("email", "student@test.local");
+
+				const hook = app.storage.auth.options.databaseHooks?.user?.create
+					?.before as unknown as CreateBeforeHook | undefined;
+				expect(hook).toBeTruthy();
+
+				// Mixed-case listed email still resolves to admin (case-insensitive).
+				const adminResult = await hook?.({
+					email: "Coach@Test.local",
+					name: "Coach",
+				});
+				expect(adminResult?.data.role).toBe("admin");
+
+				const studentResult = await hook?.({
+					email: "student@test.local",
+					name: "Student",
+				});
+				expect(studentResult?.data.role).toBe("student");
+			},
+			{ adminEmails: ["coach@test.local"] },
+		);
+	});
+
+	test("startup seeding is idempotent, promotes existing students, leaves admins", async () => {
+		const root = await mkdtemp(join(tmpdir(), "frc-bootstrap-"));
+		try {
+			const catalogDir = await createCatalogDir(root);
+			const webDistDir = await createWebDist(root);
+			const advantageScopeDistDir = await createAdvantageScopeDist(root);
+			const dataDir = join(root, "data");
+			const allowlistPath = join(dataDir, "allowlist.json");
+			const baseOptions = {
+				dataDir,
+				catalogDir,
+				webDistDir,
+				advantageScopeDistDir,
+				sessionSecret: "test-session-secret",
+				baseUrl: "http://localhost:4000",
+				containerAutoStart: false,
+				adminEmails: ["coach@team.org", "boss@team.org"],
+			};
+
+			// First startup: both admin emails are seeded into the allowlist.
+			const first = await createApp(baseOptions);
+			const afterFirst = JSON.parse(await readFile(allowlistPath, "utf8")) as {
+				emails: string[];
+			};
+			expect(afterFirst.emails).toEqual(["boss@team.org", "coach@team.org"]);
+
+			// Simulate accounts that already exist: a coach who signed in as a
+			// student before the env was set, and a boss who is already an admin.
+			const staleAdminTimestamp = "2020-01-01T00:00:00.000Z";
+			const insertUser = first.storage.db.query(
+				"INSERT INTO user (id, name, email, emailVerified, image, createdAt, updatedAt, role, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			);
+			insertUser.run(
+				"userCoachAAAAAAAAAAA",
+				"Coach",
+				"coach@team.org",
+				0,
+				null,
+				staleAdminTimestamp,
+				staleAdminTimestamp,
+				"student",
+				"coach",
+			);
+			insertUser.run(
+				"userBossBBBBBBBBBBBB",
+				"Boss",
+				"boss@team.org",
+				0,
+				null,
+				staleAdminTimestamp,
+				staleAdminTimestamp,
+				"admin",
+				"boss",
+			);
+			first.close();
+
+			// Second startup on the same data dir: idempotent allowlist, promotes the
+			// existing student, and leaves the existing admin row untouched.
+			const second = await createApp(baseOptions);
+			try {
+				const afterSecond = JSON.parse(
+					await readFile(allowlistPath, "utf8"),
+				) as { emails: string[] };
+				expect(afterSecond.emails).toEqual(["boss@team.org", "coach@team.org"]);
+
+				const coach = second.storage.db
+					.query("SELECT role, updatedAt FROM user WHERE email = ?")
+					.get("coach@team.org") as { role: string; updatedAt: string };
+				expect(coach.role).toBe("admin");
+				expect(coach.updatedAt).not.toBe(staleAdminTimestamp);
+
+				const boss = second.storage.db
+					.query("SELECT role, updatedAt FROM user WHERE email = ?")
+					.get("boss@team.org") as { role: string; updatedAt: string };
+				expect(boss.role).toBe("admin");
+				// The already-admin row is not rewritten.
+				expect(boss.updatedAt).toBe(staleAdminTimestamp);
+			} finally {
+				second.close();
+			}
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}

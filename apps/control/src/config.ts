@@ -40,12 +40,19 @@ export type ControlConfig = {
 	adminToken: string | null;
 	maxActiveContainers: number;
 	demo: boolean;
+	adminEmails: string[];
 };
 
 export type ControlConfigInput = Partial<
 	Omit<
 		ControlConfig,
-		"simPortRange" | "vscodePortRange" | "halsimPortRange" | "logLevel"
+		| "simPortRange"
+		| "vscodePortRange"
+		| "halsimPortRange"
+		| "logLevel"
+		| "containerAutoStart"
+		| "demo"
+		| "adminEmails"
 	>
 > & {
 	simPortRange?: PortRange | string;
@@ -57,6 +64,8 @@ export type ControlConfigInput = Partial<
 	port?: number | string;
 	logLevel?: LogLevel | string;
 	demo?: boolean | string;
+	containerAutoStart?: boolean | string;
+	adminEmails?: string[] | string;
 };
 
 function parseLogLevelOrThrow(value: string | LogLevel | undefined): LogLevel {
@@ -121,7 +130,21 @@ function parseBoolean(
 	if (value === undefined) {
 		return fallback;
 	}
-	return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "") {
+		return fallback;
+	}
+	return !["0", "false", "no", "off"].includes(normalized);
+}
+
+function parseAdminEmails(value: string | string[] | undefined): string[] {
+	if (value === undefined) {
+		return [];
+	}
+	const entries = Array.isArray(value) ? value : value.split(",");
+	return entries
+		.map((entry) => entry.trim().toLowerCase())
+		.filter((entry) => entry.length > 0);
 }
 
 function parsePositiveInteger(
@@ -203,8 +226,11 @@ export function loadControlConfig(
 		Boolean(Bun.env.FRC_UID && Bun.env.FRC_GID);
 	if (containerNetwork && containerUser === "0:0" && !explicitContainerUser) {
 		throw new Error(
-			"FRC_CONTAINER_NETWORK is set and the control plane is running as root, " +
-				"but no workspace container user is configured. Set FRC_CONTAINER_USER " +
+			"Workspace containers use network mode (containerized control plane) " +
+				"and the control plane is running as root, " +
+				"but no workspace container user is configured. Either chown the data " +
+				"directory to the intended non-root owner (the control plane derives the " +
+				"workspace user from the data dir's uid:gid) or set FRC_CONTAINER_USER " +
 				"(uid:gid of the host owner of the data directory) so student files are " +
 				"not created as root.",
 		);
@@ -307,5 +333,8 @@ export function loadControlConfig(
 			"MAX_ACTIVE_CONTAINERS",
 		),
 		demo: parseBoolean(input.demo ?? Bun.env.CODERUNNER_DEMO_MODE, false),
+		adminEmails: parseAdminEmails(
+			input.adminEmails ?? Bun.env.CODERUNNER_ADMIN_EMAIL,
+		),
 	};
 }

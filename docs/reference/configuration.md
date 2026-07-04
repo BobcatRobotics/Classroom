@@ -8,7 +8,7 @@ title: Configuration Reference
 CodeRunner is configured entirely through environment variables. Copy `.env.example` to `.env` in the repo root and edit only the values you need; the defaults are reasonable for local use. The control plane reads `.env` once at startup; restart the process to apply any changes.
 
 :::note Docker Compose deployments
-With the containerized control plane (the default deployment — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md)) the same `.env` is read twice: Compose interpolates the `CODERUNNER_*` values (see [Docker Compose deployment](#docker-compose-deployment) below) into `docker-compose*.yml`, and the whole file is passed into the control container. The image **fixes the in-container paths** (`/data`, `/app/...`) and sets `FRC_CONTAINER_NETWORK` itself, so the **Paths** section below and the `bun run build:*` notes apply only to a from-source host run — leave them unset for a compose deployment.
+With the containerized control plane (the default deployment — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md)) the same `.env` is read twice: Compose interpolates the `CODERUNNER_*` values (see [Docker Compose deployment](#docker-compose-deployment) below) into `docker-compose*.yml`, and the whole file is passed into the control container. The image **fixes the in-container paths** (`/data`, `/app/...`), so the **Paths** section below and the `bun run build:*` notes apply only to a from-source host run — leave them unset for a compose deployment. The control plane also auto-detects `FRC_CONTAINER_NETWORK`, `FRC_HOST_DATA_DIR`, and `FRC_CONTAINER_USER` by inspecting its own container at startup (see **Docker and Containers** below), so those need no manual setting either.
 :::
 
 ## Server
@@ -56,6 +56,7 @@ See [OAuth credentials](../deploying/oauth-credentials.md) for step-by-step regi
 | `GOOGLE_CLIENT_ID` | none | Google OAuth client ID. |
 | `GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret. |
 | `CODERUNNER_DEMO_MODE` | `false` | When `1` or `true`, bypasses authentication entirely. All visitors share one admin session. Never expose a demo instance publicly. Also enabled with the `--demo` CLI flag on startup. |
+| `CODERUNNER_ADMIN_EMAIL` | none | Comma-separated email addresses to bootstrap as admins with zero exec steps. Each is added to the allowlist at startup and granted the admin role on first OAuth sign-in; an existing account with that email is promoted to admin at the next startup. See [OAuth credentials](../deploying/oauth-credentials.md#the-easy-path-coderunner_admin_email). |
 
 ## Docker and Containers
 
@@ -68,11 +69,11 @@ See [OAuth credentials](../deploying/oauth-credentials.md) for step-by-step regi
 | `VSCODE_PORT_RANGE` | `33000-33099` | Loopback port range for openvscode-server instances. Format: `start-end`. |
 | `HALSIM_PORT_RANGE` | `34000-34099` | Loopback port range for HALSim WebSocket bridges. Format: `start-end`. |
 | `FRC_CONTAINER_AUTO_START` | `true` | Automatically start a student's workspace container when their session page loads. Also readable as `CONTAINER_AUTO_START`. |
-| `FRC_CONTAINER_USER` | auto-detected | UID:GID for container processes. On Linux defaults to the current user's UID and GID, keeping file ownership consistent with bind-mounted project directories. Also configurable via `FRC_UID` + `FRC_GID` separately. |
-| `FRC_CONTAINER_NETWORK` | none | Docker network that workspace containers join instead of publishing loopback host ports. Set (to `coderunner`) by `docker-compose.yml` when the control plane runs in a container; the control plane then reaches workspaces by container name over the network. Leave **unset** for a host/dev run (`bun run dev:control`) — a host process can't resolve container DNS names. |
-| `FRC_HOST_DATA_DIR` | none | Host-side absolute path of `FRC_DATA_DIR`, used to translate workspace bind-mount sources when the control plane itself runs in a container (the Docker daemon resolves mounts against the host). Set by `docker-compose.yml`; leave unset on the host. |
+| `FRC_CONTAINER_USER` | auto-detected | UID:GID for container processes. On a host/dev run, defaults to the current user's UID and GID (Linux), keeping file ownership consistent with bind-mounted project directories. Inside a container, auto-detected from the data directory's owner (`stat /data`) — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md#self-inspection-zero-config-containerized-mode). Set this only to override that detection. Also configurable via `FRC_UID` + `FRC_GID` separately. |
+| `FRC_CONTAINER_NETWORK` | none | Docker network that workspace containers join instead of publishing loopback host ports. Inside a container, auto-detected from the control plane's own network attachment; leave **unset** for a host/dev run (`bun run dev:control`) — a host process can't resolve container DNS names. Set this only to override detection (for example, if the container is attached to more than one user-defined network). |
+| `FRC_HOST_DATA_DIR` | none | Host-side absolute path of `FRC_DATA_DIR`, used to translate workspace bind-mount sources when the control plane itself runs in a container (the Docker daemon resolves mounts against the host). Inside a container, auto-detected from the container's own bind mounts (`docker inspect`); leave unset on the host. Set this only to override detection. |
 
-When `FRC_CONTAINER_NETWORK` is set and the control plane runs as root (the containerized case), `FRC_CONTAINER_USER` is **required** — otherwise the control plane refuses to start, to avoid root-owning student files on the host. Compose supplies it from `CODERUNNER_WORKSPACE_UID`/`GID`.
+When the control plane runs as root in network mode (the containerized case) it needs a way to resolve the workspace user, or it refuses to start to avoid root-owning student files on the host. A non-root `stat()` of the data directory satisfies this automatically; set `FRC_CONTAINER_USER` explicitly only if the data directory's owner isn't the uid:gid workspace containers should run as.
 
 Each active student workspace uses approximately 2.5 GB of RAM at the default memory cap. See [Capacity planning](../operating/capacity.md) for host sizing guidance.
 
@@ -83,9 +84,7 @@ These variables are consumed by `docker compose` itself (interpolated into `dock
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `CODERUNNER_TAG` | `latest` | Image tag to run for both the control and workspace images (a release tag like `v2.5.0`, or `latest`). |
-| `CODERUNNER_HOST_DATA_DIR` | `${PWD}/data` | Absolute **host** path of the data directory, bind-mounted into the control container at `/data` and passed through as `FRC_HOST_DATA_DIR`. |
-| `CODERUNNER_WORKSPACE_UID` | `1000` | Host UID that owns the data directory; workspace containers run as this user (supplied to the control plane as `FRC_CONTAINER_USER`). |
-| `CODERUNNER_WORKSPACE_GID` | `1000` | Host GID counterpart to `CODERUNNER_WORKSPACE_UID`. |
+| `CODERUNNER_HOST_DATA_DIR` | `./data` (in the checkout) | Host path of the data directory, bind-mounted into the control container at `/data`. Compose resolves `./data` against the project directory. Set this to relocate the data directory (for example, onto a mounted disk); the control plane derives the matching `FRC_HOST_DATA_DIR` itself by inspecting its own container, so this variable does not need to be passed through by hand. |
 | `COMPOSE_FILE` | none | Production VM only: selects the prod stack (`docker-compose.yml:docker-compose.prod.yml`) so a plain `docker compose up -d` runs Caddy + Alloy too. |
 
 ## Run Lifecycle

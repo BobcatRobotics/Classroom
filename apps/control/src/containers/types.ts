@@ -35,6 +35,11 @@ export type DockerInspectContainer = {
 	Config?: {
 		Labels?: Record<string, string>;
 	};
+	Mounts?: Array<{
+		Type?: string;
+		Source?: string;
+		Destination?: string;
+	}>;
 	NetworkSettings?: {
 		Ports?: Record<
 			string,

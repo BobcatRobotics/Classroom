@@ -9,7 +9,7 @@ Try CodeRunner locally in demo mode — no OAuth, no allowlist, no configuration
 ```bash
 git clone https://github.com/mathewdunne/CodeRunner coderunner
 cd coderunner
-docker compose -f docker-compose.yml -f docker-compose.demo.yml up
+CODERUNNER_DEMO_MODE=1 docker compose up
 ```
 
 Open [http://localhost:4000](http://localhost:4000). You land directly in the IDE as a single seeded admin user.

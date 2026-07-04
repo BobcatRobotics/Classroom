@@ -120,16 +120,12 @@ sudo curl -fsSL "https://raw.githubusercontent.com/$REPO/$TAG/docker-compose.yml
 #    compose variables, and drop the in-container path overrides that would
 #    break the container (the image fixes /data, /app/...).
 log "rebuilding /opt/coderunner/.env"
-APP_UID="$(id -u "$APP_USER")"
-APP_GID="$(id -g "$APP_USER")"
 sudo cp -n /opt/coderunner/.env /opt/coderunner/.env.pre-cutover.bak
 sudo bash -c "grep -vE '^(FRC_DATA_DIR|FRC_DB_PATH|CODE_IMAGE|PORT)=' \
   /opt/coderunner/.env.pre-cutover.bak > /opt/coderunner/.env"
 sudo bash -c "cat >> /opt/coderunner/.env <<EOF
 CODERUNNER_TAG=${TAG}
 CODERUNNER_HOST_DATA_DIR=${DATA_DIR}
-CODERUNNER_WORKSPACE_UID=${APP_UID}
-CODERUNNER_WORKSPACE_GID=${APP_GID}
 COMPOSE_FILE=docker-compose.yml
 EOF"
 sudo chown "$APP_USER:$APP_USER" /opt/coderunner/.env
@@ -159,7 +155,7 @@ log "healthz OK"
 # 7. Recycle the old port-mode student containers so the next access recreates
 #    them on the coderunner network. Projects/homes are bind-mounted (preserved).
 log "recycling workspace containers"
-sudo docker compose exec -T control bun scripts/rebuild-workspaces.ts
+sudo docker compose exec -T control coderunner rebuild-workspaces
 
 log "cutover complete"
 SCRIPT

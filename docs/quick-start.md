@@ -27,7 +27,7 @@ cd coderunner
 Start CodeRunner in demo mode:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.demo.yml up
+CODERUNNER_DEMO_MODE=1 docker compose up
 ```
 
 (Equivalently, `bun run demo:docker`.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
@@ -39,7 +39,7 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up
 1. **`coderunner-control`** — the control plane. It already contains the web shell and the prebuilt AdvantageScope Lite assets, so there is nothing to compile and no emscripten or AdvantageScope submodule needed. On start it migrates its SQLite database (under `./data`) and serves on port 4000.
 2. **`coderunner-workspace`** — the per-student image with the full Java/WPILib toolchain and the VS Code editor. It is several gigabytes, so the **first** pull takes a while; later runs reuse the cached image.
 
-Student data (the SQLite DB and per-workspace projects) lives in `./data` in the checkout. Delete that directory to reset the demo.
+Student data (the SQLite DB and per-workspace projects) lives in `./data` in the checkout. Delete its **contents** (`rm -rf data/*`) to reset the demo — keep the directory itself, since the control plane reads its ownership to decide which user workspace containers run as. (If Docker ever creates it for you, it ends up root-owned and the control plane will refuse to start until you `chown` it back.)
 
 :::note Running from source instead
 If you are developing CodeRunner (not just evaluating it), you can run the control plane directly on the host with `bun run dev:control` / `bun run dev:web`, or build a production bundle with `bun run build`. The host path needs Bun and — for a from-source AdvantageScope build — the submodule (`git submodule update --init --recursive`) and emscripten; `bun run setup:demo` downloads prebuilt assets to skip emscripten. See [Local Deployment](./deploying/local.md) and [Development Servers](./development/dev-servers.md).

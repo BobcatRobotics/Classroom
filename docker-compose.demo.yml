@@ -1,9 +1,0 @@
-# Demo override: auth is bypassed and every visitor shares one admin
-# workspace. Never expose a demo instance publicly.
-#
-#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up
-
-services:
-  control:
-    environment:
-      CODERUNNER_DEMO_MODE: "1"
