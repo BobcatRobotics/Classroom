@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../app";
@@ -206,6 +206,41 @@ describe("allowlist enforcement", () => {
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}
+	});
+});
+
+describe("allowlist reload on sign-in", () => {
+	type CreateBeforeHook = (user: {
+		email: string;
+		name: string;
+	}) => Promise<{ data: { role: string; slug: string } } | undefined>;
+
+	test("a CLI-written allowlist.json is picked up by the sign-in hook without an explicit reload call", async () => {
+		await withApp(async (app) => {
+			// Simulate `coderunner allowlist add` running as a separate process: it
+			// writes allowlist.json directly on disk, bypassing addAllowlistEntry
+			// (which would also update this process's in-memory cache).
+			const allowlistPath = join(app.storage.config.dataDir, "allowlist.json");
+			await writeFile(
+				allowlistPath,
+				JSON.stringify({ emails: ["late@test.local"], domains: [] }, null, 2),
+				"utf8",
+			);
+
+			// The in-memory cache is stale until something reloads it.
+			expect(isEmailAllowed("late@test.local")).toBe(false);
+
+			const hook = app.storage.auth.options.databaseHooks?.user?.create
+				?.before as unknown as CreateBeforeHook | undefined;
+			const result = await hook?.({
+				email: "late@test.local",
+				name: "Late",
+			});
+
+			// The hook reloads from disk before checking, so the CLI's write takes
+			// effect on this very sign-in attempt.
+			expect(result?.data.role).toBe("student");
+		});
 	});
 });
 

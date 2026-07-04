@@ -195,6 +195,7 @@ export class AppStorage {
 	private async seedBootstrapAdmins(): Promise<void> {
 		for (const email of this.config.adminEmails) {
 			await addAllowlistEntry("email", email);
+			log.info("bootstrap admin allowlisted", { email });
 
 			const user = this.db
 				.query("SELECT id, role FROM user WHERE email = ?")

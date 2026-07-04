@@ -14,10 +14,27 @@ import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { ControlConfig } from "../config";
 import { getLogger } from "../logging";
-import { isEmailAllowed } from "./allowlist";
+import { isEmailAllowed, reloadAllowlist } from "./allowlist";
 import { buildSocialProviders } from "./providers";
 
 const log = getLogger("auth");
+
+/**
+ * Reload allowlist.json from disk before enforcing it, so CLI edits
+ * (`coderunner allowlist add`) take effect on the next sign-in attempt
+ * without requiring the admin-panel Reload button or a restart. A stale
+ * cache is an acceptable fallback for a malformed file — a hard sign-in
+ * crash is not.
+ */
+async function refreshAllowlistBeforeCheck(): Promise<void> {
+	try {
+		await reloadAllowlist();
+	} catch (error) {
+		log.warn("allowlist reload failed, using cached allowlist", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+}
 
 export function slugFromEmail(email: string): string {
 	const local = email.split("@")[0] ?? "student";
@@ -87,6 +104,7 @@ export function createAuth(
 				create: {
 					before: async (user) => {
 						// Enforce allowlist on new user creation
+						await refreshAllowlistBeforeCheck();
 						if (!isEmailAllowed(user.email)) {
 							log.warn("new user rejected: not on allowlist", {
 								email: user.email,
@@ -117,6 +135,9 @@ export function createAuth(
 				// Enforce allowlist on returning users (OAuth callback)
 				if (ctx.path === "/callback/:id") {
 					const newSession = ctx.context.newSession;
+					if (newSession) {
+						await refreshAllowlistBeforeCheck();
+					}
 					if (newSession && !isEmailAllowed(newSession.user.email)) {
 						log.warn("oauth callback rejected: not on allowlist", {
 							email: newSession.user.email,
