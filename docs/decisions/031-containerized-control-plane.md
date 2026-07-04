@@ -153,8 +153,8 @@ explicit override.
 
 - `docker-compose.yml` — base stack: the control service (socket + `/data`
   mounts, the `coderunner` network with an explicit name so it matches
-  `docker run --network`, loopback `:4000`) plus a pull-only `workspace-image`
-  stub so `docker compose pull` fetches both images. The `environment:` block
+  `docker run --network`, loopback `:4000`) plus a pull-only
+  `workspace-template` stub so `docker compose pull` fetches both images. The `environment:` block
   is down to `CODE_IMAGE` and a `CODERUNNER_DEMO_MODE` passthrough — the
   `FRC_HOST_DATA_DIR`/`FRC_CONTAINER_NETWORK`/`FRC_CONTAINER_USER` plumbing is
   gone now that self-inspection derives it (see above). The volume mount is

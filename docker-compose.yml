@@ -21,6 +21,11 @@ name: coderunner
 
 services:
   control:
+    # Pin the container name (drops compose's `-1` replica suffix) so it reads
+    # as `control` in Portainer / `docker ps`. Does not change the hostname, so
+    # the control plane's self-inspection (docker inspect $HOSTNAME) is
+    # unaffected; the service name still resolves on the network for Caddy.
+    container_name: control
     image: ghcr.io/mathewdunne/coderunner-control:${CODERUNNER_TAG:-latest}
     restart: unless-stopped
     ports:
@@ -51,8 +56,11 @@ services:
 
   # Pull-only helper: the workspace image is started by the control plane via
   # the Docker CLI, not by compose, so this stub makes `docker compose pull`
-  # and the first `up` fetch it. It exits immediately and stays stopped.
-  workspace-image:
+  # and the first `up` fetch it. It exits immediately and stays stopped. Named
+  # `workspace-template` because it represents the per-student template image,
+  # not a running service.
+  workspace-template:
+    container_name: workspace-template
     image: ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}
     entrypoint: ["/bin/true"]
     restart: "no"

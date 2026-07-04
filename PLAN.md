@@ -56,7 +56,7 @@ Decisions locked in with the user:
 
 Deliberately kept as-is:
 
-- The `workspace-image` pull-only stub service (compose pull gives parallel
+- The `workspace-template` pull-only stub service (compose pull gives parallel
   pulls + progress bars).
 - Base + prod-override compose layout, selected on the VM via `COMPOSE_FILE`
   in `/opt/coderunner/.env`.
