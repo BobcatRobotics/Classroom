@@ -72,7 +72,8 @@ The metrics fall into four categories:
 - `http_requests_in_flight`: concurrent requests being dispatched. A spike
   here combined with rising latency indicates the event loop is saturated.
 - `proxy_upstream_duration_seconds{upstream, outcome}`: latency of upstream
-  HTTP fetches to `vscode`, `nt4`, `halsim`, and `ascope` upstreams.
+  HTTP fetches. Current upstreams: `vscode` (editor HTTP proxy) and `nt4`
+  (the sim alive probe, capped at 500 ms by its timeout).
 
 **Run pipeline**
 
@@ -143,4 +144,4 @@ Signs to watch for:
 
 For the cloud VM deployment, Grafana Alloy can optionally ship metrics and logs
 to Grafana Cloud. See [Grafana Cloud](./grafana.md) for setup, credentials,
-LogQL queries, and pre-built dashboards.
+LogQL queries, and the pre-built ops dashboard.

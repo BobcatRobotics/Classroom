@@ -28,7 +28,7 @@ export const httpRequestsInFlight = new Gauge({
 
 export const proxyUpstreamDuration = new Histogram({
 	name: "proxy_upstream_duration_seconds",
-	help: "Latency of upstream proxy fetches (vscode editor, NT4, HALSim, AS Lite asset).",
+	help: "Latency of upstream proxy fetches (vscode editor HTTP proxy, NT4 alive probe).",
 	labelNames: ["upstream", "outcome"] as const,
 	buckets: httpBuckets,
 	registers: [metricsRegistry],

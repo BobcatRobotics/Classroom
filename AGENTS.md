@@ -32,7 +32,7 @@ scripts/                       TypeScript utility scripts run by Bun
 patches/advantagescope/        Source-level AS Lite patches
 docs/                          Site content (Docusaurus pages) + decision logs (docs/decisions/)
 website/                       Docusaurus site config; docs/ is the content source
-dashboards/                    Pre-built Grafana dashboard JSON files (import into Grafana Cloud)
+dashboards/                    Pre-built Grafana ops dashboard JSON (import into Grafana Cloud)
 vendor/AdvantageScope/         Pinned upstream submodule
 e2e/                           Playwright E2E tests (specs/ and fixtures/)
 data/                          Runtime data, gitignored

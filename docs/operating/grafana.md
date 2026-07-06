@@ -113,20 +113,19 @@ This should return the control-plane and host (`node`) scrape targets, all `1`.
 
 ## Dashboards
 
-Six pre-built dashboard JSON files are in the [`dashboards/`](https://github.com/mathewdunne/CodeRunner/tree/main/dashboards) directory at the repo root:
+A single pre-built dashboard, `coderunner-ops.json` ("CodeRunner — Ops"), lives in the [`dashboards/`](https://github.com/mathewdunne/CodeRunner/tree/main/dashboards) directory at the repo root. It is designed for **retroactive session review** on a VM that is powered off most of the time: set the time range to cover a class session and read top to bottom. Its rows:
 
-| File | Dashboard |
+| Row | Answers |
 | --- | --- |
-| `01-control-plane-http.json` | CodeRunner — Control Plane HTTP |
-| `02-proxy-upstreams.json` | CodeRunner — Proxy Upstreams |
-| `03-runs.json` | CodeRunner — Runs |
-| `04-containers.json` | CodeRunner — Containers and Workspaces |
-| `05-node-process.json` | CodeRunner — Node / Process Health |
-| `06-ops-at-a-glance.json` | CodeRunner — Ops at a Glance |
+| Host VM | Was the box big enough? Host CPU, memory, disk used % (`/` and the data disk), network — from the Alloy `node` exporter. |
+| Workspaces | Active workspaces, per-workspace CPU/memory %, container cold-start p95. |
+| Runs | Runs by terminal status in 15-minute buckets, build duration p50/p95, run/failure/idle-stop totals over the selected range. |
+| Control plane | Request rate by route, 5xx counts, HTTP + editor-proxy p95, event-loop lag, RSS. |
+| Recent warnings & errors | Control-plane logs from Loki at `warning` and above. |
 
 ![The CodeRunner "Ops at a Glance" Grafana dashboard](/img/screenshots/grafana-ops-dashboard.png)
 
-To import them, open Grafana Cloud, go to **Dashboards → Import**, and upload each JSON file. The dashboards assume a Prometheus datasource with the metrics described in [Monitoring](./monitoring.md#what-is-exposed).
+To import it, open Grafana Cloud, go to **Dashboards → Import**, and upload the JSON file, selecting your Prometheus and Loki datasources when prompted. The panels assume the metrics described in [Monitoring](./monitoring.md#what-is-exposed). (Earlier releases shipped six narrower dashboards; they were consolidated into this one and can be recovered from git history if needed.)
 
 ## Alloy config location
 
