@@ -165,13 +165,26 @@ function parsePositiveInteger(
 	return parsed;
 }
 
-function defaultContainerUser(): string | null {
+/**
+ * Explicit workspace-user override from the environment: FRC_CONTAINER_USER,
+ * or FRC_UID:FRC_GID. Null when neither is set.
+ */
+export function envContainerUser(): string | null {
 	if (Bun.env.FRC_CONTAINER_USER) {
 		return Bun.env.FRC_CONTAINER_USER;
 	}
 
 	if (Bun.env.FRC_UID && Bun.env.FRC_GID) {
 		return `${Bun.env.FRC_UID}:${Bun.env.FRC_GID}`;
+	}
+
+	return null;
+}
+
+function defaultContainerUser(): string | null {
+	const fromEnv = envContainerUser();
+	if (fromEnv !== null) {
+		return fromEnv;
 	}
 
 	if (
@@ -210,8 +223,10 @@ export function loadControlConfig(
 		input.dataDir ?? Bun.env.FRC_DATA_DIR ?? defaultDataDir,
 	);
 
+	// An empty/whitespace value ("FRC_CONTAINER_NETWORK=" left in .env) must
+	// mean unset, not network mode with `docker run --network ""`.
 	const containerNetwork =
-		input.containerNetwork ?? Bun.env.FRC_CONTAINER_NETWORK ?? null;
+		(input.containerNetwork ?? Bun.env.FRC_CONTAINER_NETWORK)?.trim() || null;
 	const containerUser =
 		input.containerUser === undefined
 			? defaultContainerUser()
@@ -222,10 +237,12 @@ export function loadControlConfig(
 	// root-own student files on the host data disk. Network mode is the marker
 	// for a containerized deployment, so demand an explicit user there.
 	const explicitContainerUser =
-		input.containerUser !== undefined ||
-		Boolean(Bun.env.FRC_CONTAINER_USER) ||
-		Boolean(Bun.env.FRC_UID && Bun.env.FRC_GID);
-	if (containerNetwork && containerUser === "0:0" && !explicitContainerUser) {
+		input.containerUser !== undefined || envContainerUser() !== null;
+	if (
+		containerNetwork &&
+		containerUser?.split(":")[0] === "0" &&
+		!explicitContainerUser
+	) {
 		throw new Error(
 			"Workspace containers use network mode (containerized control plane) " +
 				"and the control plane is running as root, " +

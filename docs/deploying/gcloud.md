@@ -247,6 +247,10 @@ re-materialize `/opt/coderunner/.env` from Secret Manager (preserving the
 deployed `CODERUNNER_TAG`) and then `docker compose up -d`. Hand-edits to `.env`
 on the VM do not survive a reboot.
 
+It also derives `CODERUNNER_IMAGE_NS` from the Terraform `github_repo`
+variable, so a fork's VM automatically pulls the fork's own GHCR images — no
+extra configuration step.
+
 For monitoring details (Prometheus metrics, Loki log shipping, and Grafana
 dashboards), see [Monitoring](../operating/monitoring.md).
 

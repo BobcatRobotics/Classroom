@@ -1,20 +1,14 @@
 locals {
-  # Derive the GHCR workspace image path from the repo owner — matches how
-  # build-image.yml tags the image (ghcr.io/<owner>/coderunner-workspace).
-  repo_owner      = split("/", var.github_repo)[0]
-  workspace_image = "ghcr.io/${local.repo_owner}/coderunner-workspace:latest"
-  control_image   = "ghcr.io/${local.repo_owner}/coderunner-control:latest"
-
   # Cloud-init user-data is templated so var.domain, var.github_repo, etc. land
   # in the right places. Keep the substitution surface tiny on purpose; anything
-  # secret comes from Secret Manager at boot, not from Terraform.
+  # secret comes from Secret Manager at boot, not from Terraform. Image names
+  # are derived on the VM by render-env.sh (CODERUNNER_IMAGE_NS from the repo
+  # owner), matching how the deploy workflow tags them.
   user_data = templatefile("${path.module}/../cloud-init/user-data.yaml", {
-    domain          = var.domain
-    git_ref         = var.git_ref
-    github_repo     = var.github_repo
-    workspace_image = local.workspace_image
-    control_image   = local.control_image
-    instance_label  = var.instance_label
+    domain         = var.domain
+    git_ref        = var.git_ref
+    github_repo    = var.github_repo
+    instance_label = var.instance_label
   })
 }
 

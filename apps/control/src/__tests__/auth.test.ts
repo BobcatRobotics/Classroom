@@ -305,7 +305,9 @@ describe("bootstrap admin (CODERUNNER_ADMIN_EMAIL)", () => {
 			expect(afterFirst.emails).toEqual(["boss@team.org", "coach@team.org"]);
 
 			// Simulate accounts that already exist: a coach who signed in as a
-			// student before the env was set, and a boss who is already an admin.
+			// student before the env was set (with the mixed-case email the OAuth
+			// provider returned — promotion must match case-insensitively), and a
+			// boss who is already an admin.
 			const staleAdminTimestamp = "2020-01-01T00:00:00.000Z";
 			const insertUser = first.storage.db.query(
 				"INSERT INTO user (id, name, email, emailVerified, image, createdAt, updatedAt, role, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -313,7 +315,7 @@ describe("bootstrap admin (CODERUNNER_ADMIN_EMAIL)", () => {
 			insertUser.run(
 				"userCoachAAAAAAAAAAA",
 				"Coach",
-				"coach@team.org",
+				"Coach@Team.org",
 				0,
 				null,
 				staleAdminTimestamp,
@@ -344,8 +346,8 @@ describe("bootstrap admin (CODERUNNER_ADMIN_EMAIL)", () => {
 				expect(afterSecond.emails).toEqual(["boss@team.org", "coach@team.org"]);
 
 				const coach = second.storage.db
-					.query("SELECT role, updatedAt FROM user WHERE email = ?")
-					.get("coach@team.org") as { role: string; updatedAt: string };
+					.query("SELECT role, updatedAt FROM user WHERE id = ?")
+					.get("userCoachAAAAAAAAAAA") as { role: string; updatedAt: string };
 				expect(coach.role).toBe("admin");
 				expect(coach.updatedAt).not.toBe(staleAdminTimestamp);
 

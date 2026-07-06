@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { ControlAppOptions } from "./app";
+import { envContainerUser } from "./config";
 import { selfInspect } from "./containers/self-inspect";
 import {
 	configureLogging,
@@ -20,19 +21,6 @@ const demoFlag = Bun.argv.includes("--demo");
 
 const port = Number(Bun.env.PORT ?? 4000);
 
-// Explicit workspace-user override from the environment, mirroring the env
-// portion of config's defaultContainerUser(). Passing it (or an inspected
-// value) as an explicit input keeps the merge below in the right direction.
-function envContainerUser(): string | null {
-	if (Bun.env.FRC_CONTAINER_USER) {
-		return Bun.env.FRC_CONTAINER_USER;
-	}
-	if (Bun.env.FRC_UID && Bun.env.FRC_GID) {
-		return `${Bun.env.FRC_UID}:${Bun.env.FRC_GID}`;
-	}
-	return null;
-}
-
 // Zero-config containerized mode: inside a container we inspect ourselves to
 // derive the host data path, workspace network, and data-dir owner. On the host
 // this is a no-op (no /.dockerenv → no Docker calls, nothing derived).
@@ -41,10 +29,12 @@ function envContainerUser(): string | null {
 // so passing a derived value as input would beat an explicit env override —
 // wrong direction. selfInspect takes the explicit env values and returns the
 // finals (env wins, inspection fills the gaps); we pass those finals as input.
+// Empty/whitespace values count as unset — a bare "FRC_CONTAINER_NETWORK="
+// line in .env must not read as an explicit override that skips detection.
 const inspection = await selfInspect({
 	dataDir: resolve(Bun.env.FRC_DATA_DIR ?? "data"),
-	envHostDataDir: Bun.env.FRC_HOST_DATA_DIR ?? null,
-	envContainerNetwork: Bun.env.FRC_CONTAINER_NETWORK ?? null,
+	envHostDataDir: Bun.env.FRC_HOST_DATA_DIR?.trim() || null,
+	envContainerNetwork: Bun.env.FRC_CONTAINER_NETWORK?.trim() || null,
 	envContainerUser: envContainerUser(),
 });
 

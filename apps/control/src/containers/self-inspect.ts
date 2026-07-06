@@ -192,7 +192,9 @@ function deriveHostDataDir(
 		throw new Error(
 			`Could not auto-detect the host-side data directory: no bind mount in ` +
 				`this container has destination ${target}. Set FRC_HOST_DATA_DIR to the ` +
-				`host path of the data directory.`,
+				`host path of the data directory. If this .env was reused from a ` +
+				`pre-compose deployment, also remove its FRC_DATA_DIR/FRC_DB_PATH/PORT ` +
+				`lines — they override the image's in-container paths.`,
 		);
 	}
 	return mount.Source;
@@ -228,9 +230,10 @@ function deriveContainerUser(
 	dataDir: string,
 ): string | undefined {
 	const { uid, gid } = stat(dataDir);
-	// Root-owned: do NOT derive. Leaving this undefined lets the config
-	// root-guard fire (chown the data dir, or set FRC_CONTAINER_USER, to fix).
-	if (uid === 0 && gid === 0) {
+	// Root-owned (any group): do NOT derive. Workspaces would run as uid 0 and
+	// root-own student files. Leaving this undefined lets the config root-guard
+	// fire (chown the data dir, or set FRC_CONTAINER_USER, to fix).
+	if (uid === 0) {
 		return undefined;
 	}
 	return `${uid}:${gid}`;

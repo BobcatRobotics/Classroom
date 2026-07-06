@@ -91,7 +91,7 @@ cat > /tmp/cutover.sh <<'SCRIPT'
 set -euo pipefail
 TAG="${1:-latest}"
 REPO="mathewdunne/CodeRunner"
-source /etc/coderunner/deploy.env   # provides DOMAIN, DATA_DIR, APP_USER, WORKSPACE_IMAGE
+source /etc/coderunner/deploy.env   # provides DOMAIN, DATA_DIR, APP_USER
 
 log() { echo "[cutover] $*"; }
 

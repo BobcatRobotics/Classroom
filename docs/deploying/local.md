@@ -110,6 +110,18 @@ directory itself**: if you remove it, Docker recreates it root-owned on the next
 
 The full list of environment variables and their defaults is in `.env.example`.
 
+::::warning Reusing a `.env` from a pre-compose deployment
+If you're upgrading from the old bare-metal (non-Docker) control plane and
+reusing its `.env`, delete any `FRC_DATA_DIR`, `FRC_DB_PATH`, and `PORT` lines
+first. Compose passes the whole file into the container, where those lines
+override the image's fixed in-container paths and the control plane fails to
+start (with an error pointing at `FRC_HOST_DATA_DIR`).
+
+```bash
+sed -i -E '/^(FRC_DATA_DIR|FRC_DB_PATH|PORT)=/d' .env
+```
+::::
+
 ## 3. Start the app
 
 ```bash

@@ -129,6 +129,23 @@ describe("selfInspect — containerized derivation", () => {
 		expect(result.containerNetwork).toBe("coderunner");
 	});
 
+	test("refuses to derive a root uid even with a non-root group", async () => {
+		const result = await selfInspect({
+			dataDir: "/data",
+			envHostDataDir: null,
+			envContainerNetwork: null,
+			envContainerUser: null,
+			dockerenvExists: () => true,
+			hostname: () => "abc123",
+			inspect: async () => containerizedFixture(),
+			stat: () => ({ uid: 0, gid: 1001 }),
+		});
+
+		// "0:1001" would still run workspaces as root — not derived either.
+		expect(result.containerUser).toBeUndefined();
+		expect(result.autoDetected.containerUser).toBe(false);
+	});
+
 	test("derives the compose project label so workspaces can nest under it", async () => {
 		const result = await selfInspect({
 			dataDir: "/data",

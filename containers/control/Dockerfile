@@ -54,7 +54,9 @@ WORKDIR /repo
 COPY .git/modules/vendor/AdvantageScope/ .git/modules/vendor/AdvantageScope/
 COPY vendor/ vendor/
 COPY patches/ patches/
-COPY scripts/ scripts/
+# Only the two scripts this stage runs — copying all of scripts/ would rerun
+# the expensive wasm compile whenever any unrelated ops script changes.
+COPY scripts/build-ascope-lite.ts scripts/apply-ascope-patches.ts scripts/
 RUN git config --global --add safe.directory '*'
 # /usr/bin first so the nodesource node/npm win over emsdk's bundled runtime;
 # the wasm step re-prepends the emsdk paths itself (envWithEmsdk).
@@ -84,17 +86,18 @@ RUN apt-get update -qq \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-# Install with the workspace source present: bun's isolated linker creates the
-# per-workspace node_modules (apps/control/node_modules, etc.) that the control
-# plane resolves dependencies through. A manifests-only install leaves the
-# workspace deps in the .bun store but unlinked, so the runtime can't find
-# @logtape/better-auth/prom-client. --production drops the dev toolchain.
+# Manifests before the install so the production node_modules layer caches
+# across source changes. Every workspace's package.json must be present —
+# bun's isolated linker creates the per-workspace node_modules (e.g.
+# apps/control/node_modules) that the control plane resolves dependencies
+# through. --production drops the dev toolchain.
 COPY package.json bun.lock tsconfig.json tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
+COPY apps/control/package.json apps/control/package.json
 COPY packages/ packages/
+RUN bun install --frozen-lockfile --production
 COPY apps/control/ apps/control/
 COPY scripts/ scripts/
-RUN bun install --frozen-lockfile --production
 COPY catalog/ catalog/
 COPY --from=web-build /repo/apps/web/dist apps/web/dist
 COPY --from=ascope-build /repo/dist/advantagescope dist/advantagescope

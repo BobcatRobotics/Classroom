@@ -85,12 +85,21 @@ function nowIso(): string {
 	return new Date().toISOString();
 }
 
+/** Canonical on-disk project path for a workspace. Single source of truth —
+ * normalizeWorkspaceProjectPaths re-roots every DB row against it at boot. */
+function projectPathFor(
+	config: ControlConfig,
+	workspaceId: WorkspaceId,
+): string {
+	return resolve(config.dataDir, "users", workspaceId, "project");
+}
+
 async function ensureWorkspaceFiles(
 	config: ControlConfig,
 	workspaceId: WorkspaceId,
 ): Promise<string> {
 	const workspaceDir = resolve(config.dataDir, "users", workspaceId);
-	const projectDir = resolve(workspaceDir, "project");
+	const projectDir = projectPathFor(config, workspaceId);
 	const homeDir = resolve(workspaceDir, "home");
 
 	await mkdir(projectDir, { recursive: true });
@@ -197,8 +206,10 @@ export class AppStorage {
 			await addAllowlistEntry("email", email);
 			log.info("bootstrap admin allowlisted", { email });
 
+			// config.adminEmails is lowercased; the stored email keeps whatever
+			// case the OAuth provider returned, so match case-insensitively.
 			const user = this.db
-				.query("SELECT id, role FROM user WHERE email = ?")
+				.query("SELECT id, role FROM user WHERE lower(email) = ?")
 				.get(email) as { id: string; role: string | null } | null;
 			if (user && user.role !== "admin") {
 				this.db
@@ -215,12 +226,7 @@ export class AppStorage {
 			.all() as Array<{ id: WorkspaceId; project_path: string }>;
 		let updated = 0;
 		for (const row of rows) {
-			const canonical = resolve(
-				this.config.dataDir,
-				"users",
-				row.id,
-				"project",
-			);
+			const canonical = projectPathFor(this.config, row.id);
 			if (row.project_path !== canonical) {
 				this.db
 					.query("UPDATE workspaces SET project_path = ? WHERE id = ?")
@@ -278,12 +284,7 @@ export class AppStorage {
 		const baseSlug = slug.slice(0, 40) || "student";
 		const workspaceId = randomId("ws") as WorkspaceId;
 		const timestamp = nowIso();
-		const placeholderProjectPath = resolve(
-			this.config.dataDir,
-			"users",
-			workspaceId,
-			"project",
-		);
+		const placeholderProjectPath = projectPathFor(this.config, workspaceId);
 
 		let finalSlug: WorkspaceSlug | null = null;
 		const MAX_ATTEMPTS = 16;

@@ -36,6 +36,26 @@ describe("parseBoolean (via loadControlConfig)", () => {
 	});
 });
 
+describe("containerNetwork (via loadControlConfig)", () => {
+	test("empty string is treated as unset (port mode), not a network name", () => {
+		expect(loadControlConfig({ containerNetwork: "" }).containerNetwork).toBe(
+			null,
+		);
+	});
+
+	test("whitespace-only string is treated as unset", () => {
+		expect(loadControlConfig({ containerNetwork: "  " }).containerNetwork).toBe(
+			null,
+		);
+	});
+
+	test("a real network name is trimmed and kept", () => {
+		expect(
+			loadControlConfig({ containerNetwork: " coderunner " }).containerNetwork,
+		).toBe("coderunner");
+	});
+});
+
 describe("adminEmails (via loadControlConfig)", () => {
 	test("unset input falls back to an empty list", () => {
 		expect(loadControlConfig({}).adminEmails).toEqual([]);
