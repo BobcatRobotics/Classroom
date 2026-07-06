@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadControlConfig } from "../config";
+import { codeContainerName } from "../containers/metadata";
 import { toHostPath } from "../containers/paths";
 import { createStorage } from "../storage";
 import {
@@ -75,7 +76,7 @@ describe("network mode container orchestration", () => {
 				});
 
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
 				expect(runCall).toBeTruthy();
 				expect(runCall).toContain("--network");
@@ -116,7 +117,7 @@ describe("network mode container orchestration", () => {
 				const runtime = await app.containers.ensureWorkspaceRunning(
 					workspace.id,
 				);
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 				expect(runtime.ports).toEqual({
 					nt4: null,
 					vscode: null,
@@ -221,7 +222,7 @@ describe("network mode container orchestration", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				fakeDocker.containers.set(name, {
 					name,
@@ -259,7 +260,7 @@ describe("network mode container orchestration", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				// A leftover from a published-port deployment: right labels, but it
 				// publishes loopback ports and is not attached to the network.
@@ -301,7 +302,7 @@ describe("network mode container orchestration", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				fakeDocker.containers.set(name, {
 					name,

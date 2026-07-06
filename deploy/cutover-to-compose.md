@@ -199,7 +199,9 @@ investigate before declaring success.
 gcloud compute ssh "$VM" --zone="$ZONE" --tunnel-through-iap --quiet --command="
   cd /opt/coderunner && sudo docker compose ps
 "
-# Expect: service 'control' STATUS = Up ... (healthy). 'workspace-template' Exited (0) is normal.
+# Expect: service 'control' (container coderunner-control) STATUS = Up ...
+# (healthy). service 'workspace-template' (container coderunner-workspace-template)
+# Exited (0) is normal.
 ```
 
 **Control container runs non-root as the `APP_USER`:**

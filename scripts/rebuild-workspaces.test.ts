@@ -99,11 +99,11 @@ describe("rebuildWorkspaces", () => {
 	test("dry-run removes nothing and leaves leases unchanged", async () => {
 		const { db, dbPath } = await tempDb();
 		try {
-			insertLease(db, "ws_a", "running", "coderunner-ws_a-code");
+			insertLease(db, "ws_a", "running", "coderunner-workspace-a");
 			const calls: string[][] = [];
 			const dockerRunner: DockerRunner = async (args) => {
 				calls.push(args);
-				return ok("coderunner-ws_a-code\n");
+				return ok("coderunner-workspace-a\n");
 			};
 
 			const result = await rebuildWorkspaces({
@@ -114,7 +114,7 @@ describe("rebuildWorkspaces", () => {
 			});
 
 			expect(result).toEqual({
-				found: ["coderunner-ws_a-code"],
+				found: ["coderunner-workspace-a"],
 				removed: [],
 				leasesCleared: 0,
 				dryRun: true,
@@ -126,7 +126,7 @@ describe("rebuildWorkspaces", () => {
 				code_state: "running",
 				halsim_port: 34000,
 				nt4_port: 25810,
-				vscode_container: "coderunner-ws_a-code",
+				vscode_container: "coderunner-workspace-a",
 				vscode_port: 33000,
 			});
 		} finally {
@@ -137,12 +137,12 @@ describe("rebuildWorkspaces", () => {
 	test("removes only Docker containers returned by the managed V2 label query", async () => {
 		const { db, dbPath } = await tempDb();
 		try {
-			insertLease(db, "ws_a", "running", "coderunner-ws_a-code");
+			insertLease(db, "ws_a", "running", "coderunner-workspace-a");
 			const calls: string[][] = [];
 			const dockerRunner: DockerRunner = async (args) => {
 				calls.push(args);
 				if (args[0] === "container") {
-					return ok("coderunner-ws_a-code\ncoderunner-ws_b-code\n");
+					return ok("coderunner-workspace-a\ncoderunner-workspace-b\n");
 				}
 				return ok();
 			};
@@ -154,8 +154,8 @@ describe("rebuildWorkspaces", () => {
 			});
 
 			expect(result.removed).toEqual([
-				"coderunner-ws_a-code",
-				"coderunner-ws_b-code",
+				"coderunner-workspace-a",
+				"coderunner-workspace-b",
 			]);
 			expect(calls).toEqual([
 				[
@@ -169,8 +169,8 @@ describe("rebuildWorkspaces", () => {
 					"--format",
 					"{{.Names}}",
 				],
-				["rm", "-f", "coderunner-ws_a-code"],
-				["rm", "-f", "coderunner-ws_b-code"],
+				["rm", "-f", "coderunner-workspace-a"],
+				["rm", "-f", "coderunner-workspace-b"],
 			]);
 		} finally {
 			db.close();
@@ -180,11 +180,11 @@ describe("rebuildWorkspaces", () => {
 	test("clears container leases after removing managed V2 containers", async () => {
 		const { db, dbPath } = await tempDb();
 		try {
-			insertLease(db, "ws_a", "running", "coderunner-ws_a-code");
-			insertLease(db, "ws_b", "stopped", "coderunner-ws_b-code");
+			insertLease(db, "ws_a", "running", "coderunner-workspace-a");
+			insertLease(db, "ws_b", "stopped", "coderunner-workspace-b");
 			const dockerRunner: DockerRunner = async (args) =>
 				args[0] === "container"
-					? ok("coderunner-ws_a-code\ncoderunner-ws_b-code\n")
+					? ok("coderunner-workspace-a\ncoderunner-workspace-b\n")
 					: ok();
 
 			const result = await rebuildWorkspaces({

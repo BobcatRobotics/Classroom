@@ -141,8 +141,11 @@ SIM_STARTUP_TIMEOUT_MS=60000
 If this happens consistently for one student, check the container logs:
 
 ```bash
-docker logs coderunner-workspace-<workspaceId> --tail 100
+docker logs coderunner-workspace-<hex> --tail 100
 ```
+
+(The container name is `coderunner-workspace-` followed by the workspace id's
+hex suffix, with the `ws_` prefix dropped.)
 
 Look for the simulator failing to bind its HALSim port. If `HALSIM_PORT_RANGE`
 ports are exhausted, restart the control plane or stop idle containers to free

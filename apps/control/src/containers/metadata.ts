@@ -8,7 +8,7 @@ import {
 } from "./types";
 
 export function codeContainerName(workspaceId: WorkspaceId): string {
-	return `${CODE_NAME_PREFIX}${workspaceId}`;
+	return `${CODE_NAME_PREFIX}${workspaceId.replace(/^ws_/, "")}`;
 }
 
 export function workspaceHomePath(workspace: WorkspaceRow): string {

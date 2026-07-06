@@ -17,7 +17,7 @@ function fakeInspect(
 		networks[name] = { NetworkID: `fake-${name}` };
 	}
 	return {
-		Name: "/coderunner-control-1",
+		Name: "/coderunner-control",
 		State: { Running: true, Status: "running" },
 		Config: { Labels: options.labels ?? {} },
 		Mounts: options.mounts ?? [],

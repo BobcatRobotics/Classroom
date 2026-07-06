@@ -79,7 +79,7 @@ frc-sim.workspace=<workspaceId>
 
 ```bash
 docker run -d \
-  --name coderunner-workspace-<workspaceId> \
+  --name coderunner-workspace-<hex> \
   --label frc-sim.managed=true \
   --label frc-sim.version=v2 \
   --label frc-sim.role=code \
@@ -95,6 +95,9 @@ docker run -d \
   --memory=2560m \
   ghcr.io/mathewdunne/coderunner-workspace:latest
 ```
+
+(`--name` drops the `ws_` prefix from `<workspaceId>`; the label, volume paths,
+and `VSCODE_BASE_PATH` still use the full workspace id / slug.)
 
 ## s6-overlay Services
 

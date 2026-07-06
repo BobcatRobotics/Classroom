@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { codeContainerName } from "../containers/metadata";
 import { createFakeDocker, login, withApp, workspaceBySlug } from "./helpers";
 
 describe("container reconciliation", () => {
@@ -11,7 +12,7 @@ describe("container reconciliation", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				// Pre-create a container with a non-loopback (0.0.0.0) sim port
 				fakeDocker.containers.set(name, {
@@ -52,7 +53,7 @@ describe("container reconciliation", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				// Pre-create a container with wrong version label
 				fakeDocker.containers.set(name, {
@@ -94,7 +95,7 @@ describe("container reconciliation", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				// Pre-create a stopped container with correct labels
 				fakeDocker.containers.set(name, {
@@ -138,7 +139,7 @@ describe("container reconciliation", () => {
 			async (app) => {
 				await login(app, "alice");
 				const workspace = workspaceBySlug(app, "alice");
-				const name = `coderunner-workspace-${workspace.id}`;
+				const name = codeContainerName(workspace.id);
 
 				// Create a lease row without a matching Docker container
 				app.storage.upsertCodeContainerLease({
@@ -176,8 +177,7 @@ describe("container reconciliation", () => {
 
 				await app.containers.ensureCodeContainer(workspace);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 
 				// Write a file into the home directory (simulating vscode user data)
@@ -197,15 +197,15 @@ describe("container reconciliation", () => {
 				// Idle teardown
 				await app.containers.stopWorkspaceContainers(workspace.id);
 				await app.containers.removeCodeContainer(workspace.id);
-				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(false);
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					false,
+				);
 
 				// Reload creates new container
 				await app.containers.ensureCodeContainer(workspace);
-				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(true);
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					true,
+				);
 
 				// User data should persist on the host (bind-mounted home)
 				const settingsContent = await readFile(
