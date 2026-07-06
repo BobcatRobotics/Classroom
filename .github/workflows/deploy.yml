@@ -241,6 +241,14 @@ jobs:
             fi
           done
 
+      # Ship the deployed tag's compose files to the VM so they version with the
+      # release (they pin nothing themselves — images come from the .env tag).
+      # Checkout must run BEFORE auth: it cleans the workspace directory, which
+      # would delete the WIF credential file auth writes there.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
       - id: auth
         name: Authenticate to GCP via Workload Identity Federation
         uses: google-github-actions/auth@v2
@@ -252,12 +260,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT }}
-
-      # Ship the deployed tag's compose files to the VM so they version with the
-      # release (they pin nothing themselves — images come from the .env tag).
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
 
       - name: Copy compose files to VM
         run: |
