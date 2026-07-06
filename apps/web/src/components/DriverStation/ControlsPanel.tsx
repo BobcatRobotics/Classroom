@@ -366,52 +366,52 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 			role="img"
 			aria-label="Controller state visualizer"
 		>
-			{/* Body silhouette */}
+			{/* Body silhouette (Xbox-style: rounded shoulders, flared grips, bottom arch) */}
 			<path
-				d="M 101 78
-           C 78 78 61 92 51 118
-           C 41 143 36 178 42 212
-           C 49 254 70 271 101 270
-           C 126 269 144 252 159 226
-           C 171 230 186 233 200 233
-           C 214 233 229 230 241 226
-           C 256 252 274 269 299 270
-           C 330 271 351 254 358 212
-           C 364 178 359 143 349 118
-           C 339 92 322 78 299 78
-           C 274 76 247 84 226 97
-           C 216 90 207 86 200 86
-           C 193 86 184 90 174 97
-           C 153 84 126 76 101 78
+				d="M 200 66
+           C 234 66 271 74 297 80
+           C 323 86 339 101 349 124
+           C 359 147 366 175 367 203
+           C 368 230 362 252 348 264
+           C 336 274 316 274 304 262
+           C 296 254 289 243 282 233
+           C 262 217 230 213 200 213
+           C 170 213 138 217 118 233
+           C 111 243 104 254 96 262
+           C 84 274 64 274 52 264
+           C 38 252 32 230 33 203
+           C 34 175 41 147 51 124
+           C 61 101 77 86 103 80
+           C 129 74 166 66 200 66
            Z"
 				className="fill-white/[0.03] stroke-border"
 				strokeWidth="1.5"
 			/>
 
 			{/* Triggers */}
-			<Trigger x={92} value={bv(6)} label="LT" />
-			<Trigger x={274} value={bv(7)} label="RT" />
+			<Trigger x={112} value={bv(6)} label="LT" />
+			<Trigger x={258} value={bv(7)} label="RT" />
 
 			{/* Bumpers */}
-			<Bumper x={76} pressed={bp(4)} label="LB" />
-			<Bumper x={264} pressed={bp(5)} label="RB" />
+			<Bumper cx={127} angle={-8} labelX={88} pressed={bp(4)} label="LB" />
+			<Bumper cx={273} angle={8} labelX={312} pressed={bp(5)} label="RB" />
 
 			{/* Back / Start */}
-			<SmallButton cx={176} cy={118} pressed={bp(8)} label="Back" />
-			<SmallButton cx={224} cy={118} pressed={bp(9)} label="Start" />
+			<SmallButton cx={184} cy={98} pressed={bp(8)} label="Back" />
+			<SmallButton cx={216} cy={98} pressed={bp(9)} label="Start" />
 
 			{/* Left stick well + thumb */}
 			<g>
 				<circle
-					cx={118}
-					cy={139}
+					cx={120}
+					cy={118}
 					r={28}
 					className="fill-white/[0.04] stroke-border"
 					strokeWidth="1.5"
 				/>
 				<circle
-					cx={118 + ax(0) * STICK_TRAVEL}
-					cy={139 + ax(1) * STICK_TRAVEL}
+					cx={120 + ax(0) * STICK_TRAVEL}
+					cy={118 + ax(1) * STICK_TRAVEL}
 					r={18}
 					className={cn(
 						"stroke-white/30",
@@ -419,18 +419,10 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 					)}
 					strokeWidth="1.5"
 				/>
-				<text
-					x={118}
-					y={187}
-					textAnchor="middle"
-					className="fill-muted-foreground text-[8px] uppercase tracking-[0.16em]"
-				>
-					L
-				</text>
 			</g>
 
 			{/* D-pad */}
-			<g transform="translate(154 180)">
+			<g transform="translate(154 176)">
 				<DpadArm dx={0} dy={-14} pressed={bp(12)} />
 				<DpadArm dx={0} dy={14} pressed={bp(13)} />
 				<DpadArm dx={-14} dy={0} pressed={bp(14)} />
@@ -447,23 +439,23 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 			</g>
 
 			{/* Face buttons (ABXY) */}
-			<g transform="translate(292 132)">
+			<g transform="translate(281 118)">
 				<FaceButton
 					cx={0}
-					cy={-24}
+					cy={-20}
 					pressed={bp(3)}
 					className="fill-amber-400/70 stroke-amber-200/60"
 					label="Y"
 				/>
 				<FaceButton
-					cx={-26}
+					cx={-20}
 					cy={0}
 					pressed={bp(2)}
 					className="fill-sky-400/70 stroke-sky-200/60"
 					label="X"
 				/>
 				<FaceButton
-					cx={26}
+					cx={20}
 					cy={0}
 					pressed={bp(1)}
 					className="fill-red-400/70 stroke-red-200/60"
@@ -471,26 +463,26 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 				/>
 				<FaceButton
 					cx={0}
-					cy={24}
+					cy={20}
 					pressed={bp(0)}
 					className="fill-emerald-400/70 stroke-emerald-200/60"
 					label="A"
 				/>
 				{/* Inactive shadow for unpressed buttons */}
-				<UnpressedShadow cx={0} cy={-24} pressed={bp(3)} />
-				<UnpressedShadow cx={-26} cy={0} pressed={bp(2)} />
-				<UnpressedShadow cx={26} cy={0} pressed={bp(1)} />
-				<UnpressedShadow cx={0} cy={24} pressed={bp(0)} />
+				<UnpressedShadow cx={0} cy={-20} pressed={bp(3)} />
+				<UnpressedShadow cx={-20} cy={0} pressed={bp(2)} />
+				<UnpressedShadow cx={20} cy={0} pressed={bp(1)} />
+				<UnpressedShadow cx={0} cy={20} pressed={bp(0)} />
 				<text
 					x={0}
-					y={-21}
+					y={-17}
 					textAnchor="middle"
 					className="pointer-events-none fill-white/70 text-[8px] font-bold"
 				>
 					Y
 				</text>
 				<text
-					x={-26}
+					x={-20}
 					y={3}
 					textAnchor="middle"
 					className="pointer-events-none fill-white/70 text-[8px] font-bold"
@@ -498,7 +490,7 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 					X
 				</text>
 				<text
-					x={26}
+					x={20}
 					y={3}
 					textAnchor="middle"
 					className="pointer-events-none fill-white/70 text-[8px] font-bold"
@@ -507,7 +499,7 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 				</text>
 				<text
 					x={0}
-					y={27}
+					y={23}
 					textAnchor="middle"
 					className="pointer-events-none fill-white/70 text-[8px] font-bold"
 				>
@@ -518,15 +510,15 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 			{/* Right stick */}
 			<g>
 				<circle
-					cx={238}
-					cy={179}
+					cx={246}
+					cy={174}
 					r={28}
 					className="fill-white/[0.04] stroke-border"
 					strokeWidth="1.5"
 				/>
 				<circle
-					cx={238 + ax(2) * STICK_TRAVEL}
-					cy={179 + ax(3) * STICK_TRAVEL}
+					cx={246 + ax(2) * STICK_TRAVEL}
+					cy={174 + ax(3) * STICK_TRAVEL}
 					r={18}
 					className={cn(
 						"stroke-white/30",
@@ -534,21 +526,13 @@ function GamepadVisualizer({ frame, active }: VisualizerProps) {
 					)}
 					strokeWidth="1.5"
 				/>
-				<text
-					x={238}
-					y={227}
-					textAnchor="middle"
-					className="fill-muted-foreground text-[8px] uppercase tracking-[0.16em]"
-				>
-					R
-				</text>
 			</g>
 
 			{/* Optional: tiny hint text when no controller selected */}
 			{!active ? (
 				<text
 					x={200}
-					y={37}
+					y={254}
 					textAnchor="middle"
 					className="fill-muted-foreground text-[10px] uppercase tracking-[0.2em]"
 				>
@@ -573,8 +557,8 @@ function Trigger({
 		<g>
 			<rect
 				x={x}
-				y={42}
-				width={32}
+				y={24}
+				width={30}
 				height={18}
 				rx={4}
 				className="fill-white/[0.04] stroke-border"
@@ -582,15 +566,15 @@ function Trigger({
 			/>
 			<rect
 				x={x}
-				y={42 + (18 - fillHeight)}
-				width={32}
+				y={24 + (18 - fillHeight)}
+				width={30}
 				height={fillHeight}
 				rx={4}
 				className="fill-emerald-400/60"
 			/>
 			<text
-				x={x + 16}
-				y={36}
+				x={x + 15}
+				y={18}
 				textAnchor="middle"
 				className="fill-muted-foreground text-[8px] uppercase tracking-[0.18em]"
 			>
@@ -601,22 +585,27 @@ function Trigger({
 }
 
 function Bumper({
-	x,
+	cx,
+	angle,
+	labelX,
 	pressed,
 	label,
 }: {
-	x: number;
+	cx: number;
+	angle: number;
+	labelX: number;
 	pressed: boolean;
 	label: string;
 }) {
 	return (
 		<g>
 			<rect
-				x={x}
-				y={66}
-				width={50}
+				x={cx - 27}
+				y={54}
+				width={54}
 				height={10}
 				rx={5}
+				transform={`rotate(${angle} ${cx} 59)`}
 				className={cn(
 					pressed
 						? "fill-emerald-400/70 stroke-emerald-200/60"
@@ -625,8 +614,8 @@ function Bumper({
 				strokeWidth="1.5"
 			/>
 			<text
-				x={x + 25}
-				y={88}
+				x={labelX}
+				y={63}
 				textAnchor="middle"
 				className="fill-muted-foreground text-[8px] uppercase tracking-[0.18em]"
 			>
