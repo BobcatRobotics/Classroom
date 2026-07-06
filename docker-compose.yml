@@ -77,6 +77,7 @@ services:
     image: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}
     entrypoint: ["/bin/true"]
     restart: "no"
+    network_mode: "none"
 
 networks:
   coderunner:
