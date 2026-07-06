@@ -14,6 +14,7 @@ concurrency:
 
 env:
   WORKSPACE_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-workspace
+  CONTROL_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-control
 
 jobs:
   validate:
@@ -122,45 +123,48 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ env.TAG_SHA }}
             org.opencontainers.image.version=${{ env.TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=workspace
+          cache-to: type=gha,mode=max,scope=workspace
 
-      - uses: oven-sh/setup-bun@v2
+      # The control image builds the web shell and AdvantageScope Lite (incl.
+      # the emsdk/wasm step) inside its own stages, so the runner no longer
+      # installs emsdk — one build, one source of truth.
+      - name: Build and push control image
+        uses: docker/build-push-action@v6
         with:
-          bun-version-file: package.json
+          context: .
+          file: containers/control/Dockerfile
+          push: true
+          tags: |
+            ${{ env.CONTROL_IMAGE }}:${{ env.TAG }}
+            ${{ env.CONTROL_IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.TAG_SHA }}
+            org.opencontainers.image.version=${{ env.TAG }}
+          cache-from: type=gha,scope=control
+          cache-to: type=gha,mode=max,scope=control
 
-      - uses: actions/setup-node@v4
+      # Harvest the prebuilt dists straight from the build cache via the
+      # dist-export stage, so the GitHub release keeps shipping
+      # web-dist/ascope-dist tarballs (consumed by the deploy-cloudflare job and
+      # by scripts/fetch-dist.ts for emsdk-free dev). This shares every upstream
+      # layer with the push above, so it's a near-instant cache hit — and it
+      # avoids loading the full multi-hundred-MB runtime image into the daemon.
+      - name: Export release artifacts from build
+        uses: docker/build-push-action@v6
         with:
-          node-version: "24"
+          context: .
+          file: containers/control/Dockerfile
+          target: dist-export
+          outputs: type=local,dest=dist-out
+          cache-from: type=gha,scope=control
 
-      - name: Cache emsdk
-        id: cache-emsdk
-        uses: actions/cache@v4
-        with:
-          path: ~/emsdk
-          key: emsdk-4.0.12-${{ runner.os }}
-
-      - name: Install emsdk
+      - name: Package release artifacts
         run: |
           set -euo pipefail
-          if [ ! -d "$HOME/emsdk" ]; then
-            git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
-          fi
-          cd "$HOME/emsdk"
-          ./emsdk install 4.0.12
-          ./emsdk activate 4.0.12
-          echo "EMSDK=$HOME/emsdk" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build release artifacts
-        run: |
-          set -euo pipefail
-          bun run build:web
-          bun run build:ascope
-          tar -czf web-dist.tar.gz -C apps/web/dist .
-          tar -czf ascope-dist.tar.gz -C dist/advantagescope .
+          tar -czf web-dist.tar.gz -C dist-out/web-dist .
+          tar -czf ascope-dist.tar.gz -C dist-out/ascope-dist .
 
       - name: Upload release artifacts
         run: |
@@ -249,54 +253,63 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT }}
 
+      # Ship the deployed tag's compose files to the VM so they version with the
+      # release (they pin nothing themselves — images come from the .env tag).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - name: Copy compose files to VM
+        run: |
+          set -euo pipefail
+          gcloud compute scp \
+            --zone="$GCP_ZONE" \
+            --tunnel-through-iap \
+            --quiet \
+            docker-compose.yml docker-compose.prod.yml \
+            "$VM_NAME":/tmp/
+
       - name: Roll service on VM
-        env:
-          GITHUB_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
           read -r -d '' DEPLOY_SCRIPT <<EOF || true
           set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
 
+          # Wait for first-boot provisioning to finish (compose files, .env).
           for _ in \$(seq 1 60); do
             test -f /var/log/coderunner-bootstrap-done && break
             sleep 2
           done
           test -f /var/log/coderunner-bootstrap-done
 
-          sudo systemctl stop coderunner
+          sudo install -o root -g root -m 644 /tmp/docker-compose.yml /opt/coderunner/docker-compose.yml
+          sudo install -o root -g root -m 644 /tmp/docker-compose.prod.yml /opt/coderunner/docker-compose.prod.yml
+          rm -f /tmp/docker-compose.yml /tmp/docker-compose.prod.yml
 
-          cd /opt/coderunner/app
-          sudo -u coderunner git fetch --tags --depth=1 origin tag $TAG
-          sudo -u coderunner git checkout $TAG
-          sudo -u coderunner bun install --frozen-lockfile
+          # Pin the deployed tag. render-env.sh preserves CODERUNNER_TAG across
+          # reboots; compose interpolates it into the control + workspace images.
+          sudo sed -i '/^CODERUNNER_TAG=/d' /opt/coderunner/.env
+          echo "CODERUNNER_TAG=$TAG" | sudo tee -a /opt/coderunner/.env >/dev/null
 
-          RELEASE_URL="https://github.com/$GITHUB_REPO/releases/download/$TAG"
-          sudo -u coderunner curl -fsSL -o /tmp/web.tgz "\$RELEASE_URL/web-dist.tar.gz"
-          sudo -u coderunner curl -fsSL -o /tmp/ascope.tgz "\$RELEASE_URL/ascope-dist.tar.gz"
-          sudo -u coderunner rm -rf apps/web/dist && sudo -u coderunner mkdir -p apps/web/dist
-          sudo -u coderunner tar -xzf /tmp/web.tgz -C apps/web/dist
-          sudo -u coderunner rm -rf dist/advantagescope && sudo -u coderunner mkdir -p dist/advantagescope
-          sudo -u coderunner tar -xzf /tmp/ascope.tgz -C dist/advantagescope
-          sudo -u coderunner rm -f /tmp/web.tgz /tmp/ascope.tgz
+          cd /opt/coderunner
+          sudo docker compose pull
+          sudo docker compose up -d --remove-orphans
 
-          sudo -u coderunner docker pull $WORKSPACE_IMAGE:$TAG
-          sudo -u coderunner docker tag $WORKSPACE_IMAGE:$TAG $WORKSPACE_IMAGE:latest
+          # New workspace image: recycle student containers so the next access
+          # recreates them on the new image. Projects/homes are bind-mounted, so
+          # only disposable containers are removed.
+          sudo docker compose exec -T control coderunner rebuild-workspaces
 
-          sudo -u coderunner bash -lc 'set -a; source /opt/coderunner/.env; set +a; bun run docker:rebuild-workspaces'
-
-          sudo systemctl start coderunner
-
-          for _ in \$(seq 1 30); do
+          for _ in \$(seq 1 60); do
             if curl -sf http://localhost:4000/healthz >/dev/null; then
               echo "healthz OK"
               exit 0
             fi
             sleep 1
           done
-          echo "healthz did not respond within 30s"
-          sudo journalctl -u coderunner -n 80 --no-pager || true
+          echo "healthz did not respond within 60s"
+          sudo docker compose logs --tail 80 control || true
           exit 1
           EOF
 

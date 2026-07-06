@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { codeContainerName } from "../containers/metadata";
 import {
 	cookieFrom,
 	createFakeDocker,
@@ -195,9 +196,9 @@ describe("idle lifecycle and admin controls", () => {
 				const workspace = workspaceBySlug(app, "alice");
 
 				await app.containers.ensureCodeContainer(workspace);
-				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(true);
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					true,
+				);
 
 				const response = await app.fetch(
 					new Request(
@@ -213,12 +214,11 @@ describe("idle lifecycle and admin controls", () => {
 				expect(body.ok).toBe(true);
 				expect(body.action).toBe("restart-code");
 
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					true,
+				);
 				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(true);
-				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 			},
 			{
@@ -240,8 +240,7 @@ describe("idle lifecycle and admin controls", () => {
 
 				await app.containers.ensureCodeContainer(workspace);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 
 				const response = await app.fetch(
@@ -259,8 +258,7 @@ describe("idle lifecycle and admin controls", () => {
 				expect(body.action).toBe("stop-containers");
 
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(false);
 			},
 			{
@@ -484,8 +482,7 @@ describe("idle lifecycle and admin controls", () => {
 
 				await app.containers.ensureCodeContainer(workspace);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 
 				const pastTime = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -497,8 +494,7 @@ describe("idle lifecycle and admin controls", () => {
 				expect(stopped).toContain(workspace.id);
 
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(false);
 			},
 			{
@@ -520,15 +516,13 @@ describe("idle lifecycle and admin controls", () => {
 
 				await app.containers.ensureCodeContainer(workspace);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 
 				const stopped = await app.idle.sweep();
 				expect(stopped).not.toContain(workspace.id);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 			},
 			{
@@ -560,21 +554,20 @@ describe("idle lifecycle and admin controls", () => {
 
 				await app.containers.stopWorkspaceContainers(workspace.id);
 				await app.containers.removeCodeContainer(workspace.id);
-				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(false);
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					false,
+				);
 
 				expect(await exists(join(workspace.project_path, "Marker.java"))).toBe(
 					true,
 				);
 
 				await app.containers.ensureCodeContainer(workspace);
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					true,
+				);
 				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(true);
-				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(true);
 			},
 			{
@@ -596,15 +589,14 @@ describe("idle lifecycle and admin controls", () => {
 				await app.containers.ensureCodeContainer(workspace);
 				await app.containers.stopCodeContainer(workspace.id);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${workspace.id}`)
-						?.running,
+					fakeDocker.containers.get(codeContainerName(workspace.id))?.running,
 				).toBe(false);
 
 				const removed = await app.containers.cleanupStoppedContainers();
-				expect(removed).toContain(`coderunner-workspace-${workspace.id}`);
-				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${workspace.id}`),
-				).toBe(false);
+				expect(removed).toContain(codeContainerName(workspace.id));
+				expect(fakeDocker.containers.has(codeContainerName(workspace.id))).toBe(
+					false,
+				);
 			},
 			{
 				dockerRunner: fakeDocker.runner,
@@ -631,11 +623,11 @@ describe("idle lifecycle and admin controls", () => {
 				]);
 
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${aliceWorkspace.id}`)
+					fakeDocker.containers.get(codeContainerName(aliceWorkspace.id))
 						?.running,
 				).toBe(true);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${bobWorkspace.id}`)
+					fakeDocker.containers.get(codeContainerName(bobWorkspace.id))
 						?.running,
 				).toBe(true);
 
@@ -651,11 +643,11 @@ describe("idle lifecycle and admin controls", () => {
 				expect(response.status).toBe(200);
 
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${aliceWorkspace.id}`)
+					fakeDocker.containers.get(codeContainerName(aliceWorkspace.id))
 						?.running,
 				).toBe(true);
 				expect(
-					fakeDocker.containers.get(`coderunner-workspace-${bobWorkspace.id}`)
+					fakeDocker.containers.get(codeContainerName(bobWorkspace.id))
 						?.running,
 				).toBe(true);
 			},
@@ -800,7 +792,7 @@ describe("idle lifecycle and admin controls", () => {
 				const bobWorkspace = workspaceBySlug(app, "bob");
 				await app.containers.ensureCodeContainer(bobWorkspace);
 				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${bobWorkspace.id}`),
+					fakeDocker.containers.has(codeContainerName(bobWorkspace.id)),
 				).toBe(true);
 
 				const bob = app.storage.db
@@ -822,7 +814,7 @@ describe("idle lifecycle and admin controls", () => {
 					app.storage.db.query("SELECT id FROM user WHERE id = ?").get(bob.id),
 				).toBeNull();
 				expect(
-					fakeDocker.containers.has(`coderunner-workspace-${bobWorkspace.id}`),
+					fakeDocker.containers.has(codeContainerName(bobWorkspace.id)),
 				).toBe(false);
 				expect(await exists(bobWorkspace.project_path)).toBe(false);
 			},

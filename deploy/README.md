@@ -11,5 +11,5 @@ Full instructions live in the docs site:
 ## Subdirectories
 
 - `terraform/` — Infrastructure as code: VM, persistent disk, IAM, secrets, network, outputs.
-- `cloud-init/` — First-boot provisioning script (`user-data.yaml`): installs Bun, Docker, Caddy, Grafana Alloy; clones repo; writes systemd units.
+- `cloud-init/` — First-boot provisioning script (`user-data.yaml`): installs Docker + the compose plugin, fetches the compose files, and renders `/opt/coderunner/.env` and the Alloy config from Secret Manager. The control plane, Caddy, and Alloy run as compose services (`docker-compose.yml` + `docker-compose.prod.yml`); see [decision 031](../docs/decisions/031-containerized-control-plane.md).
 - `cloudflare/` — Cloudflare Pages config and catch-all Pages Function for backend proxying.

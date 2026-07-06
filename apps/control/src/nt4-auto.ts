@@ -2,7 +2,6 @@ import type {
 	AutoChooser,
 	AutoChooserPatch,
 	AutoChoosersResponse,
-	BridgeConnection,
 	WorkspaceId,
 } from "@frc-coderunner/contracts";
 import { getLogger } from "./logging";

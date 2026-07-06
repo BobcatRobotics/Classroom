@@ -33,11 +33,14 @@ import {
 } from "./lifecycle";
 import {
 	codeContainerName,
+	containerAttachedToNetwork,
+	containerHasPublishedPorts,
 	containerRuntimeState,
 	publishedPortFor,
 	v2LabelsMatch,
 	workspaceHomePath,
 } from "./metadata";
+import { toHostPath } from "./paths";
 import { allocatePortFromRange, portIsFree } from "./ports";
 import {
 	type CodeContainerStatus,
@@ -76,6 +79,24 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		this.portAvailable = options.portAvailable ?? portIsFree;
 	}
 
+	/**
+	 * Non-null when workspace containers join a shared Docker network instead
+	 * of publishing loopback host ports (the containerized-control-plane mode).
+	 */
+	private get containerNetwork(): string | null {
+		return this.storage.config.containerNetwork;
+	}
+
+	/**
+	 * The control plane's compose project, propagated onto workspace containers
+	 * so they nest under it in tools that group by `com.docker.compose.project`
+	 * (Portainer, `docker compose ls`). Null on the host / when unread, in which
+	 * case no compose label is stamped.
+	 */
+	private get composeProject(): string | null {
+		return this.storage.config.composeProject;
+	}
+
 	startWorkspaceContainers(workspace: WorkspaceRow): void {
 		if (!this.storage.config.containerAutoStart) {
 			return;
@@ -111,6 +132,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		const lease = this.storage.getContainerLease(workspaceId);
 		return runtimeFromLease(
 			this.storage.config.codeImage,
+			this.containerNetwork,
 			workspace,
 			lease,
 			code.state,
@@ -128,6 +150,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		const lease = this.storage.getContainerLease(workspaceId);
 		return runtimeFromLease(
 			this.storage.config.codeImage,
+			this.containerNetwork,
 			workspace,
 			lease,
 			code.state,
@@ -151,6 +174,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			: (lease?.code_state ?? "missing");
 		return runtimeFromLease(
 			this.storage.config.codeImage,
+			this.containerNetwork,
 			workspace,
 			lease,
 			state,
@@ -405,14 +429,26 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		});
 	}
 
-	private async adoptCodeContainer(
-		workspace: WorkspaceRow,
-		name: string,
-		container: DockerInspectContainer,
-	): Promise<CodeContainerStatus | null> {
-		if (!v2LabelsMatch(container, workspace.id)) {
-			await this.runDocker(["rm", "-f", name], true);
-			return null;
+	/**
+	 * Validate that an existing container matches the current connection mode
+	 * and return the lease ports to persist (all-null in network mode). Returns
+	 * null when the container is unusable and must be recreated — including
+	 * leftovers from the other mode after an operator switches deployments.
+	 */
+	private adoptablePorts(container: DockerInspectContainer): {
+		simPort: number | null;
+		vscodePort: number | null;
+		halsimPort: number | null;
+	} | null {
+		const network = this.containerNetwork;
+		if (network !== null) {
+			if (
+				!containerAttachedToNetwork(container, network) ||
+				containerHasPublishedPorts(container)
+			) {
+				return null;
+			}
+			return { simPort: null, vscodePort: null, halsimPort: null };
 		}
 
 		const simPublished = publishedPortFor(container, SIM_CONTAINER_PORT);
@@ -423,6 +459,27 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			!vscodePublished?.loopback ||
 			!halsimPublished?.loopback
 		) {
+			return null;
+		}
+		return {
+			simPort: simPublished.port,
+			vscodePort: vscodePublished.port,
+			halsimPort: halsimPublished.port,
+		};
+	}
+
+	private async adoptCodeContainer(
+		workspace: WorkspaceRow,
+		name: string,
+		container: DockerInspectContainer,
+	): Promise<CodeContainerStatus | null> {
+		if (!v2LabelsMatch(container, workspace.id)) {
+			await this.runDocker(["rm", "-f", name], true);
+			return null;
+		}
+
+		const adoptedPorts = this.adoptablePorts(container);
+		if (!adoptedPorts) {
 			await this.runDocker(["rm", "-f", name], true);
 			return null;
 		}
@@ -431,12 +488,15 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			const lease = this.storage.upsertCodeContainerLease({
 				workspaceId: workspace.id,
 				containerName: name,
-				simPort: simPublished.port,
-				vscodePort: vscodePublished.port,
-				halsimPort: halsimPublished.port,
+				...adoptedPorts,
 				state: "running",
 			});
-			return statusFromLease(this.storage.config.codeImage, lease, "running");
+			return statusFromLease(
+				this.storage.config.codeImage,
+				this.containerNetwork,
+				lease,
+				"running",
+			);
 		}
 
 		// Restarting a stopped container consumes a capacity slot, exactly like a
@@ -458,10 +518,8 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 				return null;
 			}
 
-			const rSim = publishedPortFor(restarted, SIM_CONTAINER_PORT);
-			const rVscode = publishedPortFor(restarted, VSCODE_CONTAINER_PORT);
-			const rHalsim = publishedPortFor(restarted, HALSIM_CONTAINER_PORT);
-			if (!rSim?.loopback || !rVscode?.loopback || !rHalsim?.loopback) {
+			const restartedPorts = this.adoptablePorts(restarted);
+			if (!restartedPorts) {
 				await this.runDocker(["rm", "-f", name], true);
 				return null;
 			}
@@ -469,13 +527,12 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			const lease = this.storage.upsertCodeContainerLease({
 				workspaceId: workspace.id,
 				containerName: name,
-				simPort: rSim.port,
-				vscodePort: rVscode.port,
-				halsimPort: rHalsim.port,
+				...restartedPorts,
 				state: containerRuntimeState(restarted),
 			});
 			return statusFromLease(
 				this.storage.config.codeImage,
+				this.containerNetwork,
 				lease,
 				lease.code_state,
 			);
@@ -486,11 +543,12 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 
 	private async createCodeContainer(
 		workspace: WorkspaceRow,
-		simPort: number,
-		vscodePort: number,
-		halsimPort: number,
+		simPort: number | null,
+		vscodePort: number | null,
+		halsimPort: number | null,
 	): Promise<CodeContainerStatus> {
 		await this.ensureImage();
+		const config = this.storage.config;
 		const homePath = workspaceHomePath(workspace);
 		await mkdir(homePath, { recursive: true, mode: 0o700 });
 
@@ -517,21 +575,42 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			"frc-sim.role=code",
 			"--label",
 			`frc-sim.workspace=${workspace.id}`,
+			// Mount sources are resolved by the Docker daemon against the HOST
+			// filesystem, so they go through toHostPath (a no-op outside the
+			// containerized deployment).
 			"--mount",
-			`type=bind,src=${workspace.project_path},dst=/workspace/project`,
+			`type=bind,src=${toHostPath(config, workspace.project_path)},dst=/workspace/project`,
 			"--mount",
-			`type=bind,src=${homePath},dst=/config`,
-			"-p",
-			`127.0.0.1:${vscodePort}:${VSCODE_CONTAINER_PORT}`,
-			"-p",
-			`127.0.0.1:${simPort}:${SIM_CONTAINER_PORT}`,
-			"-p",
-			`127.0.0.1:${halsimPort}:${HALSIM_CONTAINER_PORT}`,
+			`type=bind,src=${toHostPath(config, homePath)},dst=/config`,
+		];
+
+		// Nest workspace containers under the control plane's compose project in
+		// Portainer / `docker compose ls`. Note this makes `docker compose down
+		// --remove-orphans` (or a Portainer "remove stack") select them too;
+		// their real lifecycle owner is still the frc-sim.managed reconciler.
+		if (this.composeProject !== null) {
+			args.push("--label", `com.docker.compose.project=${this.composeProject}`);
+		}
+
+		if (this.containerNetwork !== null) {
+			args.push("--network", this.containerNetwork);
+		} else {
+			args.push(
+				"-p",
+				`127.0.0.1:${vscodePort}:${VSCODE_CONTAINER_PORT}`,
+				"-p",
+				`127.0.0.1:${simPort}:${SIM_CONTAINER_PORT}`,
+				"-p",
+				`127.0.0.1:${halsimPort}:${HALSIM_CONTAINER_PORT}`,
+			);
+		}
+
+		args.push(
 			"--memory",
 			this.storage.config.codeMemoryLimit,
 			"-e",
 			`VSCODE_BASE_PATH=/u/${workspace.slug}/vscode/`,
-		];
+		);
 
 		if (this.storage.config.containerUser) {
 			const [puid, pgid] = this.storage.config.containerUser.split(":");
@@ -555,15 +634,18 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		await this.runDocker(args);
 
 		const created = await this.inspectContainer(name);
-		const createdSim = created
-			? publishedPortFor(created, SIM_CONTAINER_PORT)
-			: null;
-		const createdVscode = created
-			? publishedPortFor(created, VSCODE_CONTAINER_PORT)
-			: null;
-		const createdHalsim = created
-			? publishedPortFor(created, HALSIM_CONTAINER_PORT)
-			: null;
+		const createdSim =
+			created && this.containerNetwork === null
+				? publishedPortFor(created, SIM_CONTAINER_PORT)
+				: null;
+		const createdVscode =
+			created && this.containerNetwork === null
+				? publishedPortFor(created, VSCODE_CONTAINER_PORT)
+				: null;
+		const createdHalsim =
+			created && this.containerNetwork === null
+				? publishedPortFor(created, HALSIM_CONTAINER_PORT)
+				: null;
 		const lease = this.storage.upsertCodeContainerLease({
 			workspaceId: workspace.id,
 			containerName: name,
@@ -575,6 +657,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 
 		return statusFromLease(
 			this.storage.config.codeImage,
+			this.containerNetwork,
 			lease,
 			lease.code_state,
 		);
@@ -649,6 +732,12 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 	private async createWithRetries(
 		workspace: WorkspaceRow,
 	): Promise<CodeContainerStatus> {
+		// Network mode has no host port allocation, so port-bind conflicts cannot
+		// happen and there is nothing to retry.
+		if (this.containerNetwork !== null) {
+			return this.createCodeContainer(workspace, null, null, null);
+		}
+
 		const simRange = this.storage.config.simPortRange;
 		const vscodeRange = this.storage.config.vscodePortRange;
 		const halsimRange = this.storage.config.halsimPortRange;
@@ -721,6 +810,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		});
 		return statusFromLease(
 			this.storage.config.codeImage,
+			this.containerNetwork,
 			lease,
 			"error",
 			message,

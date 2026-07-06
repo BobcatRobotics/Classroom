@@ -26,6 +26,9 @@ export type ControlConfig = {
 	dockerPath: string;
 	codeImage: string;
 	codeMemoryLimit: string;
+	containerNetwork: string | null;
+	composeProject: string | null;
+	hostDataDir: string | null;
 	simPortRange: PortRange;
 	vscodePortRange: PortRange;
 	halsimPortRange: PortRange;
@@ -38,12 +41,19 @@ export type ControlConfig = {
 	adminToken: string | null;
 	maxActiveContainers: number;
 	demo: boolean;
+	adminEmails: string[];
 };
 
 export type ControlConfigInput = Partial<
 	Omit<
 		ControlConfig,
-		"simPortRange" | "vscodePortRange" | "halsimPortRange" | "logLevel"
+		| "simPortRange"
+		| "vscodePortRange"
+		| "halsimPortRange"
+		| "logLevel"
+		| "containerAutoStart"
+		| "demo"
+		| "adminEmails"
 	>
 > & {
 	simPortRange?: PortRange | string;
@@ -55,6 +65,8 @@ export type ControlConfigInput = Partial<
 	port?: number | string;
 	logLevel?: LogLevel | string;
 	demo?: boolean | string;
+	containerAutoStart?: boolean | string;
+	adminEmails?: string[] | string;
 };
 
 function parseLogLevelOrThrow(value: string | LogLevel | undefined): LogLevel {
@@ -119,7 +131,21 @@ function parseBoolean(
 	if (value === undefined) {
 		return fallback;
 	}
-	return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "") {
+		return fallback;
+	}
+	return !["0", "false", "no", "off"].includes(normalized);
+}
+
+function parseAdminEmails(value: string | string[] | undefined): string[] {
+	if (value === undefined) {
+		return [];
+	}
+	const entries = Array.isArray(value) ? value : value.split(",");
+	return entries
+		.map((entry) => entry.trim().toLowerCase())
+		.filter((entry) => entry.length > 0);
 }
 
 function parsePositiveInteger(
@@ -139,13 +165,26 @@ function parsePositiveInteger(
 	return parsed;
 }
 
-function defaultContainerUser(): string | null {
+/**
+ * Explicit workspace-user override from the environment: FRC_CONTAINER_USER,
+ * or FRC_UID:FRC_GID. Null when neither is set.
+ */
+export function envContainerUser(): string | null {
 	if (Bun.env.FRC_CONTAINER_USER) {
 		return Bun.env.FRC_CONTAINER_USER;
 	}
 
 	if (Bun.env.FRC_UID && Bun.env.FRC_GID) {
 		return `${Bun.env.FRC_UID}:${Bun.env.FRC_GID}`;
+	}
+
+	return null;
+}
+
+function defaultContainerUser(): string | null {
+	const fromEnv = envContainerUser();
+	if (fromEnv !== null) {
+		return fromEnv;
 	}
 
 	if (
@@ -159,12 +198,61 @@ function defaultContainerUser(): string | null {
 	return null;
 }
 
+function parseHostDataDir(value: string | null): string | null {
+	if (value === null) {
+		return null;
+	}
+	const trimmed = value.trim();
+	if (trimmed === "") {
+		return null;
+	}
+	if (!trimmed.startsWith("/") && !/^[A-Za-z]:[\\/]/u.test(trimmed)) {
+		throw new Error(
+			`FRC_HOST_DATA_DIR must be an absolute path (got "${value}"). ` +
+				"It is the host-side location of the data directory, passed verbatim " +
+				"to the Docker daemon for bind mounts.",
+		);
+	}
+	return trimmed;
+}
+
 export function loadControlConfig(
 	input: ControlConfigInput = {},
 ): ControlConfig {
 	const dataDir = resolve(
 		input.dataDir ?? Bun.env.FRC_DATA_DIR ?? defaultDataDir,
 	);
+
+	// An empty/whitespace value ("FRC_CONTAINER_NETWORK=" left in .env) must
+	// mean unset, not network mode with `docker run --network ""`.
+	const containerNetwork =
+		(input.containerNetwork ?? Bun.env.FRC_CONTAINER_NETWORK)?.trim() || null;
+	const containerUser =
+		input.containerUser === undefined
+			? defaultContainerUser()
+			: input.containerUser;
+
+	// Inside a container the process usually runs as root, so the "mirror my
+	// own uid:gid" fallback would silently run workspace containers as root and
+	// root-own student files on the host data disk. Network mode is the marker
+	// for a containerized deployment, so demand an explicit user there.
+	const explicitContainerUser =
+		input.containerUser !== undefined || envContainerUser() !== null;
+	if (
+		containerNetwork &&
+		containerUser?.split(":")[0] === "0" &&
+		!explicitContainerUser
+	) {
+		throw new Error(
+			"Workspace containers use network mode (containerized control plane) " +
+				"and the control plane is running as root, " +
+				"but no workspace container user is configured. Either chown the data " +
+				"directory to the intended non-root owner (the control plane derives the " +
+				"workspace user from the data dir's uid:gid) or set FRC_CONTAINER_USER " +
+				"(uid:gid of the host owner of the data directory) so student files are " +
+				"not created as root.",
+		);
+	}
 
 	return {
 		logLevel: parseLogLevelOrThrow(input.logLevel ?? Bun.env.LOG_LEVEL),
@@ -210,9 +298,17 @@ export function loadControlConfig(
 		googleClientSecret:
 			input.googleClientSecret ?? Bun.env.GOOGLE_CLIENT_SECRET ?? null,
 		dockerPath: input.dockerPath ?? Bun.env.FRC_DOCKER_PATH ?? "docker",
-		codeImage: input.codeImage ?? Bun.env.CODE_IMAGE ?? "coderunner-workspace",
+		codeImage:
+			input.codeImage ??
+			Bun.env.CODE_IMAGE ??
+			`${Bun.env.CODERUNNER_IMAGE_NS ?? "ghcr.io/mathewdunne"}/coderunner-workspace:${Bun.env.CODERUNNER_TAG ?? "latest"}`,
 		codeMemoryLimit:
 			input.codeMemoryLimit ?? Bun.env.CODE_MEMORY_LIMIT ?? "2560m",
+		containerNetwork,
+		composeProject: input.composeProject ?? null,
+		hostDataDir: parseHostDataDir(
+			input.hostDataDir ?? Bun.env.FRC_HOST_DATA_DIR ?? null,
+		),
 		simPortRange: parsePortRange(
 			input.simPortRange ?? Bun.env.SIM_PORT_RANGE,
 			defaultSimPortRange,
@@ -235,10 +331,7 @@ export function loadControlConfig(
 			30_000,
 			"SIM_STARTUP_TIMEOUT_MS",
 		),
-		containerUser:
-			input.containerUser === undefined
-				? defaultContainerUser()
-				: input.containerUser,
+		containerUser,
 		containerAutoStart: parseBoolean(
 			input.containerAutoStart ??
 				Bun.env.FRC_CONTAINER_AUTO_START ??
@@ -262,5 +355,8 @@ export function loadControlConfig(
 			"MAX_ACTIVE_CONTAINERS",
 		),
 		demo: parseBoolean(input.demo ?? Bun.env.CODERUNNER_DEMO_MODE, false),
+		adminEmails: parseAdminEmails(
+			input.adminEmails ?? Bun.env.CODERUNNER_ADMIN_EMAIL,
+		),
 	};
 }

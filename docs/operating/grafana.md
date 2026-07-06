@@ -57,32 +57,32 @@ echo -n '<numeric-loki-instance-id>' \
   | gcloud secrets versions add coderunner-grafana-cloud-loki-user --data-file=-
 ```
 
-Then re-render the VM's `.env` and restart Alloy:
+Then re-render the VM's `.env` and recreate the Alloy container so it reloads
+the rendered config:
 
 ```bash
 gcloud compute ssh coderunner --zone=us-central1-a --tunnel-through-iap \
-  --command="sudo /opt/coderunner/render-env.sh && sudo systemctl restart alloy"
+  --command="sudo /opt/coderunner/render-env.sh && cd /opt/coderunner && sudo docker compose up -d alloy"
 ```
 
 Secret names are defined in [`deploy/terraform/secrets.tf`](https://github.com/mathewdunne/CodeRunner/blob/main/deploy/terraform/secrets.tf).
 
 ## Service management
 
-Alloy runs as a systemd service on the VM:
+Alloy runs as a compose service on the VM (`/opt/coderunner`):
 
 ```bash
-sudo systemctl status alloy
-sudo systemctl restart alloy
-sudo journalctl -u alloy -f
+cd /opt/coderunner
+sudo docker compose ps alloy
+sudo docker compose restart alloy
+sudo docker compose logs -f alloy
 ```
 
 ## What is shipped
 
-**Metrics:** Alloy scrapes `localhost:4000/metrics` every 30 seconds and remote-writes to Grafana Cloud Prometheus. It also collects host-level metrics (CPU, memory, disk, network) via the built-in Unix exporter, labeled with the `instance` value from `instance_label` in `terraform.tfvars`.
+**Metrics:** Alloy scrapes `control:4000/metrics` (over the compose network) every 30 seconds and remote-writes to Grafana Cloud Prometheus. It also collects host-level metrics (CPU, memory, disk, network) via the built-in Unix exporter — it reads the host's `/proc`, `/sys`, and `/` through bind mounts since Alloy is containerized — labeled with the `instance` value from `instance_label` in `terraform.tfvars`.
 
-**Logs:** systemd captures the control plane's JSON stdout into journald. `loki.source.journal` in the Alloy config tails the `coderunner.service` unit and ships entries to Loki. The pipeline extracts `level` and `category` as Loki labels; high-cardinality fields like `workspaceId` and `runId` stay in the JSON body and are queried with `| json` at read time.
-
-The `alloy` user must be in the `systemd-journal` group to read journald; the bootstrap script adds it. Without that membership, `loki.source.journal` produces zero entries silently.
+**Logs:** the control plane writes JSON to stdout, captured by Docker's json-file log driver. Alloy's `discovery.docker` finds the `control` container and `loki.source.docker` ships its log lines to Loki. The pipeline extracts `level` and `category` as Loki labels; high-cardinality fields like `workspaceId` and `runId` stay in the JSON body and are queried with `| json` at read time. The compose `service` name is also copied into a `unit` label (its value is now `control`, not the old `coderunner.service` — update any saved queries accordingly).
 
 ## Starter LogQL queries
 
@@ -90,17 +90,17 @@ Find these under **Explore → Loki datasource** in Grafana Cloud:
 
 ```logql
 # All logs from one student
-{unit="coderunner.service"} | json | workspaceId="alice-1"
+{job="coderunner"} | json | workspaceId="alice-1"
 
 # All errors
-{unit="coderunner.service", level="error"}
+{job="coderunner", level="error"}
 
 # Run lifecycle events with duration
-{unit="coderunner.service", category="control.runs"} | json
+{job="coderunner", category="control.runs"} | json
   | line_format "{{.message}} {{.workspaceId}} {{.durationMs}}ms"
 
 # Container start failures
-{unit="coderunner.service", category="control.containers"} |= "failed"
+{job="coderunner", category="control.containers"} |= "failed"
 ```
 
 To verify Alloy is shipping metrics, run this in **Explore → Prometheus datasource**:
@@ -109,7 +109,7 @@ To verify Alloy is shipping metrics, run this in **Explore → Prometheus dataso
 up{instance="coderunner"}
 ```
 
-This should return three series, all `1`.
+This should return the control-plane and host (`node`) scrape targets, all `1`.
 
 ## Dashboards
 
@@ -130,4 +130,4 @@ To import them, open Grafana Cloud, go to **Dashboards → Import**, and upload 
 
 ## Alloy config location
 
-The rendered Alloy config lives at `/etc/alloy/config.alloy` on the VM. It is regenerated from the template at `/etc/alloy/config.alloy.tmpl` on every boot by `render-env.sh`, which substitutes secrets from GCP Secret Manager. Do not edit `config.alloy` directly; changes are overwritten on next boot. Edit the template instead, then run `render-env.sh` and restart `alloy`.
+The rendered Alloy config lives at `/opt/coderunner/alloy/config.alloy` on the VM and is bind-mounted read-only into the Alloy container. It is regenerated from the template at `/opt/coderunner/alloy/config.alloy.tmpl` on every boot by `render-env.sh`, which substitutes secrets from GCP Secret Manager. Do not edit `config.alloy` directly; changes are overwritten on next boot. Edit the template instead, then run `render-env.sh` and `docker compose up -d alloy`.

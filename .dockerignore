@@ -1,0 +1,36 @@
+# Shared by both image builds (context = repo root):
+#   containers/code/Dockerfile    needs containers/code/, catalog/
+#   containers/control/Dockerfile needs package.json, bun.lock, tsconfig*,
+#     apps/, packages/, scripts/, catalog/, vendor/, patches/, and the
+#     submodule gitdir .git/modules/vendor/AdvantageScope (for the
+#     AdvantageScope patch/symlink steps).
+
+# Git metadata, except the AdvantageScope submodule gitdir.
+.git
+!.git/modules/vendor/AdvantageScope
+
+# Dependencies and build outputs (regenerated inside the build stages).
+node_modules
+**/node_modules
+dist
+apps/web/dist
+
+# Runtime and local-only data.
+data
+*.env
+.env*
+
+# Not used by any image. (*.md is root-level only — catalog lesson READMEs
+# under catalog/ still ship in both images.)
+website
+docs
+dashboards
+deploy
+e2e
+lessons-repo-root
+graphify-out
+test-results
+playwright-report
+.github
+.claude
+*.md

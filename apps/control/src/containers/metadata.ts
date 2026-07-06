@@ -8,7 +8,7 @@ import {
 } from "./types";
 
 export function codeContainerName(workspaceId: WorkspaceId): string {
-	return `${CODE_NAME_PREFIX}${workspaceId}`;
+	return `${CODE_NAME_PREFIX}${workspaceId.replace(/^ws_/, "")}`;
 }
 
 export function workspaceHomePath(workspace: WorkspaceRow): string {
@@ -45,6 +45,22 @@ export function publishedPortFor(
 		hostIp,
 		loopback: isLoopbackHost(hostIp),
 	};
+}
+
+export function containerAttachedToNetwork(
+	container: DockerInspectContainer,
+	networkName: string,
+): boolean {
+	return Boolean(container.NetworkSettings?.Networks?.[networkName]);
+}
+
+export function containerHasPublishedPorts(
+	container: DockerInspectContainer,
+): boolean {
+	const ports = container.NetworkSettings?.Ports ?? {};
+	return Object.values(ports).some(
+		(bindings) => Array.isArray(bindings) && bindings.length > 0,
+	);
 }
 
 export function containerRuntimeState(

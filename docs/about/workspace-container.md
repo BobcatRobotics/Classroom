@@ -16,7 +16,8 @@ published ports, labels, environment variables, and first-run behavior) is the
 
 ## What is inside the image
 
-The image (`coderunner-workspace` by default, overridden via `CODE_IMAGE`) is
+The image (`ghcr.io/mathewdunne/coderunner-workspace:latest` by default,
+overridden via `CODE_IMAGE`) is
 built on [linuxserver/openvscode-server](https://github.com/linuxserver/docker-openvscode-server)
 (Ubuntu 24.04 with s6-overlay process supervision) and adds the following on
 top:
@@ -74,8 +75,7 @@ the container being stopped, restarted, or recreated. See
 
 ## Container ports
 
-Three ports are published inside the container and bound on the **host loopback
-interface** (`127.0.0.1`) only, never on a public network interface:
+Three ports are used inside the container:
 
 | Container port | Purpose |
 |---|---|
@@ -83,11 +83,22 @@ interface** (`127.0.0.1`) only, never on a public network interface:
 | 3300 | HALSim WebSocket server (robot enable/disable and mode) |
 | 5810 | NT4 NetworkTables server (telemetry) |
 
-The control plane allocates host-side port numbers from configurable ranges
-(defaults: `33000–33099` for the editor, `25810–25899` for NT4,
-`34000–34099` for HALSim) and records the assignments in its SQLite database.
-The browser never connects to these ports directly; all traffic is proxied
-through the control plane's single public port.
+How the control plane reaches them depends on deployment mode:
+
+- **Port mode** (the host dev loop, `bun run dev:control`): each container's
+  ports are published on the **host loopback interface** (`127.0.0.1`) only,
+  never on a public network interface. The control plane allocates host-side
+  port numbers from configurable ranges (defaults: `33000–33099` for the
+  editor, `25810–25899` for NT4, `34000–34099` for HALSim) and records the
+  assignments in its SQLite database.
+- **Network mode** (the default for `docker compose` deployments): containers
+  publish **no** host ports at all. They join a shared Docker network and the
+  control plane proxies to them by container name over Docker's internal DNS.
+  Concurrency here is bounded by `MAX_ACTIVE_CONTAINERS` rather than by the
+  size of a port range — see [Capacity](../operating/capacity.md).
+
+Either way, the browser never connects to these ports directly; all traffic is
+proxied through the control plane's single public port.
 
 ## Container labels
 
@@ -102,9 +113,12 @@ frc-sim.workspace=<workspaceId>
 ```
 
 On startup, if the control plane finds an existing container with matching
-labels and loopback-bound ports, it adopts it rather than creating a new one.
-A container without matching labels or with publicly-bound ports is removed and
-replaced.
+labels and the right port shape for the current mode — loopback-bound ports in
+port mode, attached to the workspace network with no published ports in
+network mode — it adopts it rather than creating a new one. A container
+without matching labels, or whose port shape belongs to the other mode, is
+removed and replaced (this is also how a leftover from a prior deployment mode
+gets recreated after a cutover).
 
 ## First-run behavior
 

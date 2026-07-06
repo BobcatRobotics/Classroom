@@ -190,6 +190,7 @@ type FakeContainer = {
 	running: boolean;
 	labels: Record<string, string>;
 	ports: FakeContainerPort[];
+	networks?: string[];
 };
 
 export function ok(stdout = ""): DockerCommandResult {
@@ -212,6 +213,10 @@ export function dockerInspect(container: FakeContainer): unknown {
 		}
 		portsMap[key].push({ HostIp: p.hostIp, HostPort: String(p.hostPort) });
 	}
+	const networks: Record<string, unknown> = {};
+	for (const network of container.networks ?? []) {
+		networks[network] = { NetworkID: `fake-${network}` };
+	}
 	return {
 		Name: `/${container.name}`,
 		State: {
@@ -223,6 +228,7 @@ export function dockerInspect(container: FakeContainer): unknown {
 		},
 		NetworkSettings: {
 			Ports: portsMap,
+			Networks: networks,
 		},
 	};
 }
@@ -339,11 +345,18 @@ export function createFakeDocker(
 				}
 			}
 			const labels: Record<string, string> = {};
+			const networks: string[] = [];
 			for (let index = 0; index < args.length; index += 1) {
 				if (args[index] === "--label") {
 					const [key, value] = (args[index + 1] ?? "").split("=");
 					if (key && value) {
 						labels[key] = value;
+					}
+				}
+				if (args[index] === "--network") {
+					const network = args[index + 1];
+					if (network) {
+						networks.push(network);
 					}
 				}
 			}
@@ -352,6 +365,7 @@ export function createFakeDocker(
 				running: true,
 				labels,
 				ports: parsedPorts,
+				networks,
 			});
 			options.onRun?.(name, parsedPorts);
 			return ok("fake-container-id\n");

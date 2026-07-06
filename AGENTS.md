@@ -25,6 +25,7 @@ apps/control/src/metrics-collector.ts  15s Docker stats poller that writes per-c
 apps/web/                      React + Vite browser IDE shell
 packages/contracts/            Shared API schemas, message types, and path rules
 containers/code/               V2 merged openvscode-server + sim container
+containers/control/            Control-plane image: multi-stage build burying the emsdk/AdvantageScope compile, the coderunner dispatching entrypoint
 catalog/                       Bundled (zero-config) lesson catalog: modules.json + modules/<id>/, baked into the code image
 lessons-repo-root/             Staging for the standalone remote lessons repo (will move out of this repo); not used by the app build
 scripts/                       TypeScript utility scripts run by Bun
@@ -60,6 +61,30 @@ import. The catalog has two sources behind one interface: a **bundled** `catalog
 imports keep `.git` for push. The per-import backup/restore flow was removed
 (pure discard + git). See [`docs/lessons/overview.md`](./docs/lessons/overview.md)
 and `docs/decisions/029-lessons-and-modules.md`.
+
+**Containerized control plane (post-V2):** the control plane ships as a Docker
+image (`containers/control/Dockerfile` → `ghcr.io/mathewdunne/coderunner-control`)
+and is deployed with docker compose (`docker-compose.yml` base +
+`docker-compose.prod.yml` for Caddy/Alloy; demo mode is `CODERUNNER_DEMO_MODE=1
+docker compose up`, an env passthrough rather than an override file). It runs
+the host Docker daemon over the bind-mounted socket and manages workspace
+containers as siblings. The control container runs **non-root** as the data-dir
+owner (image default `USER bun`; compose overrides via
+`user: ${CODERUNNER_UID}:${CODERUNNER_GID}` with `group_add:
+${CODERUNNER_DOCKER_GID}` for socket access), so `./data` stays host-owned, not
+root-owned. Two modes via env: **port mode** (default;
+`FRC_CONTAINER_NETWORK` unset) publishes loopback ports and is what
+`bun run dev:control` uses; **network mode** (`FRC_CONTAINER_NETWORK=coderunner`)
+joins a shared Docker network with no published ports and needs
+`FRC_HOST_DATA_DIR` to translate bind-mount paths. Inside a container the
+control plane self-inspects (`docker inspect` on itself) to auto-detect the
+network, host data path, and workspace uid:gid, so those two env vars —
+plus `FRC_CONTAINER_USER` — are optional overrides rather than required
+plumbing; `CODERUNNER_ADMIN_EMAIL` bootstraps the first admin(s) with zero exec
+steps; ops commands run as `coderunner <subcommand>` (a dispatching CLI baked
+into the image) instead of `bun scripts/<name>.ts`. The image build runs the
+emsdk/AdvantageScope compile in a build stage. See
+`docs/decisions/031-containerized-control-plane.md`.
 
 ## Working Principles
 
@@ -99,11 +124,14 @@ and `docs/decisions/029-lessons-and-modules.md`.
 - Run E2E tests (Playwright, mocked tier): `bun run e2e`
 - Run E2E security tests: `bun run e2e:security`
 - Build workspace image locally: `bun run docker:build:workspace`
+- Build control image locally: `bun run docker:build:control`
 - Pull workspace image from GHCR: `bun run docker:pull:workspace`
 - Apply/check migrations: `bun run migrate`, `bun run migrate:status`
 - Start control plane (dev, `--watch`): `bun run dev:control`
 - Start web shell with HMR: `bun run dev:web`
-- Start prod (migrates then serves): `bun run start`
+- Start prod from source (migrates then serves): `bun run start`
+- Run the containerized demo stack: `bun run demo:docker` (or `CODERUNNER_DEMO_MODE=1 docker compose up`)
+- Containerized ops (compose deployments): `docker compose exec control coderunner <subcommand>` (or `docker compose run --rm control <subcommand>` while the plane is stopped) — see `docs/reference/cli-reference.md`
 - Prod build (web + ascope + image pull): `bun run build`
 - Backup projects: `bun run backup`
 - Restore projects: `bun run restore -- <backup-dir>`
@@ -118,10 +146,10 @@ See `docs/deploying/` and `docs/operating/` for operator documentation.
 
 Three test tiers, all runnable without Docker:
 
-- **`bun run test`** — Bun unit/integration tests for the control plane (~290 tests). Covers auth, runs, proxy, containers, the lessons catalog + load pipeline, security, reconciliation, property-based tests, and metrics route-templating cardinality.
-- **`bun run test:web`** — Vitest frontend tests (~70 tests). Covers React hooks (`useSession`, `useLessons`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`), DriverStation components, Zustand store, keyboard/gamepad mappings.
+- **`bun run test`** — Bun unit/integration tests for the control plane (~350 tests). Covers auth, runs, proxy, containers, the lessons catalog + load pipeline, security, reconciliation, property-based tests, and metrics route-templating cardinality.
+- **`bun run test:web`** — Vitest frontend tests (~80 tests). Covers React hooks (`useSession`, `useLessons`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`), DriverStation components, Zustand store, keyboard/gamepad mappings.
 - **`bun run e2e`** — Playwright E2E mocked tier (~55 tests). Full login→editor→run→telemetry→DS flows against in-process `ControlApp` with fake openvscode-server, HALSim, and NT4 backends. No Docker required.
-- **`bun run e2e:security`** — Playwright security specs (CSRF, XSS output encoding, response headers).
+- **`bun run e2e:security`** — Playwright security specs (~8 tests): CSRF, XSS output encoding, response headers.
 
 E2E tests use a custom Playwright fixture (`e2e/fixtures/app.ts`) that creates an isolated `ControlApp` per test with its own random port, SQLite DB, and fake upstream servers. Auth is seeded via `loginAs()` which writes user/session rows and HMAC-signs cookies.
 

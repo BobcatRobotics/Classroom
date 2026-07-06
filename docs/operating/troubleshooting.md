@@ -20,22 +20,85 @@ that workspace.
 docker info
 
 # Check whether the workspace image exists
-docker images coderunner-workspace
+docker images | grep coderunner-workspace
 
-# If missing, pull the pre-built image
-bun run docker:pull:workspace
+# If missing, pull both images (control + workspace)
+docker compose pull
 
-# Or rebuild it locally (takes 5–15 min on first build)
-bun run docker:build:workspace
+# From-source host checkout: pull or build the workspace image directly
+bun run docker:pull:workspace    # or docker:build:workspace to build locally
 ```
 
-Check for port conflicts: if all ports in `SIM_PORT_RANGE` or
-`VSCODE_PORT_RANGE` are in use, container startup fails. Verify the ranges are
-not overlapping with other services on the host. Defaults are `25810–25899`
-(sim NT4) and `33000–33099` (openvscode-server).
+In **port mode** (the host dev loop, or a `docker compose` deployment with
+`FRC_CONTAINER_NETWORK` explicitly unset), check for port conflicts: if all
+ports in `SIM_PORT_RANGE` or `VSCODE_PORT_RANGE` are in use, container startup
+fails. Verify the ranges are not overlapping with other services on the host.
+Defaults are `25810–25899` (sim NT4) and `33000–33099` (openvscode-server).
+This does not apply to **network mode** — the default for `docker compose`
+deployments — where workspace containers publish no host ports at all; see
+[decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md).
 
 After the image is present and Docker is healthy, the student's container will
 start on their next workspace open.
+
+---
+
+## Control plane can't reach the Docker socket (permission denied)
+
+**Symptom.** The `control` container starts but the logs show
+`permission denied` while connecting to `/var/run/docker.sock` (often
+`Got permission denied while trying to connect to the Docker daemon socket`),
+and no workspace containers ever start.
+
+**Cause.** The control container runs as a non-root user and needs the host
+`docker` group gid added as a supplementary group to reach the bind-mounted
+socket. `CODERUNNER_DOCKER_GID` does not match the host's actual docker group
+gid — the `1001` default does not match many distributions (Debian/Ubuntu often
+use `999`/`998`).
+
+**Fix.** Look up the real gid and set it in `.env`, then recreate the container:
+
+```bash
+stat -c '%g' /var/run/docker.sock     # e.g. 999
+```
+
+```bash
+# in .env
+CODERUNNER_DOCKER_GID=999
+```
+
+```bash
+docker compose up -d control          # recreate with the corrected group_add
+```
+
+---
+
+## Control plane can't write /data (SQLITE_READONLY / read-only data dir)
+
+**Symptom.** The `control` container fails at startup (or on the first write)
+with `SQLITE_READONLY: attempt to write a readonly database`, or logs an error
+about being unable to write under `/data`.
+
+**Cause.** The bind-mounted `./data` (or files inside it) is not owned by the
+`CODERUNNER_UID:CODERUNNER_GID` the control container runs as. This is typically
+leftover `root:root` files from a pre-non-root deployment that ran the control
+plane as root, or a `./data` that Docker recreated root-owned after the
+directory was deleted.
+
+**Fix.** Confirm the ownership matches the configured uid:gid (default
+`1000:1000`), then reclaim it on the host:
+
+```bash
+ls -ln data                           # check the owner uid/gid
+stat -c '%g' /var/run/docker.sock     # (for the docker gid, if also affected)
+
+# Reclaim the data dir for the control container's uid:gid (adjust to yours)
+sudo chown -R 1000:1000 data
+```
+
+Then restart the control plane (`docker compose up -d control`). Never delete
+the `./data` directory itself — Docker would recreate it root-owned and this
+failure would return.
 
 ---
 
@@ -78,12 +141,17 @@ SIM_STARTUP_TIMEOUT_MS=60000
 If this happens consistently for one student, check the container logs:
 
 ```bash
-docker logs coderunner-workspace-<workspaceId> --tail 100
+docker logs coderunner-workspace-<hex> --tail 100
 ```
+
+(The container name is `coderunner-workspace-` followed by the workspace id's
+hex suffix, with the `ws_` prefix dropped.)
 
 Look for the simulator failing to bind its HALSim port. If `HALSIM_PORT_RANGE`
 ports are exhausted, restart the control plane or stop idle containers to free
-leases.
+leases. This only applies in port mode — network-mode deployments don't lease
+host ports for workspace containers, so exhaustion here means
+`MAX_ACTIVE_CONTAINERS` instead (see below).
 
 ---
 
@@ -113,12 +181,22 @@ bun run allowlist:add student@gmail.com
 bun run allowlist:add yourteam.org
 ```
 
+On a containerized deployment run these inside the control container instead
+(`cd /opt/coderunner && sudo` on the VM):
+`docker compose exec control coderunner allowlist list|add <email-or-domain>`.
+
 **Cause: empty allowlist.** If the allowlist is empty, everyone is blocked.
 Confirm with `bun run allowlist:list` and add at least one entry.
 
 ---
 
 ## Port range exhausted
+
+This applies to **port mode** only (the host dev loop, or a `docker compose`
+deployment with `FRC_CONTAINER_NETWORK` explicitly unset). Network mode — the
+default for `docker compose` deployments — never leases host ports for
+workspace containers, so it can't hit this failure; its concurrency limit is
+`MAX_ACTIVE_CONTAINERS` alone (see [Capacity](./capacity.md)).
 
 **Symptom.** Container startup fails with a log message about no free ports, or
 many students get "server at capacity" even when the concurrency cap has not
@@ -180,22 +258,17 @@ bun run backup
 
 ## Control plane crashes or becomes unresponsive
 
-**Symptom.** The browser shows disconnected. The `coderunner.service` systemd
-unit shows `failed` or logs a fatal error.
+**Symptom.** The browser shows disconnected. `docker compose ps` shows the
+`control` container unhealthy or restarting, or its logs show a fatal error.
 
 **Cause.** An unhandled exception, OOM on the host, or a corrupt database.
 
-**Fix.** On a local deployment, restart the control plane:
+**Fix.** Restart the control plane and check its logs (prefix with
+`cd /opt/coderunner && sudo` on the VM):
 
 ```bash
-bun run start
-```
-
-On the cloud VM:
-
-```bash
-sudo systemctl restart coderunner
-sudo journalctl -u coderunner -n 100
+docker compose restart control
+docker compose logs --tail 100 control
 ```
 
 On startup the control plane reconnects to existing containers via Docker

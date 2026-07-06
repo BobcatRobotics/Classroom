@@ -9,7 +9,11 @@ import type {
 	WorkspaceId,
 	WorkspaceSlug,
 } from "@frc-coderunner/contracts";
-import { loadAllowlist, setAllowlistPath } from "./auth/allowlist";
+import {
+	addAllowlistEntry,
+	loadAllowlist,
+	setAllowlistPath,
+} from "./auth/allowlist";
 import { type Auth, createAuth } from "./auth/auth";
 import type { ControlConfig, ControlConfigInput } from "./config";
 import { loadControlConfig } from "./config";
@@ -81,12 +85,21 @@ function nowIso(): string {
 	return new Date().toISOString();
 }
 
+/** Canonical on-disk project path for a workspace. Single source of truth —
+ * normalizeWorkspaceProjectPaths re-roots every DB row against it at boot. */
+function projectPathFor(
+	config: ControlConfig,
+	workspaceId: WorkspaceId,
+): string {
+	return resolve(config.dataDir, "users", workspaceId, "project");
+}
+
 async function ensureWorkspaceFiles(
 	config: ControlConfig,
 	workspaceId: WorkspaceId,
 ): Promise<string> {
 	const workspaceDir = resolve(config.dataDir, "users", workspaceId);
-	const projectDir = resolve(workspaceDir, "project");
+	const projectDir = projectPathFor(config, workspaceId);
 	const homeDir = resolve(workspaceDir, "home");
 
 	await mkdir(projectDir, { recursive: true });
@@ -129,11 +142,18 @@ export class AppStorage {
 				applied.length > 0 ? applied.map((m) => m.name) : undefined,
 		});
 
-		// 2. Initialize allowlist
+		// 2. Re-root persisted project paths under the current data directory.
+		// project_path is always <dataDir>/users/<id>/project by construction, but
+		// rows written by a differently-rooted deployment (host vs container, or a
+		// restored backup) carry the old prefix. Docker mounts and file APIs use
+		// the path the control plane sees now, so normalize eagerly.
+		this.normalizeWorkspaceProjectPaths();
+
+		// 3. Initialize allowlist
 		setAllowlistPath(this.config.dataDir);
 		await loadAllowlist();
 
-		// 3. Create Better Auth instance and run its migrations
+		// 4. Create Better Auth instance and run its migrations
 		this.auth = createAuth(this.db, this.config, {
 			ensureWorkspace: async (userId, slug) => {
 				await this.ensureWorkspaceForUser(userId, slug);
@@ -143,7 +163,13 @@ export class AppStorage {
 		const { runMigrations } = await getMigrations(this.auth.options);
 		await runMigrations();
 
-		// 4. Warn if no auth providers are configured (skipped in demo mode).
+		// 5. Bootstrap admins from CODERUNNER_ADMIN_EMAIL. Runs after the allowlist
+		// is loaded and the better-auth `user` table exists, so it can both seed
+		// allowlist entries and promote an account that signed in before the env
+		// was set. New accounts get the admin role via the user.create hook.
+		await this.seedBootstrapAdmins();
+
+		// 6. Warn if no auth providers are configured (skipped in demo mode).
 		if (!this.config.demo) {
 			const hasGitHub = Boolean(
 				this.config.githubClientId && this.config.githubClientSecret,
@@ -167,6 +193,53 @@ export class AppStorage {
 
 	close(): void {
 		this.db.close();
+	}
+
+	/**
+	 * Seed the accounts named in CODERUNNER_ADMIN_EMAIL so a fresh deployment
+	 * needs zero exec steps: each email is added to the allowlist (idempotent),
+	 * and any existing non-admin account with that email is promoted. Accounts
+	 * that have not signed in yet get the admin role from the user.create hook.
+	 */
+	private async seedBootstrapAdmins(): Promise<void> {
+		for (const email of this.config.adminEmails) {
+			await addAllowlistEntry("email", email);
+			log.info("bootstrap admin allowlisted", { email });
+
+			// config.adminEmails is lowercased; the stored email keeps whatever
+			// case the OAuth provider returned, so match case-insensitively.
+			const user = this.db
+				.query("SELECT id, role FROM user WHERE lower(email) = ?")
+				.get(email) as { id: string; role: string | null } | null;
+			if (user && user.role !== "admin") {
+				this.db
+					.query("UPDATE user SET role = ?, updatedAt = ? WHERE id = ?")
+					.run("admin", nowIso(), user.id);
+				log.info("bootstrap admin promoted", { email });
+			}
+		}
+	}
+
+	private normalizeWorkspaceProjectPaths(): void {
+		const rows = this.db
+			.query("SELECT id, project_path FROM workspaces")
+			.all() as Array<{ id: WorkspaceId; project_path: string }>;
+		let updated = 0;
+		for (const row of rows) {
+			const canonical = projectPathFor(this.config, row.id);
+			if (row.project_path !== canonical) {
+				this.db
+					.query("UPDATE workspaces SET project_path = ? WHERE id = ?")
+					.run(canonical, row.id);
+				updated += 1;
+			}
+		}
+		if (updated > 0) {
+			log.info("re-rooted workspace project paths", {
+				updated,
+				dataDir: this.config.dataDir,
+			});
+		}
 	}
 
 	findWorkspaceByUserId(userId: string): WorkspaceRow | null {
@@ -211,12 +284,7 @@ export class AppStorage {
 		const baseSlug = slug.slice(0, 40) || "student";
 		const workspaceId = randomId("ws") as WorkspaceId;
 		const timestamp = nowIso();
-		const placeholderProjectPath = resolve(
-			this.config.dataDir,
-			"users",
-			workspaceId,
-			"project",
-		);
+		const placeholderProjectPath = projectPathFor(this.config, workspaceId);
 
 		let finalSlug: WorkspaceSlug | null = null;
 		const MAX_ATTEMPTS = 16;

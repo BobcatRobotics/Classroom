@@ -5,16 +5,54 @@ title: CLI Reference
 
 # CLI Reference
 
-All scripts are run from the repo root with `bun run NAME`. They require Bun 1.3.13 or newer.
+All scripts are run from the repo root with `bun run NAME` and require Bun 1.3.13 or newer — this is the interface for a from-source host checkout (including the host dev loop). For a `docker compose` deployment, the equivalent ops surface is the `coderunner` CLI baked into the control image; see [Containerized ops: the `coderunner` CLI](#containerized-ops-the-coderunner-cli) below.
 
 ## Running the App
 
 | Script | What it does |
 |--------|-------------|
-| `start` | Applies pending database migrations, then starts the control plane. The normal way to run CodeRunner in production. |
-| `demo` | Applies migrations, then starts the control plane in demo mode (`--demo`). Auth is bypassed and every visitor shares one admin workspace — for local evaluation only. See [Quick Start](../quick-start.md). |
-| `dev:control` | Starts the control plane with `--watch` so it restarts automatically when source files change. Use during backend development. |
+| `start` | Applies pending database migrations, then starts the control plane. The normal way to run CodeRunner from source. |
+| `demo` | Applies migrations, then starts the control plane in demo mode (`--demo`), from source. Auth is bypassed and every visitor shares one admin workspace — for local evaluation only. See [Quick Start](../quick-start.md). |
+| `demo:docker` | Runs the containerized demo stack: `CODERUNNER_DEMO_MODE=1 docker compose up`. The containerized equivalent of `demo`. |
+| `dev:control` | Starts the control plane with `--watch` so it restarts automatically when source files change. Use during backend development. Always runs in port mode, regardless of `FRC_CONTAINER_NETWORK`. |
 | `dev:web` | Starts the Vite dev server for the React web shell with HMR. Use alongside `dev:control` during frontend development. |
+
+## Containerized ops: the `coderunner` CLI
+
+In a `docker compose` deployment the scripts documented on this page are baked
+into the control image and reachable through one dispatching entrypoint,
+`coderunner <subcommand>`, installed at `/usr/local/bin/coderunner`
+(`containers/control/entrypoint.sh`). Two invocation forms work, for different
+reasons:
+
+- `docker compose exec control coderunner <subcommand>` — runs inside the
+  already-running `control` container. `exec` bypasses the image
+  `ENTRYPOINT` entirely, so this form only works because `coderunner` is also
+  installed on `PATH`, not because it's the entrypoint.
+- `docker compose run --rm control <subcommand>` — starts a fresh one-off
+  container from the same image; `run` replaces `CMD`, so the entrypoint
+  itself does the dispatching. Use this form when the control plane is
+  stopped (for example, `restore`), since `exec` requires a running container.
+
+| `coderunner` subcommand | Equivalent `bun run` script (from-source) | What it does |
+|---|---|---|
+| `serve` (default; also plain `docker compose up`) | `start` | Applies migrations, then starts the server as PID 1. |
+| `backup` | `backup` | See [Backup and Restore](#backup-and-restore). |
+| `restore` | `restore` | See [Backup and Restore](#backup-and-restore). Backup directory paths are resolved inside `/data`. |
+| `allowlist` | `allowlist:list` / `allowlist:add` / `allowlist:remove` | See [Users and Access](#users-and-access). |
+| `users` | `users:list` / `users:promote` / `users:demote` | See [Users and Access](#users-and-access). |
+| `audit-prune` | `audit:prune` | See [Database](#database). |
+| `rebuild-workspaces` | `docker:rebuild-workspaces` | See [Docker Images and Containers](#docker-images-and-containers). |
+| `cleanup` | `docker:cleanup` | See [Docker Images and Containers](#docker-images-and-containers). |
+| `migrate` | `migrate` / `migrate:status` | See [Database](#database). |
+| `help` / `--help` | — | Prints the subcommand list. |
+| anything else | — | Passed through verbatim (`exec "$@"`) — for example, `docker compose run --rm control bash` opens a shell. |
+
+Example: `bun run allowlist:add coach@example.com` on a from-source checkout
+is `docker compose exec control coderunner allowlist add coach@example.com`
+in a compose deployment. Setting `CODERUNNER_ADMIN_EMAIL` before first boot
+avoids needing either form for the first admin — see
+[OAuth credentials](../deploying/oauth-credentials.md#the-easy-path-coderunner_admin_email).
 
 ## Build
 
@@ -47,9 +85,9 @@ All scripts are run from the repo root with `bun run NAME`. They require Bun 1.3
 
 | Script | What it does |
 |--------|-------------|
-| `docker:pull:workspace` | Pulls `ghcr.io/mathewdunne/coderunner-workspace:latest` from the GitHub Container Registry. Called automatically by `build`. |
-| `docker:build:workspace` | Builds the workspace image locally from `containers/code/Dockerfile`. Use when iterating on the container itself; normal deployments pull the prebuilt image instead. |
-| `docker:push:workspace` | Builds and then pushes the workspace image to GHCR. Used by the release workflow; not needed for normal operation. |
+| `docker:pull:workspace` | Pulls the workspace image (`${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}`) from the registry. Called automatically by `build`. |
+| `docker:build:workspace` | Builds the workspace image locally from `containers/code/Dockerfile`, tagged with the same canonical name the pull uses — so a rebuild is picked up directly by `docker compose up`. Use when iterating on the container itself; normal deployments pull the prebuilt image instead. |
+| `docker:build:control` | Builds the control-plane image locally from `containers/control/Dockerfile` (multi-stage: web build, AdvantageScope/emsdk build, runtime), tagged with its canonical name. Use when iterating on the control image itself; normal deployments pull the prebuilt image via `docker compose pull`. |
 | `docker:cleanup` | Removes all stopped managed containers (those with the `frc-sim.managed=true` label). Safe to run while the control plane is up. Accepts `--dry-run` to preview what would be removed. |
 | `docker:rebuild-workspaces` | Removes all running and stopped managed V2 workspace containers and clears their database leases, forcing fresh containers on next login. Student project files are untouched; they are bind-mounted and survive container removal. Accepts `--dry-run`. Run this after updating the workspace image to force students into the new image on their next session. |
 
@@ -82,10 +120,10 @@ All scripts are run from the repo root with `bun run NAME`. They require Bun 1.3
 | `check` | Runs Biome lint and format checks together (read-only, suitable for CI). |
 | `check:fix` | Runs Biome lint, format, and import organization and writes all safe fixes. Run this before finalizing any code change. |
 | `verify` | Full CI gate: `biome ci`, typecheck, all tests, and E2E. Must pass before merging. |
-| `test` | Runs Bun unit and integration tests for the control plane and shared packages (~290 tests). No Docker required. |
-| `test:web` | Runs Vitest frontend tests for the React web shell (~70 tests). No Docker required. |
+| `test` | Runs Bun unit and integration tests for the control plane and shared packages (~350 tests). No Docker required. |
+| `test:web` | Runs Vitest frontend tests for the React web shell (~80 tests). No Docker required. |
 | `e2e` | Runs Playwright E2E tests against an in-process mocked app (~55 tests). No Docker required. |
 | `e2e:ui` | Opens the Playwright UI for interactive E2E debugging. |
 | `e2e:debug` | Runs E2E tests with `PWDEBUG=1` for step-through debugging. |
-| `e2e:security` | Runs Playwright security specs (CSRF, XSS, response headers). |
+| `e2e:security` | Runs Playwright security specs (~8 tests): CSRF, XSS, response headers. |
 | `e2e:report` | Opens the last Playwright HTML report. |

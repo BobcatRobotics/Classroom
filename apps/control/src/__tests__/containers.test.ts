@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type ControlAppOptions, createApp } from "../app";
 import { managedContainerStats } from "../containers/lifecycle";
+import { codeContainerName } from "../containers/metadata";
 import {
 	cookieFrom,
 	createCatalogDir,
@@ -51,7 +52,7 @@ describe("code container orchestration", () => {
 					id: string;
 					project_path: string;
 				};
-				const expectedName = `coderunner-workspace-${workspace.id}`;
+				const expectedName = codeContainerName(workspace.id);
 				expect(body.code.containerName).toBe(expectedName);
 				expect(fakeDocker.containers.has(expectedName)).toBe(true);
 

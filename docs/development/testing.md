@@ -30,7 +30,7 @@ Runs Bun's built-in test runner across the control plane
 (`apps/control/`), shared contracts (`packages/contracts/`), scripts
 (`scripts/`), and the two frontend files that live in Bun test style
 (`apps/web/src/lib/keyboard-mapping.test.ts` and
-`keyboard-mapping.property.test.ts`). Approximately 290 tests covering:
+`keyboard-mapping.property.test.ts`). Approximately 350 tests covering:
 
 - Authentication: session creation, cookie HMAC signing, allowlist enforcement, role gating
 - Proxy layer: hop-by-hop header stripping, WebSocket upgrade, base-path routing
@@ -46,7 +46,7 @@ Runs Bun's built-in test runner across the control plane
 bun run test:web
 ```
 
-Runs Vitest inside `apps/web/`. Approximately 70 tests covering:
+Runs Vitest inside `apps/web/`. Approximately 80 tests covering:
 
 - React hooks: `useSession`, `useLessons`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`
 - DriverStation components: Enable/Disable button state machine, mode switching

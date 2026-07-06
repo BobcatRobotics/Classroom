@@ -1,18 +1,14 @@
 locals {
-  # Derive the GHCR workspace image path from the repo owner — matches how
-  # build-image.yml tags the image (ghcr.io/<owner>/coderunner-workspace).
-  repo_owner      = split("/", var.github_repo)[0]
-  workspace_image = "ghcr.io/${local.repo_owner}/coderunner-workspace:latest"
-
   # Cloud-init user-data is templated so var.domain, var.github_repo, etc. land
   # in the right places. Keep the substitution surface tiny on purpose; anything
-  # secret comes from Secret Manager at boot, not from Terraform.
+  # secret comes from Secret Manager at boot, not from Terraform. Image names
+  # are derived on the VM by render-env.sh (CODERUNNER_IMAGE_NS from the repo
+  # owner), matching how the deploy workflow tags them.
   user_data = templatefile("${path.module}/../cloud-init/user-data.yaml", {
-    domain          = var.domain
-    git_ref         = var.git_ref
-    github_repo     = var.github_repo
-    workspace_image = local.workspace_image
-    instance_label  = var.instance_label
+    domain         = var.domain
+    git_ref        = var.git_ref
+    github_repo    = var.github_repo
+    instance_label = var.instance_label
   })
 }
 
@@ -66,14 +62,14 @@ resource "google_compute_instance" "coderunner" {
   # Allow stopping/starting without recreating the VM. Useful for resizes.
   allow_stopping_for_update = true
 
-  # Re-render .env from Secret Manager on every boot, in case secrets rotated.
-  # Only restart services if render-env.sh succeeded — a transient gcloud blip
-  # must NOT silently swap in a broken .env.
+  # Re-render .env from Secret Manager on every boot, in case secrets rotated,
+  # then bring the compose stack up. Only act if render-env.sh succeeded — a
+  # transient gcloud blip must NOT silently swap in a broken .env.
   metadata_startup_script = <<-EOT
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -x /opt/coderunner/render-env.sh ] && /opt/coderunner/render-env.sh; then
-      systemctl restart coderunner alloy || true
+      cd /opt/coderunner && docker compose up -d --remove-orphans || true
     fi
   EOT
 

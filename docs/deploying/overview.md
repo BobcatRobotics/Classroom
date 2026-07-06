@@ -16,9 +16,10 @@ the one that matches how your students will reach the app.
 
 Everything runs on one box (a lab PC, a spare laptop, or a mini PC) and
 students connect to it over the local network (for example
-`http://192.168.1.50:4000/`). This is the simplest path: clone the repo, build,
-and start. Traffic is plain HTTP, so keep the machine on a trusted network. It
-is ideal for in-person meetings where everyone is on the same Wi-Fi.
+`http://192.168.1.50:4000/`). This is the simplest path: clone the repo,
+set a couple of `.env` values, and `docker compose up`. Traffic is plain HTTP,
+so keep the machine on a trusted network. It is ideal for in-person meetings
+where everyone is on the same Wi-Fi.
 
 See [Local Deployment](./local.md).
 

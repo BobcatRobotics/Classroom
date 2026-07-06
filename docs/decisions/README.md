@@ -4,7 +4,9 @@ Record active architecture decisions here.
 
 ## Active (V2 and post-V2)
 
-011–030 are the current decision logs (see files in this directory).
+011–031 are the current decision logs (see files in this directory). The latest:
+
+- [`031-containerized-control-plane.md`](031-containerized-control-plane.md) — the control plane ships as a Docker image deployed with docker compose; dual-mode container networking, host-path translation, emsdk moved into the build.
 
 ## Archive
 

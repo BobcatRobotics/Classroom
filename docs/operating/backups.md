@@ -27,6 +27,24 @@ The server backup is not a substitute for version control. See
 [Team Import](../lessons/team-import.md) for how students commit and push from
 their workspace.
 
+:::note Containerized deployments
+`backup`/`restore` run inside the control container via the `coderunner` CLI,
+which sees the data directory at `/data`:
+
+```bash
+docker compose exec control coderunner backup
+docker compose run --rm control restore <backup-dir>
+```
+
+`run --rm` works even while the control plane is stopped, which is normal
+before a `restore`. Backups land in `/data/backups/...` — i.e. under your
+`CODERUNNER_HOST_DATA_DIR` on the host. A `<backup-dir>` passed to `restore`
+must be a path **inside** `/data` (the container can't see arbitrary host
+paths). On the VM, prefix with `cd /opt/coderunner && sudo`. The `bun run
+backup` / `bun run restore` forms below apply to a from-source host checkout;
+the paths and options are identical.
+:::
+
 ## Creating a backup
 
 ```bash
@@ -63,7 +81,8 @@ bun run backup -- --projects-only
 
 ## Restoring from a backup
 
-Stop the control plane before restoring, then:
+Stop the control plane before restoring (`docker compose stop control`, or
+`Ctrl+C` for a host run), then:
 
 ```bash
 bun run restore -- <backup-dir>

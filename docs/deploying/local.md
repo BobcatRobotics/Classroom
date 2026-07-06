@@ -11,30 +11,33 @@ no cloud account, domain name, or TLS certificate.
 
 For a public URL with HTTPS, see [Google Cloud Deployment](./gcloud.md) instead.
 
+The control plane, Caddy, and the per-student workspaces all run as containers,
+so the only thing you install on the host is **Docker with the Compose plugin**.
+You no longer need Bun, the AdvantageScope submodule, or emscripten for a
+self-hosted deployment — the published `coderunner-control` image already
+contains the web shell and AdvantageScope Lite assets.
+
 ## Prerequisites
 
 | Requirement | Minimum | Recommended |
 | --- | --- | --- |
-| **Bun** | 1.3.13+ | Latest stable |
-| **Docker Engine** | 24+ | Native Linux Docker |
+| **Docker Engine + Compose plugin** | 24+ | Native Linux Docker |
 | **Git** | 2.x | n/a |
 | **RAM** | 16 GB (3–5 students) | 32 GB (10 students) |
 | **CPU** | 4 cores | 6+ cores |
 | **Disk** | 20 GB free | 50+ GB free |
 | **OS** | Linux (Ubuntu 22.04+), Windows + WSL2 | Ubuntu 22.04+ native |
 
-On Windows, use PowerShell 7 (`pwsh`) for all commands.
-
 You also need at least one OAuth provider configured before students can sign in.
 Register your GitHub or Google OAuth app first; see [OAuth Credentials](./oauth-credentials.md).
 
-## 1. Clone and set up the repo
+## 1. Clone the repo
+
+You only need the compose files and `.env.example`; no submodules or `bun install`.
 
 ```bash
 git clone https://github.com/mathewdunne/CodeRunner.git CodeRunner
 cd CodeRunner
-git submodule update --init --recursive
-bun install
 ```
 
 ## 2. Create your `.env` file
@@ -60,6 +63,10 @@ GITHUB_CLIENT_ID=<your-github-client-id>
 GITHUB_CLIENT_SECRET=<your-github-client-secret>
 # GOOGLE_CLIENT_ID=<your-google-client-id>
 # GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+
+# Your email(s) — bootstraps admin access with zero exec steps. Comma-separated.
+# Each is added to the allowlist at startup and made an admin on first sign-in.
+CODERUNNER_ADMIN_EMAIL=you@yourteam.org
 ```
 
 `BETTER_AUTH_SECRET` defaults to a hardcoded dev placeholder; always change it
@@ -67,87 +74,146 @@ in any non-demo deployment. `BETTER_AUTH_URL` defaults to
 `http://localhost:4000`, which works for single-machine use but must be updated
 to the LAN IP if students are on other devices (OAuth callbacks must match).
 
-The full list of environment variables and their defaults is in `.env.example`
-and in [Configuration](../reference/configuration.md).
+Student data (the SQLite DB and per-workspace projects) defaults to `./data` in
+the checkout — no env var needed for a single-machine setup. Set
+`CODERUNNER_HOST_DATA_DIR` to an **absolute** host path only if you want to
+relocate it, for example onto a larger or separate disk. The control plane
+figures out the corresponding in-container mapping itself by inspecting its
+own container at startup, so you don't need to keep the two paths in sync by
+hand.
 
-## 3. Build the workspace image and web assets
+The control container runs as a **non-root** user so the files it writes to
+`./data` stay owned by a real host user rather than root. Three variables
+govern that identity (all default to values that work on a typical single-user
+Linux host):
 
-Pull the pre-built workspace container image from GHCR:
+- `CODERUNNER_UID` / `CODERUNNER_GID` (default `1000:1000`) — the uid:gid the
+  control container runs as. These must match the user who owns `./data`;
+  `1000:1000` is correct for the first user created on most single-user hosts.
+- `CODERUNNER_DOCKER_GID` (default `1001`) — the host `docker` group gid, added
+  as a supplementary group so the non-root process can reach the Docker socket.
+  The `1001` default does **not** match many distributions (Debian/Ubuntu often
+  use `999` or `998`), so look yours up first:
+
+  ```bash
+  stat -c '%g' /var/run/docker.sock
+  ```
+
+  Set `CODERUNNER_DOCKER_GID` in `.env` to whatever that prints if it isn't
+  `1001`, or the control plane won't be able to start or manage containers.
+
+`./data` ships in the checkout (as `data/.gitkeep`), so it's already owned by
+whoever cloned the repo — leave the directory in place. **Never delete the
+directory itself**: if you remove it, Docker recreates it root-owned on the next
+`up`, and the non-root control plane then can't write it. Delete only its
+*contents* (`rm -rf data/*`) if you need to reset.
+
+The full list of environment variables and their defaults is in `.env.example`.
+
+::::warning Reusing a `.env` from a pre-compose deployment
+If you're upgrading from the old bare-metal (non-Docker) control plane and
+reusing its `.env`, delete any `FRC_DATA_DIR`, `FRC_DB_PATH`, and `PORT` lines
+first. Compose passes the whole file into the container, where those lines
+override the image's fixed in-container paths and the control plane fails to
+start (with an error pointing at `FRC_HOST_DATA_DIR`).
 
 ```bash
-bun run docker:pull:workspace
+sed -i -E '/^(FRC_DATA_DIR|FRC_DB_PATH|PORT)=/d' .env
 ```
+::::
 
-Then build the web shell and AdvantageScope Lite:
+## 3. Start the app
 
 ```bash
-bun run build:web
-bun run build:ascope
+docker compose up -d
 ```
 
-Or run all three together with:
-
-```bash
-bun run build
-```
-
-`bun run build` runs `build:web`, `build:ascope`, and `docker:pull:workspace` in
-sequence.
-
-## 4. Allowlist who can sign in
-
-The allowlist controls which email addresses (or entire domains) are permitted
-to complete OAuth login. **No one can sign in until at least one entry is added.**
-
-```bash
-# Allow a specific email
-bun run allowlist:add coach@frcteam.org
-
-# Or allow every address at a domain
-bun run allowlist:add frcteam.org
-```
-
-Other commands: `bun run allowlist:list`, `bun run allowlist:remove`.
-
-## 5. Start the app
-
-```bash
-bun run start
-```
-
-This runs pending database migrations first (via `bun run migrate`), then starts
-the control plane on port 4000. Students open `http://<your-LAN-IP>:4000/` in
-their browsers.
+This pulls the `coderunner-control` and `coderunner-workspace` images from GHCR,
+creates the `coderunner` Docker network, runs database migrations, and starts the
+control plane on port 4000. The first pull is several gigabytes (the workspace
+image carries the Java/WPILib toolchain), so it takes a while; later starts reuse
+the cache.
 
 To verify the app is up:
 
 ```bash
 curl http://localhost:4000/healthz
+docker compose ps          # control should be "healthy"
 ```
 
-## 6. Promote the first admin
+Students open `http://<your-LAN-IP>:4000/` in their browsers.
 
-The first time a coach signs in via OAuth, their account is created as a regular
-user. After signing in once, promote them to admin:
+To pull a newer release later, set `CODERUNNER_TAG` in `.env` (or leave it at
+`latest`) and run `docker compose pull && docker compose up -d`.
+
+## 4. Sign in as the first admin
+
+If you set `CODERUNNER_ADMIN_EMAIL` in `.env` before `docker compose up`, there
+are **no exec steps to reach the admin panel**. On startup the control plane
+adds each listed email to the allowlist and, on first OAuth sign-in, creates the
+account with the admin role (an account that already exists is promoted at the
+next startup). Just open the app, sign in with that email, and you land as an
+admin who can manage workspaces, adjust the container cap, and view the audit
+log.
+
+If you would rather bootstrap by hand — or you need to add students and make
+later changes — the ops commands run inside the control container via the
+`coderunner` CLI, either with `docker compose exec` (control plane already up)
+or `docker compose run --rm control <subcommand>` (works even while it's
+stopped).
+
+The allowlist controls which email addresses (or entire domains) may complete
+OAuth login. **No one can sign in until they match an allowlist entry** (the
+`CODERUNNER_ADMIN_EMAIL` accounts are added automatically):
 
 ```bash
-bun run users:promote coach@frcteam.org
+# Allow a specific student email
+docker compose exec control coderunner allowlist add student@frcteam.org
+
+# Or allow every address at a domain
+docker compose exec control coderunner allowlist add frcteam.org
 ```
 
-Admins can manage workspaces, adjust the container cap, and view the audit log
-from the admin panel. See [OAuth Credentials](./oauth-credentials.md) for more
-on the allowlist and admin bootstrap flow.
+Other allowlist commands: `... coderunner allowlist list`,
+`... coderunner allowlist remove`.
 
-Other user commands: `bun run users:list`, `bun run users:demote`.
+To promote another coach to admin after they have signed in once:
+
+```bash
+docker compose exec control coderunner users promote coach@frcteam.org
+```
+
+Other user commands: `... coderunner users list`, `... coderunner users demote`.
+See [OAuth Credentials](./oauth-credentials.md) for more on the allowlist and
+admin bootstrap flow.
 
 ## Stopping and restarting
 
-Press `Ctrl+C` to stop the control plane. Student containers keep running and
-are reconciled on the next `bun run start`. To stop containers too:
-
 ```bash
-bun run docker:cleanup
+docker compose stop      # stop the control plane (student containers keep running)
+docker compose up -d     # start again; existing student containers are reconciled
+docker compose down      # stop and remove the control container + network
 ```
+
+Student containers are managed by the control plane (not compose), so they
+survive `docker compose stop`.
+
+:::warning `--remove-orphans` also removes student containers
+Student containers carry the control plane's `com.docker.compose.project`
+label so they group under the stack in tools like Portainer. A side effect is
+that `docker compose down --remove-orphans` (and a Portainer "remove stack")
+select them too and will stop **live student workspaces**. Plain
+`docker compose down` only warns about them; add `--remove-orphans` only when
+no students are active. Their real lifecycle owner is still the control plane,
+not compose.
+:::
+
+To force them all to recreate (for example
+after a workspace-image update), recycle them with
+`docker compose exec control coderunner rebuild-workspaces` while the control
+plane is up, or `bun run docker:rebuild-workspaces` from a from-source
+checkout. To just remove already-stopped ones without forcing a recreate, use
+`coderunner cleanup` / `bun run docker:cleanup` instead.
 
 ## A note on plain HTTP
 

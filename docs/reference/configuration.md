@@ -7,6 +7,10 @@ title: Configuration Reference
 
 CodeRunner is configured entirely through environment variables. Copy `.env.example` to `.env` in the repo root and edit only the values you need; the defaults are reasonable for local use. The control plane reads `.env` once at startup; restart the process to apply any changes.
 
+:::note Docker Compose deployments
+With the containerized control plane (the default deployment — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md)) the same `.env` is read twice: Compose interpolates the `CODERUNNER_*` values (see [Docker Compose deployment](#docker-compose-deployment) below) into `docker-compose*.yml`, and the whole file is passed into the control container. The image **fixes the in-container paths** (`/data`, `/app/...`), so the **Paths** section below and the `bun run build:*` notes apply only to a from-source host run — leave them unset for a compose deployment. The control plane also auto-detects `FRC_CONTAINER_NETWORK`, `FRC_HOST_DATA_DIR`, and `FRC_CONTAINER_USER` by inspecting its own container at startup (see **Docker and Containers** below), so those need no manual setting either.
+:::
+
 ## Server
 
 | Variable | Default | Purpose |
@@ -52,21 +56,40 @@ See [OAuth credentials](../deploying/oauth-credentials.md) for step-by-step regi
 | `GOOGLE_CLIENT_ID` | none | Google OAuth client ID. |
 | `GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret. |
 | `CODERUNNER_DEMO_MODE` | `false` | When `1` or `true`, bypasses authentication entirely. All visitors share one admin session. Never expose a demo instance publicly. Also enabled with the `--demo` CLI flag on startup. |
+| `CODERUNNER_ADMIN_EMAIL` | none | Comma-separated email addresses to bootstrap as admins with zero exec steps. Each is added to the allowlist at startup and granted the admin role on first OAuth sign-in; an existing account with that email is promoted to admin at the next startup. See [OAuth credentials](../deploying/oauth-credentials.md#the-easy-path-coderunner_admin_email). |
 
 ## Docker and Containers
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `FRC_DOCKER_PATH` | `docker` | Path to the Docker CLI binary. Override if Docker is not on `PATH`. |
-| `CODE_IMAGE` | `coderunner-workspace` | Docker image name for student workspace containers. |
+| `CODE_IMAGE` | `${CODERUNNER_IMAGE_NS}/coderunner-workspace:${CODERUNNER_TAG}` | Docker image name for student workspace containers. Set it to override the canonical name entirely. |
 | `CODE_MEMORY_LIMIT` | `2560m` | Memory cap applied to each workspace container via Docker `--memory`. Lower to `2048m` if the host is RAM-constrained. |
 | `SIM_PORT_RANGE` | `25810-25899` | Loopback port range allocated for HALSim NT4 connections. Format: `start-end`. |
 | `VSCODE_PORT_RANGE` | `33000-33099` | Loopback port range for openvscode-server instances. Format: `start-end`. |
 | `HALSIM_PORT_RANGE` | `34000-34099` | Loopback port range for HALSim WebSocket bridges. Format: `start-end`. |
 | `FRC_CONTAINER_AUTO_START` | `true` | Automatically start a student's workspace container when their session page loads. Also readable as `CONTAINER_AUTO_START`. |
-| `FRC_CONTAINER_USER` | auto-detected | UID:GID for container processes. On Linux defaults to the current user's UID and GID, keeping file ownership consistent with bind-mounted project directories. Also configurable via `FRC_UID` + `FRC_GID` separately. |
+| `FRC_CONTAINER_USER` | auto-detected | UID:GID for container processes. On a host/dev run, defaults to the current user's UID and GID (Linux), keeping file ownership consistent with bind-mounted project directories. Inside a container, auto-detected from the data directory's owner (`stat /data`) — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md#self-inspection-zero-config-containerized-mode). Set this only to override that detection. Also configurable via `FRC_UID` + `FRC_GID` separately. |
+| `FRC_CONTAINER_NETWORK` | none | Docker network that workspace containers join instead of publishing loopback host ports. Inside a container, auto-detected from the control plane's own network attachment; leave **unset** for a host/dev run (`bun run dev:control`) — a host process can't resolve container DNS names. Set this only to override detection (for example, if the container is attached to more than one user-defined network). |
+| `FRC_HOST_DATA_DIR` | none | Host-side absolute path of `FRC_DATA_DIR`, used to translate workspace bind-mount sources when the control plane itself runs in a container (the Docker daemon resolves mounts against the host). Inside a container, auto-detected from the container's own bind mounts (`docker inspect`); leave unset on the host. Set this only to override detection. |
+
+In a containerized network-mode deployment the control plane needs a way to resolve the workspace user, or it refuses to start to avoid root-owning student files on the host. A non-root `stat()` of the data directory satisfies this automatically; set `FRC_CONTAINER_USER` explicitly only if the data directory's owner isn't the uid:gid workspace containers should run as. The control container itself also runs as a non-root uid:gid (the data-dir owner) — see `CODERUNNER_UID` / `CODERUNNER_GID` / `CODERUNNER_DOCKER_GID` under [Docker Compose deployment](#docker-compose-deployment) below.
 
 Each active student workspace uses approximately 2.5 GB of RAM at the default memory cap. See [Capacity planning](../operating/capacity.md) for host sizing guidance.
+
+## Docker Compose deployment
+
+These variables are consumed by `docker compose` itself (interpolated into `docker-compose*.yml`), **not** read directly by the control plane. They only apply to the containerized deployment; see [Local Deployment](../deploying/local.md) and [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md).
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CODERUNNER_TAG` | `latest` | Image tag to run for both the control and workspace images (a release tag like `v2.5.0`, or `latest`). |
+| `CODERUNNER_IMAGE_NS` | `ghcr.io/mathewdunne` | Registry + owner for both coderunner images. Forks publishing their own images set this once. Unlike the other variables in this table it is also read by the control plane and the image build/pull script, so the same `.env` line covers every consumer. |
+| `CODERUNNER_HOST_DATA_DIR` | `./data` (in the checkout) | Host path of the data directory, bind-mounted into the control container at `/data`. Compose resolves `./data` against the project directory. Set this to relocate the data directory (for example, onto a mounted disk); the control plane derives the matching `FRC_HOST_DATA_DIR` itself by inspecting its own container, so this variable does not need to be passed through by hand. |
+| `CODERUNNER_UID` | `1000` | uid the **control container** runs as (compose `user:`). Should own `CODERUNNER_HOST_DATA_DIR` so `./data` stays host-owned rather than root-owned. The `1000` default is correct for the first user on most single-user hosts. Distinct from `FRC_CONTAINER_USER`, which governs the workspace siblings. |
+| `CODERUNNER_GID` | `1000` | gid the control container runs as (paired with `CODERUNNER_UID` in compose `user:`). |
+| `CODERUNNER_DOCKER_GID` | `1001` | Host `docker` group gid, added to the non-root control process as a supplementary group (compose `group_add:`) so it can reach the bind-mounted socket. Find it with `stat -c '%g' /var/run/docker.sock` — stock Debian/Ubuntu installs often use `999`/`998`, not `1001`. |
+| `COMPOSE_FILE` | none | Production VM only: selects the prod stack (`docker-compose.yml:docker-compose.prod.yml`) so a plain `docker compose up -d` runs Caddy + Alloy too. |
 
 ## Run Lifecycle
 
@@ -93,6 +116,7 @@ The idle manager periodically checks active containers and stops those that have
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `ADMIN_TOKEN` | none | Bearer token accepted by `/admin/*` endpoints as an alternative to an admin user session. Useful as a break-glass bootstrap token before any admin user has signed in. Leave unset to require a signed-in admin session. |
+| `METRICS_TOKEN` | none | Bearer token accepted for scraping `GET /metrics`. When set, scrapers send `Authorization: Bearer <token>`. Leave unset to require an admin user session instead. |
 | `MAX_ACTIVE_CONTAINERS` | `10` | Hard cap on simultaneously running workspace containers. New workspace requests beyond this limit are rejected until a slot is freed. |
 
 See [Monitoring](../operating/monitoring.md) for the `/metrics` Prometheus endpoint.
@@ -124,9 +148,10 @@ On a cloud VM the `.env` file is regenerated on every boot by `render-env.sh`, s
 
 ## Notes on .env.example vs config.ts
 
-Two variables appear in `.env.example` but are not in `config.ts`'s `ControlConfig` struct because they are read outside of it:
+Three variables appear in `.env.example` but are not in `config.ts`'s `ControlConfig` struct because they are read outside of it:
 
 - `PORT`: read directly by `apps/control/src/main.ts` as the listen port; also feeds the `BETTER_AUTH_URL` default in `config.ts`.
 - `LOG_FORMAT`: read directly by `apps/control/src/logging.ts`; not part of `ControlConfig`.
+- `METRICS_TOKEN`: read directly by `apps/control/src/app.ts` to gate the `/metrics` endpoint; not part of `ControlConfig`.
 
-Both are real, documented, and functional; they are just not stored in the config object.
+All three are real, documented, and functional; they are just not stored in the config object.

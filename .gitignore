@@ -4,8 +4,13 @@ dist/
 .npm/
 *.tsbuildinfo
 
-# V1 runtime data
-data/
+# Runtime data. The directory itself is kept (data/.gitkeep) so a fresh clone
+# already has it owned by the cloning user — the containerized control plane
+# stat()s it to pick the uid:gid workspace containers run as. If Docker had to
+# create it at first `docker compose up` it would be root-owned and the
+# control plane would refuse to start.
+data/*
+!data/.gitkeep
 
 # Environment (secrets)
 .env

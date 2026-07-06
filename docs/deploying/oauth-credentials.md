@@ -89,6 +89,42 @@ set. Where these values live depends on the deployment:
 OAuth establishes *who* a person is; CodeRunner separately controls *whether*
 they may sign in (the allowlist) and *whether* they are an admin (the role).
 
+### The easy path: `CODERUNNER_ADMIN_EMAIL`
+
+Set `CODERUNNER_ADMIN_EMAIL` (comma-separated for multiple people) alongside
+your OAuth credentials before the first startup and the two steps below happen
+automatically — **no exec commands needed**. At startup the control plane adds
+each listed email to the allowlist, and on first OAuth sign-in the account is
+created with the admin role. An account that already exists with that email is
+promoted to admin at the next startup, so it also rescues a coach who signed in
+before the env var was set.
+
+```bash
+CODERUNNER_ADMIN_EMAIL=coach@frcteam.org,assistant@frcteam.org
+```
+
+This is the recommended way to reach the admin panel on a fresh deployment. The
+manual commands below are still useful for allowlisting students and for
+changing roles later.
+
+### Manual bootstrap and later changes
+
+:::note Running these commands
+On a containerized deployment (the default) the `allowlist` and `users`
+commands run **inside the control container** via the `coderunner` CLI:
+
+```bash
+docker compose exec control coderunner allowlist add coach@frcteam.org
+docker compose exec control coderunner users promote coach@frcteam.org
+```
+
+Use `docker compose run --rm control <subcommand>` instead while the control
+plane is stopped. On the Google Cloud VM the compose project lives in
+`/opt/coderunner` and needs `sudo` (`cd /opt/coderunner && sudo docker compose
+exec -T control …`). The `bun run …` short forms shown below are equivalent
+and apply to a from-source host checkout with Bun.
+:::
+
 ### 1. Allowlist the emails that may sign in
 
 The allowlist gates every OAuth login. Until an email or domain is added,
@@ -113,8 +149,8 @@ bun run users:promote coach@frcteam.org
 ```
 
 The reverse is `bun run users:demote`, and `bun run users:list` shows current
-roles. On the cloud VM, run `users:promote` over IAP SSH; see the
-[Google Cloud Deployment](./gcloud.md) "Promote yourself to admin" step.
+roles. On the cloud VM, run `coderunner users promote` over IAP SSH; see the
+[Google Cloud Deployment](./gcloud.md) "Become the first admin" step.
 
 > Admins also get a break-glass option: setting the `ADMIN_TOKEN` env var lets
 > you call the `/admin/*` API with a bearer token even before any user is

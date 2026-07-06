@@ -29,13 +29,18 @@ Log categories follow the pattern `control.<subsystem>`, for example
 `control.runs`, `control.containers`, `control.auth`, `control.idle`.
 
 ANSI colors are disabled automatically when output is not a TTY (piped to a
-file or journald).
+file or captured by Docker's log driver).
 
-### Capturing a session on a local deployment
+### Capturing a session
+
+For a containerized deployment, follow the control container's logs:
 
 ```bash
-bun run start 2>&1 | tee coderunner-$(date +%Y%m%d).log
+docker compose logs -f control | tee coderunner-$(date +%Y%m%d).log
 ```
+
+For a from-source host run, pipe `bun run dev:control` (or `bun run start`)
+through `tee` the same way.
 
 ## Prometheus metrics
 
