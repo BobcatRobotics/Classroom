@@ -1,5 +1,12 @@
 import { ArrowDownToLine, Terminal } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { SimRunStatus } from "@/lib/contracts";
@@ -64,22 +71,23 @@ function ConsoleViewport({
 	lines: string[];
 }) {
 	const viewportRef = useRef<HTMLDivElement>(null);
-	const autoScrollRef = useRef(true);
-	const [autoScroll, setAutoScroll] = useState(true);
+	const pinnedRef = useRef(true);
+	const prevLenRef = useRef(lines.length);
+	const [pinned, setPinnedState] = useState(true);
 	const visibleLines = useMemo(
 		() => (lines.length > 0 ? lines : [emptyText]),
 		[emptyText, lines],
 	);
 
 	const setPinned = useCallback((value: boolean) => {
-		autoScrollRef.current = value;
-		setAutoScroll(value);
+		pinnedRef.current = value;
+		setPinnedState(value);
 	}, []);
 
-	const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+	const scrollToBottom = useCallback(() => {
 		const viewport = viewportRef.current;
 		if (!viewport) return;
-		viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+		viewport.scrollTo({ top: viewport.scrollHeight });
 	}, []);
 
 	const handleScroll = useCallback(() => {
@@ -95,11 +103,15 @@ function ConsoleViewport({
 		return () => viewport.removeEventListener("scroll", handleScroll);
 	}, [handleScroll]);
 
-	useEffect(() => {
-		if (!autoScrollRef.current) return;
-		const frame = window.requestAnimationFrame(() => scrollToBottom());
-		return () => window.cancelAnimationFrame(frame);
-	}, [scrollToBottom]);
+	// Tail: re-run on every new/replaced line. A shrink in line count means the
+	// console was reset (a new run), so resume tailing even if the user had
+	// scrolled away. useLayoutEffect scrolls before paint to avoid flicker.
+	useLayoutEffect(() => {
+		const prev = prevLenRef.current;
+		prevLenRef.current = lines.length;
+		if (lines.length < prev) setPinned(true);
+		if (pinnedRef.current) scrollToBottom();
+	}, [lines, scrollToBottom, setPinned]);
 
 	return (
 		<div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -116,14 +128,14 @@ function ConsoleViewport({
 				</div>
 			</ScrollArea>
 
-			{!autoScroll ? (
+			{!pinned ? (
 				<Button
 					type="button"
 					size="sm"
 					variant="secondary"
 					onClick={() => {
 						setPinned(true);
-						window.requestAnimationFrame(() => scrollToBottom("smooth"));
+						scrollToBottom();
 					}}
 					className="absolute right-4 bottom-3 h-7 gap-1.5 rounded-md shadow-md"
 				>
