@@ -8,10 +8,6 @@ Full instructions live in the docs site:
 - [Cloudflare Pages](../docs/deploying/cloudflare.md) — optional CDN layer for the web shell with graceful offline handling.
 - [Seasonal Teardown & Restore](../docs/operating/seasonal-teardown.md) — snapshot-based off-season teardown to near-zero cost and fall restore.
 
-One-time migration:
-
-- [`cutover-to-compose.md`](./cutover-to-compose.md) — agent/operator runbook to move a live bare-metal VM to the containerized control plane via gcloud + IAP SSH (snapshot, cutover, verify, rollback).
-
 ## Subdirectories
 
 - `terraform/` — Infrastructure as code: VM, persistent disk, IAM, secrets, network, outputs.
