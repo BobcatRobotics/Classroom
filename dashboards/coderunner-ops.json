@@ -35,7 +35,7 @@
 		{
 			"id": 100,
 			"type": "row",
-			"title": "Host VM — was the box big enough?",
+			"title": "Host VM",
 			"gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
 			"collapsed": false,
 			"panels": []
