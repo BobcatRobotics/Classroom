@@ -47,6 +47,7 @@ export type ControlAppOptions = ControlConfigInput & {
 	runtimeProvider?: WorkspaceRuntimeProvider | undefined;
 	dockerRunner?: DockerRunner | undefined;
 	portAvailable?: ((port: number) => Promise<boolean>) | undefined;
+	blockDevices?: string[] | undefined;
 	upstreamFetch?: HttpFetch | undefined;
 	runCommandFactory?: RunCommandFactory | undefined;
 	halsimWebSocketFactory?: HalSimWebSocketFactory | undefined;

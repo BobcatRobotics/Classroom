@@ -97,6 +97,64 @@ describe("code container orchestration", () => {
 		);
 	});
 
+	test("code container creation caps disk reads per detected block device", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				const response = await login(app, "alice");
+				const cookie = cookieFrom(response);
+				await app.fetch(
+					new Request("http://localhost/u/alice/api/containers/status", {
+						headers: { cookie },
+					}),
+				);
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				expect(runCall).toContain("--device-read-bps");
+				expect(runCall).toContain("/dev/nvme0n1:48mb");
+				expect(runCall).toContain("/dev/nvme1n1:48mb");
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 45911, end: 45911 },
+				vscodePortRange: { start: 46001, end: 46001 },
+				codeDiskReadLimit: "48mb",
+				blockDevices: ["/dev/nvme0n1", "/dev/nvme1n1"],
+			},
+		);
+	});
+
+	test("disabling the disk read limit omits --device-read-bps", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				const response = await login(app, "alice");
+				const cookie = cookieFrom(response);
+				await app.fetch(
+					new Request("http://localhost/u/alice/api/containers/status", {
+						headers: { cookie },
+					}),
+				);
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				expect(runCall).not.toContain("--device-read-bps");
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 45912, end: 45912 },
+				vscodePortRange: { start: 46002, end: 46002 },
+				codeDiskReadLimit: null,
+				blockDevices: ["/dev/nvme0n1"],
+			},
+		);
+	});
+
 	test("opening a workspace kicks off code container startup without blocking the shell", async () => {
 		const fakeDocker = createFakeDocker();
 

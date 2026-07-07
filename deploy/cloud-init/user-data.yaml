@@ -125,7 +125,7 @@ write_files:
         echo "GOOGLE_CLIENT_SECRET=$GOOG_CLIENT_SECRET"
         echo "ADMIN_TOKEN=$ADMIN_TOKEN_VAL"
         echo "METRICS_TOKEN=$METRICS_TOKEN_VAL"
-        echo "CODE_MEMORY_LIMIT=3200m"
+        echo "CODE_MEMORY_LIMIT=4096m"
         echo "IDLE_STOP_MINUTES=10"
         echo "LOG_LEVEL=info"
         # JSON logs flow stdout → docker json-file → Alloy loki.source.docker →

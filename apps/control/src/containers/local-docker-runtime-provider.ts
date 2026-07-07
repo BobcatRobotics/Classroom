@@ -14,6 +14,7 @@ import type {
 	WorkspaceRuntimeProvider,
 } from "../runtime";
 import type { AppStorage, WorkspaceRow } from "../storage";
+import { listWorkspaceDiskLimitDevices } from "./block-devices";
 import { runtimeFromLease, statusFromLease } from "./converters";
 import {
 	dockerPortBindError,
@@ -60,6 +61,7 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 	private readonly dockerRunner: DockerRunner;
 	private readonly customDockerRunner: DockerRunner | null;
 	private readonly portAvailable: (port: number) => Promise<boolean>;
+	private readonly blockDevices: string[];
 	private readonly activeEnsures = new Map<
 		string,
 		Promise<CodeContainerStatus>
@@ -77,6 +79,10 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			options.dockerRunner ??
 			((args) => runDockerCli(this.storage.config.dockerPath, args));
 		this.portAvailable = options.portAvailable ?? portIsFree;
+		this.blockDevices =
+			this.storage.config.codeDiskReadLimit === null
+				? []
+				: (options.blockDevices ?? listWorkspaceDiskLimitDevices());
 	}
 
 	/**
@@ -612,6 +618,16 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			`VSCODE_BASE_PATH=/u/${workspace.slug}/vscode/`,
 		);
 
+		// A container thrashing against its memory limit re-reads its page cache
+		// from disk indefinitely; without a read cap that saturates the host's
+		// provisioned disk throughput and stalls everything on the VM.
+		const diskReadLimit = this.storage.config.codeDiskReadLimit;
+		if (diskReadLimit !== null) {
+			for (const device of this.blockDevices) {
+				args.push("--device-read-bps", `${device}:${diskReadLimit}`);
+			}
+		}
+
 		if (this.storage.config.containerUser) {
 			const [puid, pgid] = this.storage.config.containerUser.split(":");
 			if (puid) {
@@ -630,6 +646,12 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			simPort,
 			vscodePort,
 			halsimPort,
+			diskReadLimit:
+				diskReadLimit === null
+					? "(disabled)"
+					: this.blockDevices.length === 0
+						? "(no devices)"
+						: `${diskReadLimit} × ${this.blockDevices.join(", ")}`,
 		});
 		await this.runDocker(args);
 

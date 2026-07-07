@@ -56,8 +56,10 @@ All of these defaults are environment-overridable at container launch time
 (see the container README for the full variable list).
 
 The control plane enforces a **hard memory cap** on every container via
-Docker's `--memory` flag. The default is `2560m`, controlled by the
-`CODE_MEMORY_LIMIT` environment variable on the control plane.
+Docker's `--memory` flag. The default is `4096m`, controlled by the
+`CODE_MEMORY_LIMIT` environment variable on the control plane. Disk reads are
+capped per block device via `--device-read-bps` (default `64mb`, controlled by
+`CODE_DISK_READ_LIMIT`) so one container cannot saturate host disk throughput.
 
 ## How student data persists
 

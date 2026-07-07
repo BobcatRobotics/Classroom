@@ -26,6 +26,8 @@ export type ControlConfig = {
 	dockerPath: string;
 	codeImage: string;
 	codeMemoryLimit: string;
+	/** Per-device `--device-read-bps` rate for workspace containers; null = no limit. */
+	codeDiskReadLimit: string | null;
 	containerNetwork: string | null;
 	composeProject: string | null;
 	hostDataDir: string | null;
@@ -163,6 +165,35 @@ function parsePositiveInteger(
 		throw new Error(`${name} must be a positive integer.`);
 	}
 	return parsed;
+}
+
+const DISABLED_DISK_LIMIT_VALUES = new Set(["0", "off", "none", "false"]);
+
+/**
+ * A Docker byte-rate value ("64mb", "500kb", …) for `--device-read-bps`, or
+ * null when disabled. Validated here so a typo fails at boot with a clear
+ * message instead of failing every workspace container creation.
+ */
+function parseDiskReadLimit(
+	value: string | null | undefined,
+	fallback: string,
+): string | null {
+	if (value === null) {
+		return null;
+	}
+	// An empty value ("CODE_DISK_READ_LIMIT=" left in .env) means unset, not
+	// disabled — disabling this guard requires an explicit "0"/"off".
+	const raw = ((value ?? "").trim() || fallback).toLowerCase();
+	if (DISABLED_DISK_LIMIT_VALUES.has(raw)) {
+		return null;
+	}
+	if (!/^\d+(b|kb|mb|gb)?$/u.test(raw)) {
+		throw new Error(
+			`Invalid CODE_DISK_READ_LIMIT "${value}". Expected a Docker byte rate ` +
+				`like "64mb" (units: b, kb, mb, gb), or "0" to disable.`,
+		);
+	}
+	return raw;
 }
 
 /**
@@ -303,7 +334,14 @@ export function loadControlConfig(
 			Bun.env.CODE_IMAGE ??
 			`${Bun.env.CODERUNNER_IMAGE_NS ?? "ghcr.io/mathewdunne"}/coderunner-workspace:${Bun.env.CODERUNNER_TAG ?? "latest"}`,
 		codeMemoryLimit:
-			input.codeMemoryLimit ?? Bun.env.CODE_MEMORY_LIMIT ?? "2560m",
+			input.codeMemoryLimit ?? Bun.env.CODE_MEMORY_LIMIT ?? "4096m",
+		// `??` would turn an explicit null (disable) into the env/default value.
+		codeDiskReadLimit: parseDiskReadLimit(
+			input.codeDiskReadLimit === undefined
+				? Bun.env.CODE_DISK_READ_LIMIT
+				: input.codeDiskReadLimit,
+			"64mb",
+		),
 		containerNetwork,
 		composeProject: input.composeProject ?? null,
 		hostDataDir: parseHostDataDir(

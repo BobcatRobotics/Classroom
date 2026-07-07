@@ -346,7 +346,7 @@ previous tag**.
 
 The default `c4-standard-4` with two 50 GB `hyperdisk-balanced` disks runs to a
 modest always-on cost (low tens of US dollars per month). Each active student
-uses roughly 2.5 GB RAM at the default `CODE_MEMORY_LIMIT=3200m` set by
+can use up to 4 GB RAM at the default `CODE_MEMORY_LIMIT=4096m` set by
 `render-env.sh` in production. To scale up, set
 `machine_type = "c4-standard-8"` or larger in `terraform.tfvars` and run
 `terraform apply`.

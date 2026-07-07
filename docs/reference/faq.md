@@ -7,7 +7,7 @@ title: FAQ
 
 ### What hardware do I need for my team?
 
-Each active student workspace uses approximately 2.5 GB of RAM at the default `CODE_MEMORY_LIMIT=2560m`. The server-side reference sizing (from `.env.example`) is:
+Each active student workspace can use up to 4 GB of RAM at the default `CODE_MEMORY_LIMIT=4096m` (idle editors use much less). The server-side reference sizing (from `.env.example`) is:
 
 - **3–5 students:** 16 GB RAM, 4+ CPU cores
 - **6–10 students:** 32 GB RAM, 6+ cores

@@ -117,9 +117,11 @@ Each student's container:
   control plane derives it by `stat()`ing the bind-mounted data directory
   (or an explicit `FRC_CONTAINER_USER` override) and refuses to start if that
   resolves to root — see [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md).
-- Has a hard memory cap enforced by Docker's cgroup limit (default `2560m`,
+- Has a hard memory cap enforced by Docker's cgroup limit (default `4096m`,
   set by `CODE_MEMORY_LIMIT`). A runaway robot program cannot exhaust host
-  memory.
+  memory. Disk reads are likewise throttled per device (default `64mb`, set
+  by `CODE_DISK_READ_LIMIT`) so a single container cannot monopolize host
+  disk throughput.
 - Has its three ports bound on `127.0.0.1` only in port mode, or published
   nowhere at all in network mode; either way it has no inbound network
   exposure beyond what the control plane itself proxies.

@@ -22,20 +22,24 @@ host itself.
 
 ## Container memory cap
 
-Each container is hard-limited to `CODE_MEMORY_LIMIT` (default: `2560m`). If a
+Each container is hard-limited to `CODE_MEMORY_LIMIT` (default: `4096m`). If a
 container exceeds its limit, the Linux OOM killer terminates a process inside it.
 The student typically sees a failed run; the container itself keeps running.
 
-The cloud VM deployment uses `3200m` to give the heavier openvscode-server and
-Java language server more headroom.
+Be careful lowering this: a cold Gradle build plus the Java language server and
+openvscode-server together approach 4 GB. A container pinned at its limit does
+not always OOM — when most of its memory is reclaimable page cache, the kernel
+evicts and re-reads the container's files (jars, class files) in a loop
+instead. That thrashing generates sustained disk reads that can saturate the
+host's disk throughput and stall the whole VM. `CODE_DISK_READ_LIMIT` (below)
+bounds the blast radius, but the right fix is a limit the workload actually
+fits in.
 
 Adjust in your `.env`:
 
 ```bash
-# Tighter cap for a memory-constrained host
-CODE_MEMORY_LIMIT=2048m
-
-# More headroom if containers OOM during builds
+# Tighter cap for a memory-constrained host (expect slower cold builds and
+# occasional language-server OOMs)
 CODE_MEMORY_LIMIT=3072m
 ```
 
@@ -43,12 +47,27 @@ Changing `CODE_MEMORY_LIMIT` requires a control-plane restart to take effect for
 newly started containers. Already-running containers are not affected until they
 are next restarted.
 
+## Container disk read cap
+
+Each workspace container's disk reads are throttled to `CODE_DISK_READ_LIMIT`
+per physical block device (default: `64mb`, via Docker `--device-read-bps`).
+This keeps one container that is thrashing, indexing, or scanning from
+monopolizing the host's provisioned disk throughput — on cloud VMs that
+budget is small (a default GCP Hyperdisk Balanced volume is ~140 MiB/s) and a
+single unthrottled container can freeze the entire host, including SSH.
+
+Devices are auto-detected from `/sys/block` when the control plane runs
+containerized (compose deployments). Host/dev runs apply no limit, because a
+VM-backed Docker daemon (Docker Desktop) exposes different devices than the
+host. Set `CODE_DISK_READ_LIMIT=0` to disable. Like the memory cap, changes
+apply to newly started containers after a control-plane restart.
+
 ## Host sizing guidance
 
 | Students | RAM | CPU | Disk | Notes |
 |---|---|---|---|---|
 | 1–3 | 16 GB | 4 cores | 30 GB | Development or testing |
-| 4–6 | 16–24 GB | 4–6 cores | 40 GB | Small classroom; consider lowering `CODE_MEMORY_LIMIT` to `2048m` |
+| 4–6 | 16–24 GB | 4–6 cores | 40 GB | Small classroom; consider lowering `CODE_MEMORY_LIMIT` to `3072m` |
 | 7–10 | 32 GB | 6+ cores | 50 GB | Full classroom; preferred target |
 | 10+ | 48+ GB | 8+ cores | 80 GB | Large classroom; increase `CODE_MEMORY_LIMIT` and cap |
 
@@ -76,9 +95,11 @@ available_for_containers = total_RAM - 4 GB
 safe_cap ≈ available_for_containers × 0.6 ÷ CODE_MEMORY_LIMIT_GB
 ```
 
-For a 32 GB host with `CODE_MEMORY_LIMIT=2560m`:
-`(32 - 4) × 0.6 ÷ 2.5 ≈ 6–7 containers` with comfortable headroom for
-simultaneous builds.
+For a 32 GB host with `CODE_MEMORY_LIMIT=4096m`:
+`(32 - 4) × 0.6 ÷ 4 ≈ 4 containers` with comfortable headroom for
+simultaneous builds. Idle editors use far less than their cap, so a higher
+`MAX_ACTIVE_CONTAINERS` usually works in practice — but expect OOM kills if
+many students build at once.
 
 ## Measuring actual usage
 

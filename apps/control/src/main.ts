@@ -90,6 +90,7 @@ log.info("control plane configuration", {
 		: "(same as dataDir)",
 	codeImage: c.codeImage,
 	codeMemoryLimit: c.codeMemoryLimit,
+	codeDiskReadLimit: c.codeDiskReadLimit ?? "(disabled)",
 	containerNetwork: c.containerNetwork
 		? detected.containerNetwork
 			? `${c.containerNetwork} (auto-detected)`

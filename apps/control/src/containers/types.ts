@@ -8,6 +8,8 @@ export type DockerRunner = (args: string[]) => Promise<DockerCommandResult>;
 export type ContainerOrchestratorOptions = {
 	dockerRunner?: DockerRunner | undefined;
 	portAvailable?: ((port: number) => Promise<boolean>) | undefined;
+	/** Host block devices for `--device-read-bps`; default: auto-detected. */
+	blockDevices?: string[] | undefined;
 };
 
 export type CodeContainerStatus = ContainersStatusResponse["code"];

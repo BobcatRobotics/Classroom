@@ -64,7 +64,8 @@ See [OAuth credentials](../deploying/oauth-credentials.md) for step-by-step regi
 |----------|---------|---------|
 | `FRC_DOCKER_PATH` | `docker` | Path to the Docker CLI binary. Override if Docker is not on `PATH`. |
 | `CODE_IMAGE` | `${CODERUNNER_IMAGE_NS}/coderunner-workspace:${CODERUNNER_TAG}` | Docker image name for student workspace containers. Set it to override the canonical name entirely. |
-| `CODE_MEMORY_LIMIT` | `2560m` | Memory cap applied to each workspace container via Docker `--memory`. Lower to `2048m` if the host is RAM-constrained. |
+| `CODE_MEMORY_LIMIT` | `4096m` | Memory cap applied to each workspace container via Docker `--memory`. A cold Gradle build plus the Java language server needs most of this; setting it too low causes cgroup page-cache thrashing (the container re-reads its jars from disk in a loop) that can saturate host disk throughput. Lower with care on RAM-constrained hosts. |
+| `CODE_DISK_READ_LIMIT` | `64mb` | Per-device disk read cap applied to each workspace container via Docker `--device-read-bps`, so one thrashing or scan-heavy container cannot monopolize host disk throughput and stall the VM. Devices are auto-detected from `/sys/block` when the control plane runs containerized; host/dev runs apply no limit (a VM-backed Docker daemon such as Docker Desktop has different devices than the host). Set to `0` or `off` to disable. See [decision 033](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/033-workspace-disk-read-limit.md). |
 | `SIM_PORT_RANGE` | `25810-25899` | Loopback port range allocated for HALSim NT4 connections. Format: `start-end`. |
 | `VSCODE_PORT_RANGE` | `33000-33099` | Loopback port range for openvscode-server instances. Format: `start-end`. |
 | `HALSIM_PORT_RANGE` | `34000-34099` | Loopback port range for HALSim WebSocket bridges. Format: `start-end`. |

@@ -117,6 +117,7 @@ export async function createApp(
 		runtimeProvider: configuredRuntimeProvider,
 		dockerRunner,
 		portAvailable,
+		blockDevices,
 		upstreamFetch: configuredUpstreamFetch,
 		runCommandFactory,
 		halsimWebSocketFactory,
@@ -131,7 +132,11 @@ export async function createApp(
 	}
 	const runtimeProvider =
 		configuredRuntimeProvider ??
-		new LocalDockerRuntimeProvider(storage, { dockerRunner, portAvailable });
+		new LocalDockerRuntimeProvider(storage, {
+			dockerRunner,
+			portAvailable,
+			blockDevices,
+		});
 	const containers = runtimeProvider as LocalDockerRuntimeProvider;
 	const halsim = new HalSimBridge(
 		halsimWebSocketFactory ? { webSocketFactory: halsimWebSocketFactory } : {},

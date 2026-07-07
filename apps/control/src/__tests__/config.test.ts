@@ -93,3 +93,45 @@ describe("adminEmails (via loadControlConfig)", () => {
 		).toEqual(["coach@team.org", "assistant@team.org"]);
 	});
 });
+
+describe("codeDiskReadLimit (via loadControlConfig)", () => {
+	test("defaults to 64mb", () => {
+		expect(loadControlConfig({}).codeDiskReadLimit).toBe("64mb");
+	});
+
+	test("accepts a Docker byte rate and normalizes case", () => {
+		expect(
+			loadControlConfig({ codeDiskReadLimit: "100MB" }).codeDiskReadLimit,
+		).toBe("100mb");
+	});
+
+	test('"0" and "off" disable the limit', () => {
+		expect(
+			loadControlConfig({ codeDiskReadLimit: "0" }).codeDiskReadLimit,
+		).toBe(null);
+		expect(
+			loadControlConfig({ codeDiskReadLimit: "off" }).codeDiskReadLimit,
+		).toBe(null);
+	});
+
+	test("empty string means unset and falls back to the default", () => {
+		expect(loadControlConfig({ codeDiskReadLimit: "" }).codeDiskReadLimit).toBe(
+			"64mb",
+		);
+	});
+
+	test("explicit null disables the limit", () => {
+		expect(
+			loadControlConfig({ codeDiskReadLimit: null }).codeDiskReadLimit,
+		).toBe(null);
+	});
+
+	test("rejects values Docker would not accept", () => {
+		expect(() => loadControlConfig({ codeDiskReadLimit: "fast" })).toThrow(
+			/CODE_DISK_READ_LIMIT/,
+		);
+		expect(() => loadControlConfig({ codeDiskReadLimit: "64 mb" })).toThrow(
+			/CODE_DISK_READ_LIMIT/,
+		);
+	});
+});
