@@ -102,6 +102,12 @@ COPY catalog/ catalog/
 COPY --from=web-build /repo/apps/web/dist apps/web/dist
 COPY --from=ascope-build /repo/dist/advantagescope dist/advantagescope
 
+# License texts travel with the image, not just the repo: this image ships a
+# patched AdvantageScope build, and BSD-3-Clause requires the notice to
+# accompany the binary distribution. Last of the COPY layers so editing the
+# notices doesn't invalidate the install or dist layers above.
+COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/coderunner/
+
 # /data is the bind-mounted host data directory (SQLite DB + per-student
 # projects). The ops scripts' relative "data" fallbacks rely on these being
 # set, so keep them even though compose usually repeats them.

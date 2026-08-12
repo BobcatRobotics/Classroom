@@ -21,7 +21,10 @@ data
 .env*
 
 # Not used by any image. (*.md is root-level only — catalog lesson READMEs
-# under catalog/ still ship in both images.)
+# under catalog/ still ship in both images. THIRD_PARTY_NOTICES.md is the one
+# exception: BSD-3-Clause requires the notice to accompany the binary
+# distribution, and the images are that distribution. Extensionless LICENSE is
+# not matched by *.md and needs no negation.)
 website
 docs
 dashboards
@@ -34,3 +37,4 @@ playwright-report
 .github
 .claude
 *.md
+!THIRD_PARTY_NOTICES.md

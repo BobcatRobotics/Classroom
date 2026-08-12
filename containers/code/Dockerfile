@@ -128,6 +128,13 @@ RUN mkdir -p /opt/frc-gradle-cache \
     && cp -a /config/.gradle/. /opt/frc-gradle-cache/ \
     && rm -rf /config/.gradle /workspace/template
 
+# ── License notices ───────────────────────────────────────────────────
+# This image redistributes openvscode-server, Temurin, WPILib, and the bundled
+# extensions; the BSD-3-Clause components require their notice to accompany
+# the distribution. Placed after the Gradle priming so notice edits don't
+# invalidate that layer.
+COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/coderunner/
+
 # ── Runtime defaults ──────────────────────────────────────────────────
 RUN mkdir -p /workspace/project \
     && chown -R abc:abc /workspace

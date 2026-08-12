@@ -22,6 +22,23 @@ const config: Config = {
   projectName: 'CodeRunner',
   trailingSlash: false,
 
+  // Google Search Console ownership verification for the URL-prefix property
+  // https://mathewdunne.github.io/CodeRunner/, which the Google OAuth consent
+  // screen requires before it will accept this domain as an authorized domain.
+  // Uncomment and paste the token from Search Console → Add property → URL
+  // prefix → HTML tag. Preferred over the file-upload method because it lives
+  // in version control and survives rebuilds.
+  //
+  // headTags: [
+  //   {
+  //     tagName: 'meta',
+  //     attributes: {
+  //       name: 'google-site-verification',
+  //       content: 'PASTE_TOKEN_HERE',
+  //     },
+  //   },
+  // ],
+
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
   markdown: {
@@ -77,8 +94,43 @@ const config: Config = {
         },
       ],
     },
+    // The footer renders on every page, including the site root. Google's
+    // OAuth verification requires the privacy policy to be reachable from the
+    // application home page, so the Legal column is load-bearing — don't drop
+    // it. See docs/legal/.
     footer: {
       style: 'dark',
+      links: [
+        {
+          title: 'Docs',
+          items: [
+            {label: 'Quick Start', to: '/quick-start'},
+            {label: 'Architecture', to: '/about/architecture'},
+            {label: 'Deploying', to: '/deploying/overview'},
+          ],
+        },
+        {
+          title: 'Legal',
+          items: [
+            {label: 'Privacy Policy', to: '/legal/privacy'},
+            {label: 'Terms of Service', to: '/legal/terms'},
+            {label: 'Licenses', to: '/legal/licenses'},
+          ],
+        },
+        {
+          title: 'More',
+          items: [
+            {
+              label: 'GitHub',
+              href: 'https://github.com/mathewdunne/CodeRunner',
+            },
+            {
+              label: 'Issues',
+              href: 'https://github.com/mathewdunne/CodeRunner/issues',
+            },
+          ],
+        },
+      ],
       copyright: `Copyright © ${new Date().getFullYear()} CodeRunner contributors. Built with Docusaurus.`,
     },
     prism: {

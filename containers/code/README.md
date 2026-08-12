@@ -4,16 +4,18 @@ Merged per-student container for V2. Combines openvscode-server + Java IDE + WPI
 
 ## What's Inside
 
-| Component | Version | Purpose |
-|---|---|---|
-| Base image | linuxserver/openvscode-server:1.109.5 | Ubuntu 24.04, s6-overlay, openvscode-server, PUID/PGID |
-| openvscode-server | 1.109.5 (from base) | Browser-based VS Code editor |
-| JDK | Temurin 17.0.15+6 | Java compilation and simulation |
-| redhat.java | 1.38.0 | Java language support (JDT LS) |
-| vscode-wpilib | 2026.1.1 | WPILib project tooling |
-| Java Extension Pack | 0.30.5 | Debugger, test runner, Maven/Gradle, project manager |
-| Spotless Gradle | 1.2.1 | Code formatting via Spotless |
-| Gradle cache | Primed from template | Fast first builds (~seconds vs ~minutes) |
+| Component | Version | License | Purpose |
+|---|---|---|---|
+| Base image | linuxserver/openvscode-server:1.109.5 | GPL-3.0 | Ubuntu 24.04, s6-overlay, openvscode-server, PUID/PGID |
+| openvscode-server | 1.109.5 (from base) | MIT | Browser-based VS Code editor |
+| JDK | Temurin 17.0.15+6 | GPL-2.0 w/ Classpath Exception | Java compilation and simulation |
+| redhat.java | 1.38.0 | EPL-2.0 | Java language support (JDT LS) |
+| vscode-wpilib | 2026.1.1 | BSD-3-Clause | WPILib project tooling |
+| Java Extension Pack | 0.30.5 | MIT | Debugger, test runner, Maven/Gradle, project manager |
+| Spotless Gradle | 1.2.1 | MIT | Code formatting via Spotless |
+| Gradle cache | Primed from template | BSD-3-Clause (WPILib) | Fast first builds (~seconds vs ~minutes) |
+
+Required notices for all of the above are in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md), which ships inside the image at `/usr/share/coderunner/`.
 
 The runtime seeds conservative memory defaults for classroom density:
 

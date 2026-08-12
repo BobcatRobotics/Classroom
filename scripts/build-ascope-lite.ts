@@ -189,12 +189,23 @@ async function runPostinstallForLite(): Promise<void> {
 	// workspace install is also unused. Run only the steps Lite's compile
 	// and asset staging actually depend on.
 	console.log("Running Lite-only postinstall steps (skipping owlet, docs)...");
-	// getLicenses populates ThirdPartyLicenses.txt referenced by the bundle.
+	// getLicenses populates ThirdPartyLicenses.txt, the aggregated dependency
+	// license list AdvantageScope's own bundle is required to ship. Kept
+	// non-fatal so a network hiccup doesn't break a local build, but a build
+	// that skips it produces a bundle that is missing required attribution —
+	// so say so loudly rather than burying it in a one-line warning.
 	await run("node", ["getLicenses.mjs"], { cwd: ascopeRoot }).catch((error) => {
 		console.warn(
 			`getLicenses.mjs failed (non-fatal): ${error instanceof Error ? error.message : error}`,
 		);
 	});
+	if (!(await exists(resolve(ascopeRoot, "ThirdPartyLicenses.txt")))) {
+		console.warn(
+			"WARNING: ThirdPartyLicenses.txt is missing. The AdvantageScope Lite " +
+				"bundle will ship without its third-party attribution list. Do not " +
+				"publish this build — rerun getLicenses.mjs with network access.",
+		);
+	}
 	// tesseract language data is referenced by Lite's optional OCR features;
 	// failure is non-fatal because Lite's NT4 view does not need OCR.
 	await run("node", ["tesseractLangDownload.mjs"], { cwd: ascopeRoot }).catch(

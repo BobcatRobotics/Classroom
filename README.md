@@ -58,3 +58,9 @@ bun run verify        # typecheck + Bun tests + Vitest + Playwright
 ```
 
 See [docs/development/dev-servers.md](docs/development/dev-servers.md) for the full development workflow.
+
+## License
+
+CodeRunner is released under the [MIT License](LICENSE).
+
+It redistributes third-party software that remains under its own terms — most notably [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) (BSD-3-Clause, shipped patched), [openvscode-server](https://github.com/gitpod-io/openvscode-server) (MIT), and [WPILib](https://github.com/wpilibsuite/allwpilib) (BSD-3-Clause), plus the Java toolchain and VS Code extensions baked into the container images. Required notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and ship inside both images at `/usr/share/coderunner/`. None of those projects endorse or are affiliated with CodeRunner.
