@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This license covers the CodeRunner source code in this repository. CodeRunner
-also redistributes third-party software — including AdvantageScope,
-openvscode-server, WPILib, and the Java toolchain and VS Code extensions baked
-into the container images — which remains under its own license terms. See
-THIRD_PARTY_NOTICES.md for the required notices.
