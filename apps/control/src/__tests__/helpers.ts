@@ -185,12 +185,18 @@ type FakeContainerPort = {
 	hostIp: string;
 };
 
+type FakeContainerMount = {
+	Type: string;
+	Destination: string;
+};
+
 type FakeContainer = {
 	name: string;
 	running: boolean;
 	labels: Record<string, string>;
 	ports: FakeContainerPort[];
 	networks?: string[];
+	mounts?: FakeContainerMount[];
 };
 
 export function ok(stdout = ""): DockerCommandResult {
@@ -226,11 +232,31 @@ export function dockerInspect(container: FakeContainer): unknown {
 		Config: {
 			Labels: container.labels,
 		},
+		Mounts: container.mounts,
 		NetworkSettings: {
 			Ports: portsMap,
 			Networks: networks,
 		},
 	};
+}
+
+/** Parse `--mount type=…,src=…,dst=…` flags out of a `docker run` argv. */
+function parseMountFlags(args: string[]): FakeContainerMount[] {
+	const mounts: FakeContainerMount[] = [];
+	for (let index = 0; index < args.length; index += 1) {
+		if (args[index] !== "--mount") continue;
+		const fields = new Map(
+			(args[index + 1] ?? "")
+				.split(",")
+				.map((pair) => pair.split("=") as [string, string]),
+		);
+		const type = fields.get("type");
+		const destination = fields.get("dst");
+		if (type && destination) {
+			mounts.push({ Type: type, Destination: destination });
+		}
+	}
+	return mounts;
 }
 
 export function createFakeDocker(
@@ -366,9 +392,16 @@ export function createFakeDocker(
 				labels,
 				ports: parsedPorts,
 				networks,
+				mounts: parseMountFlags(args),
 			});
 			options.onRun?.(name, parsedPorts);
 			return ok("fake-container-id\n");
+		}
+
+		// The demo-mode /config volume. Creation is not allowFailure, so an
+		// unhandled fall-through here would throw rather than fail an assertion.
+		if (args[0] === "volume" && (args[1] === "create" || args[1] === "rm")) {
+			return ok();
 		}
 
 		if (args[0] === "start") {

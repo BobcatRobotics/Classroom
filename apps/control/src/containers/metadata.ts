@@ -11,6 +11,11 @@ export function codeContainerName(workspaceId: WorkspaceId): string {
 	return `${CODE_NAME_PREFIX}${workspaceId.replace(/^ws_/, "")}`;
 }
 
+/** Named volume backing `/config` in demo mode. */
+export function codeVolumeName(workspaceId: WorkspaceId): string {
+	return `${codeContainerName(workspaceId)}-config`;
+}
+
 export function workspaceHomePath(workspace: WorkspaceRow): string {
 	return resolve(dirname(workspace.project_path), "home");
 }
@@ -61,6 +66,19 @@ export function containerHasPublishedPorts(
 	return Object.values(ports).some(
 		(bindings) => Array.isArray(bindings) && bindings.length > 0,
 	);
+}
+
+/**
+ * Type of the container's `/config` mount (`"bind"` or `"volume"`), or null when
+ * the inspect output carries no mount for it.
+ */
+export function configMountType(
+	container: DockerInspectContainer,
+): string | null {
+	const mount = container.Mounts?.find(
+		(entry) => entry.Destination === "/config",
+	);
+	return mount?.Type ?? null;
 }
 
 export function containerRuntimeState(

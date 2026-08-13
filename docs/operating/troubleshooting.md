@@ -45,18 +45,17 @@ start on their next workspace open.
 
 ## Control plane can't reach the Docker socket (permission denied)
 
-**Symptom.** The `control` container starts but the logs show
-`permission denied` while connecting to `/var/run/docker.sock` (often
-`Got permission denied while trying to connect to the Docker daemon socket`),
-and no workspace containers ever start.
+**Symptom.** The `control` container crash-loops. The logs show
+`permission denied` while connecting to `/var/run/docker.sock`, and no workspace
+containers ever start.
 
-**Cause.** The control container runs as a non-root user and needs the host
-`docker` group gid added as a supplementary group to reach the bind-mounted
-socket. `CODERUNNER_DOCKER_GID` does not match the host's actual docker group
-gid — the `1001` default does not match many distributions (Debian/Ubuntu often
-use `999`/`998`).
+**Cause.** The control container runs as a non-root user and needs the group
+that owns the socket added as a supplementary group to reach it.
+`CODERUNNER_DOCKER_GID` does not match that group. This is a Linux-host problem:
+the `0` default matches Docker Desktop's root-owned socket, but a Linux host
+running Docker Engine natively owns the socket by its `docker` group instead.
 
-**Fix.** Look up the real gid and set it in `.env`, then recreate the container:
+**Fix.** Look up the host's real `docker` group gid and set it in `.env`:
 
 ```bash
 stat -c '%g' /var/run/docker.sock     # e.g. 999
@@ -67,8 +66,10 @@ stat -c '%g' /var/run/docker.sock     # e.g. 999
 CODERUNNER_DOCKER_GID=999
 ```
 
+Then recreate the container to pick up the corrected `group_add`:
+
 ```bash
-docker compose up -d control          # recreate with the corrected group_add
+docker compose up -d control
 ```
 
 ---

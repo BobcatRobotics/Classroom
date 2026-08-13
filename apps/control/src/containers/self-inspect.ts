@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { hostname as osHostname } from "node:os";
 import { resolve } from "node:path";
-import { defaultDockerRunner, inspectContainer } from "./docker-client";
+import { defaultDockerRunner, inspectContainerOrThrow } from "./docker-client";
 import type { DockerInspectContainer } from "./types";
 
 /**
@@ -56,7 +56,7 @@ export type SelfInspectOptions = {
 	// ── Injectable dependencies (defaults hit the real system) ──────────
 	/** Whether this process runs inside a container. */
 	dockerenvExists?: () => boolean;
-	/** `docker inspect` runner; returns null when the container can't be read. */
+	/** `docker inspect` runner; throws or returns null when it can't be read. */
 	inspect?: (id: string) => Promise<DockerInspectContainer | null>;
 	/** This container's id/hostname (compose sets the hostname to the id). */
 	hostname?: () => string;
@@ -95,7 +95,7 @@ export async function selfInspect(
 		envContainerNetwork,
 		envContainerUser,
 		dockerenvExists = () => existsSync("/.dockerenv"),
-		inspect = (id: string) => inspectContainer(defaultDockerRunner, id),
+		inspect = (id: string) => inspectContainerOrThrow(defaultDockerRunner, id),
 		hostname = osHostname,
 		stat = defaultStat,
 	} = options;
@@ -240,8 +240,23 @@ function deriveContainerUser(
 }
 
 function inspectFailureMessage(id: string, error?: unknown): string {
-	const detail =
-		error instanceof Error ? `: ${error.message}` : error ? `: ${error}` : "";
+	const raw =
+		error instanceof Error ? error.message : error ? String(error) : "";
+	const detail = raw ? `: ${raw}` : "";
+
+	// None of the three env vars below can fix a denied socket, so pointing at
+	// them sends people the wrong way. Name the real fix when docker says so.
+	if (/permission denied/i.test(raw) && /docker\.sock/i.test(raw)) {
+		return (
+			`Failed to inspect this control-plane container ("${id}")${detail}. The ` +
+			`control plane runs as a non-root user and reaches the Docker socket via ` +
+			`its supplementary groups, none of which own /var/run/docker.sock. Set ` +
+			`CODERUNNER_DOCKER_GID in .env to the owning group — find it with ` +
+			`stat -c '%g' /var/run/docker.sock — then recreate the container with ` +
+			`docker compose up -d control.`
+		);
+	}
+
 	return (
 		`Failed to inspect this control-plane container ("${id}")${detail}. The ` +
 		`containerized control plane auto-detects FRC_HOST_DATA_DIR, ` +

@@ -1,3 +1,4 @@
+import { EDITOR_STATE_HEADER } from "@frc-coderunner/contracts";
 import { requireWebSocketOrigin } from "../auth/middleware";
 import { getLogger } from "../logging";
 import { proxyUpstreamDuration } from "../metrics";
@@ -97,8 +98,14 @@ export async function vscodeHttpProxyResponse(
 	);
 	const vscode = runtime.endpoints.vscode;
 	if (runtime.state !== "running" || !vscode) {
+		// No runtime.error means the container is still coming up rather than
+		// having failed, so the shell can say "starting" instead of showing an
+		// indefinite spinner that reads as broken.
 		return new Response(runtime.error ?? "Editor is not running.", {
 			status: 503,
+			...(runtime.error
+				? {}
+				: { headers: { [EDITOR_STATE_HEADER]: "starting" } }),
 		});
 	}
 
@@ -114,8 +121,11 @@ export async function vscodeHttpProxyResponse(
 			workspaceId: auth.workspace.id,
 			httpBaseUrl: vscode.httpBaseUrl,
 		});
+		// Running container, editor still booting: first boot seeds the Gradle
+		// cache and extensions, which can outlast this probe on a slow filesystem.
 		return new Response("Editor upstream did not become ready.", {
 			status: 503,
+			headers: { [EDITOR_STATE_HEADER]: "starting" },
 		});
 	}
 

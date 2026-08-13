@@ -3,6 +3,9 @@ sidebar_position: 2
 title: Quick Start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Quick Start
 
 This is the fastest way to see CodeRunner running on your own machine. It uses **demo mode**, which skips all of the login and account setup so you can land directly in the editor and try things out. Demo mode is for evaluation only. See the caveats at the end before you put an instance in front of students.
@@ -13,7 +16,7 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 
 - **Docker**, up and running, with the **Compose plugin** (`docker compose version`). The control plane, each workspace, and the robot simulation all run inside containers, so Docker is the only hard requirement for the demo.
 - **Git.** Clone the repository (a plain ZIP download is fine too — the demo pulls prebuilt images and does not need submodules or Bun).
-- **A Unix-like environment is recommended.** WSL2, Linux and macOS are first-class. On Windows, run inside [WSL2](https://learn.microsoft.com/windows/wsl/). See [Platform support](#platform-support) below.
+- **On Docker Desktop the demo needs no configuration** — macOS, native Windows, and WSL2 integration all work as-is. On a **Linux host running Docker Engine natively**, the Docker socket belongs to the `docker` group rather than root, so set `CODERUNNER_DOCKER_GID` in `.env` to what `stat -c '%g' /var/run/docker.sock` prints. A Unix-like environment still matters for everything past the demo — see [Platform support](#platform-support) below.
 
 ## Steps
 
@@ -26,11 +29,31 @@ cd coderunner
 
 Start CodeRunner in demo mode:
 
+<Tabs groupId="shell">
+<TabItem value="posix" label="Linux / macOS" default>
+
 ```bash
 CODERUNNER_DEMO_MODE=1 docker compose up
 ```
 
-(Equivalently, `bun run demo:docker`.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
+</TabItem>
+<TabItem value="powershell" label="Windows (PowerShell)">
+
+```powershell
+$env:CODERUNNER_DEMO_MODE = "1"; docker compose up
+```
+
+</TabItem>
+<TabItem value="cmd" label="Windows (cmd)">
+
+```bat
+set "CODERUNNER_DEMO_MODE=1" && docker compose up
+```
+
+</TabItem>
+</Tabs>
+
+(Equivalently, `bun run demo:docker` on any of the three — Bun runs package scripts through its own POSIX-style shell.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
 
 ## What that command does
 
@@ -41,18 +64,29 @@ CODERUNNER_DEMO_MODE=1 docker compose up
 
 Student data (the SQLite DB and per-workspace projects) lives in `./data` in the checkout. Delete its **contents** (`rm -rf data/*`) to reset the demo — keep the directory itself, since the control plane reads its ownership to decide which user workspace containers run as. (Don't delete the directory: if Docker recreates it, it ends up root-owned, and because the control container now runs as your non-root user it can't write a root-owned `./data` — `chown` it back to yourself to recover.)
 
+Demo mode also keeps the workspace's editor and build caches in a Docker volume. They regenerate on their own, but to clear them too:
+
+```bash
+docker compose down --remove-orphans
+docker volume prune -a --force --filter label=frc-sim.managed=true
+```
+
+`--remove-orphans` is what actually reaps the workspace containers — they are labelled into the compose project but are not compose services, and a volume still attached to a *stopped* container is skipped by the prune. `prune -a` needs Docker 23 or newer.
+
 :::note Running from source instead
 If you are developing CodeRunner (not just evaluating it), you can run the control plane directly on the host with `bun run dev:control` / `bun run dev:web`, or build a production bundle with `bun run build`. The host path needs Bun and — for a from-source AdvantageScope build — the submodule (`git submodule update --init --recursive`) and emscripten; `bun run setup:demo` downloads prebuilt assets to skip emscripten. See [Local Deployment](./deploying/local.md) and [Development Servers](./development/dev-servers.md).
 :::
 
 ## Platform support
 
-CodeRunner runs on Linux, macOS, and Windows, but the development experience is not equal across them:
+CodeRunner runs on Linux, macOS, and Windows, but they are not equal:
 
 - **Linux and macOS** are first-class. The build and dev loop run at full speed with no extra setup.
 - **Native Windows** is fine for the demo, which uses prebuilt assets. For full development (building from source, the dev loop), performance is noticeably worse — file-heavy steps like the AdvantageScope build and the Node/Bun tooling are much slower, largely due to antivirus scanning and slower filesystem access.
 
 If you are developing on Windows, running CodeRunner inside [WSL](https://learn.microsoft.com/windows/wsl/) (a Linux distribution under Windows) is **recommended**. Clone the repository into the WSL filesystem (not a `/mnt/c/...` path) and run all commands from there to get Linux-level performance.
+
+The same goes for **running a real instance for students**, and more strongly — outside demo mode the workspace caches sit on a host bind mount, which is fast on Linux and slow on Docker Desktop. Native Windows is for trying CodeRunner out; host it on Linux or WSL2, which is what the deployment docs assume.
 
 ## About demo mode
 

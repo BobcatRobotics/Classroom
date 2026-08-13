@@ -31,16 +31,21 @@ services:
     restart: unless-stopped
     # Run as the host owner of the data dir (keeps ./data host-owned, drops
     # root). group_add grants the non-root process access to the bind-mounted
-    # Docker socket (host `docker` group gid). Find the gid with:
-    #   stat -c '%g' /var/run/docker.sock
-    # The defaults (1000:1000, docker gid 1001) match this host; prod overrides
-    # via .env. The numeric socket gid works even without a matching named group
-    # inside the container, and the same identity applies to
+    # Docker socket. The numeric socket gid works even without a matching named
+    # group inside the container, and the same identity applies to
     # `docker compose run --rm control <subcommand>`, so ops commands run
     # non-root too.
+    #
+    # The socket's owner differs by platform: root inside Docker Desktop's VM
+    # (hence the 0 default, which makes Docker Desktop zero-config), a `docker`
+    # group on Linux hosts running Docker Engine natively, where you must set
+    # CODERUNNER_DOCKER_GID — find it with `stat -c '%g' /var/run/docker.sock`
+    # (prod writes it into .env from cloud-init). Supplementary groups do not
+    # affect the ownership of files the process creates, so ./data stays
+    # host-owned either way.
     user: "${CODERUNNER_UID:-1000}:${CODERUNNER_GID:-1000}"
     group_add:
-      - "${CODERUNNER_DOCKER_GID:-1001}"
+      - "${CODERUNNER_DOCKER_GID:-0}"
     ports:
       # Loopback only: Caddy (prod) or the local browser reaches it here.
       - "127.0.0.1:4000:4000"
