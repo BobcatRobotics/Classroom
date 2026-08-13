@@ -4,11 +4,12 @@ Record active architecture decisions here.
 
 ## Active (V2 and post-V2)
 
-011–033 are the current decision logs (see files in this directory). The latest:
+011–034 are the current decision logs (see files in this directory). The latest:
 
 - [`031-containerized-control-plane.md`](031-containerized-control-plane.md) — the control plane ships as a Docker image deployed with docker compose; dual-mode container networking, host-path translation, emsdk moved into the build.
 - [`032-canonical-image-naming.md`](032-canonical-image-naming.md) — one canonical name per image, derived from `CODERUNNER_IMAGE_NS` + `CODERUNNER_TAG`.
 - [`033-workspace-disk-read-limit.md`](033-workspace-disk-read-limit.md) — workspace containers get a per-device `--device-read-bps` cap (`CODE_DISK_READ_LIMIT`) so one memory-thrashing container cannot saturate host disk throughput and freeze the VM; `CODE_MEMORY_LIMIT` default raised to `4096m`.
+- [`034-demo-mode-portability.md`](034-demo-mode-portability.md) — the demo runs unconfigured on Docker Desktop: `group_add` always includes root, and demo mode keeps `/config` on a named volume and skips the disk read cap so performance no longer depends on the host filesystem.
 
 ## Archive
 

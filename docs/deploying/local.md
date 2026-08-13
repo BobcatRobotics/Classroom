@@ -101,6 +101,8 @@ Linux host):
 
   Set `CODERUNNER_DOCKER_GID` in `.env` to whatever that prints if it isn't
   `1001`, or the control plane won't be able to start or manage containers.
+  Do not set it to `0` — compose already adds root unconditionally (which is
+  what Docker Desktop's root-owned socket needs) and rejects duplicate entries.
 
 `./data` ships in the checkout (as `data/.gitkeep`), so it's already owned by
 whoever cloned the repo — leave the directory in place. **Never delete the

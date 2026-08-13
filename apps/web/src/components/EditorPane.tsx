@@ -6,12 +6,15 @@ interface EditorPaneProps {
 	editorUrl: string | null;
 	editorStatus: EditorStatus;
 	errorMessage?: string;
+	/** Seconds spent waiting, used to explain an unusually slow first boot. */
+	waitingSeconds?: number;
 }
 
 export function EditorPane({
 	editorUrl,
 	editorStatus,
 	errorMessage,
+	waitingSeconds = 0,
 }: EditorPaneProps) {
 	const [iframeLoaded, setIframeLoaded] = useState(false);
 	const editorReachable = editorStatus === "reachable";
@@ -45,11 +48,20 @@ export function EditorPane({
 				/>
 			)}
 			{showOverlay && (
-				<div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card">
+				<div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card px-6 text-center">
 					<Loader2 className="size-8 animate-spin text-muted-foreground" />
 					<span className="font-mono text-sm text-muted-foreground">
-						Loading VS Code…
+						{editorStatus === "starting"
+							? "Starting the editor…"
+							: "Loading VS Code…"}
 					</span>
+					{/* Without this, a slow first boot just looks hung. */}
+					{editorStatus === "starting" && waitingSeconds >= 20 && (
+						<span className="max-w-md text-xs text-muted-foreground">
+							First boot can take a few minutes.
+							Later starts are much faster.
+						</span>
+					)}
 				</div>
 			)}
 		</div>

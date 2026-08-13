@@ -7,7 +7,11 @@ import {
 	inspectContainers,
 	runDocker,
 } from "./docker-client";
-import { codeContainerName, containerRuntimeState } from "./metadata";
+import {
+	codeContainerName,
+	codeVolumeName,
+	containerRuntimeState,
+} from "./metadata";
 import type { DockerRunner, ManagedContainerStats } from "./types";
 
 const log = getLogger("containers");
@@ -74,6 +78,22 @@ export async function removeCodeContainer(
 			halsimPort: null,
 			state: "missing",
 		});
+	}
+}
+
+/**
+ * Delete the demo-mode `/config` volume for a workspace. For workspace DELETION
+ * only — container recycling (restart, rebuild, cleanup) must keep the volume so
+ * the next start reuses the seeded caches. A no-op when the volume is absent.
+ */
+export async function removeCodeVolume(
+	dockerRunner: DockerRunner,
+	workspaceId: WorkspaceId,
+): Promise<void> {
+	const volume = codeVolumeName(workspaceId);
+	const result = await runDocker(dockerRunner, ["volume", "rm", volume], true);
+	if (result.exitCode === 0) {
+		log.info("removed config volume", { workspaceId, volume });
 	}
 }
 

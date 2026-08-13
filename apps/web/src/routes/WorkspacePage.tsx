@@ -59,7 +59,8 @@ export function WorkspacePage() {
 	const editorUrl = workspaceSlug
 		? `/u/${workspaceSlug}/vscode/?folder=/workspace/project`
 		: null;
-	const editorStatus = useEditorReachability(editorUrl);
+	const { status: editorStatus, waitingSeconds: editorWaitingSeconds } =
+		useEditorReachability(editorUrl);
 	const scopeFrameRef = useRef<HTMLIFrameElement>(null);
 	useScopeHandshake(simSlug, scopeFrameRef);
 
@@ -213,6 +214,7 @@ export function WorkspacePage() {
 						editorUrl={editorUrl}
 						editorStatus={editorStatus}
 						errorMessage={errorMessage}
+						waitingSeconds={editorWaitingSeconds}
 					/>
 				}
 				scope={<ScopePane ref={scopeFrameRef} />}

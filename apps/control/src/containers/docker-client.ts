@@ -100,6 +100,21 @@ export async function inspectContainer(
 	return parsed[0] ?? null;
 }
 
+/**
+ * Like `inspectContainer`, but distinguishes "docker itself failed" (throws,
+ * carrying docker's stderr) from "no such container" (returns null). Callers
+ * probing for existence want the collapsed version; startup self-inspection
+ * needs the stderr, since a denied socket is not a missing container.
+ */
+export async function inspectContainerOrThrow(
+	dockerRunner: DockerRunner,
+	name: string,
+): Promise<DockerInspectContainer | null> {
+	const result = await runDocker(dockerRunner, ["container", "inspect", name]);
+	const parsed = JSON.parse(result.stdout) as DockerInspectContainer[];
+	return parsed[0] ?? null;
+}
+
 export async function inspectContainers(
 	dockerRunner: DockerRunner,
 	names: string[],

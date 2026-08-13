@@ -14,7 +14,7 @@ CODERUNNER_DEMO_MODE=1 docker compose up
 
 Open [http://localhost:4000](http://localhost:4000). You land directly in the IDE as a single seeded admin user.
 
-**Prerequisites:** Docker with the Compose plugin (running). No Bun, submodules, or emscripten needed — the control image ships the web shell and AdvantageScope assets prebuilt.
+**Prerequisites:** Docker with the Compose plugin (running). No Bun, submodules, or emscripten needed — the control image ships the web shell and AdvantageScope assets prebuilt. No configuration either: the demo behaves the same on Linux, macOS, WSL2, and native Windows.
 
 > **Warning:** Demo mode bypasses authentication entirely. Every visitor shares the same admin user and workspace. Do not expose a demo instance to the public internet. See [docs/quick-start.md](docs/quick-start.md) for full details and next steps.
 

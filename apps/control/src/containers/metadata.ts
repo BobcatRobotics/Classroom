@@ -11,6 +11,11 @@ export function codeContainerName(workspaceId: WorkspaceId): string {
 	return `${CODE_NAME_PREFIX}${workspaceId.replace(/^ws_/, "")}`;
 }
 
+/** Named volume backing `/config` in demo mode. */
+export function codeVolumeName(workspaceId: WorkspaceId): string {
+	return `${codeContainerName(workspaceId)}-config`;
+}
+
 export function workspaceHomePath(workspace: WorkspaceRow): string {
 	return resolve(dirname(workspace.project_path), "home");
 }

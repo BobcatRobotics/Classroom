@@ -28,12 +28,14 @@ import {
 	countRunningContainers,
 	managedContainerStats,
 	removeCodeContainer,
+	removeCodeVolume,
 	stopCodeContainer,
 	stopWorkspaceContainers,
 	stopWorkspaceSim,
 } from "./lifecycle";
 import {
 	codeContainerName,
+	codeVolumeName,
 	containerAttachedToNetwork,
 	containerHasPublishedPorts,
 	containerRuntimeState,
@@ -166,6 +168,8 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 
 	async removeWorkspace(workspaceId: WorkspaceId): Promise<void> {
 		await removeCodeContainer(this.storage, this.dockerRunner, workspaceId);
+		// Deletion, not recycling — so the demo-mode /config volume goes too.
+		await removeCodeVolume(this.dockerRunner, workspaceId);
 	}
 
 	async getWorkspaceStatus(
@@ -360,6 +364,29 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		name: string,
 	): Promise<DockerInspectContainer | null> {
 		return inspectContainerCli(this.dockerRunner, name);
+	}
+
+	/**
+	 * Created explicitly rather than letting `--mount type=volume` auto-create it,
+	 * because `--mount` cannot set the labels cleanup reaps by. Idempotent.
+	 */
+	private async ensureConfigVolume(
+		volume: string,
+		workspaceId: WorkspaceId,
+	): Promise<void> {
+		await this.runDocker([
+			"volume",
+			"create",
+			"--label",
+			"frc-sim.managed=true",
+			"--label",
+			"frc-sim.version=v2",
+			"--label",
+			"frc-sim.role=code",
+			"--label",
+			`frc-sim.workspace=${workspaceId}`,
+			volume,
+		]);
 	}
 
 	private async ensureImage(): Promise<void> {
@@ -559,6 +586,16 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		await mkdir(homePath, { recursive: true, mode: 0o700 });
 
 		const name = codeContainerName(workspace.id);
+		// /config holds only regenerable state (Gradle caches, extensions, editor
+		// state, build output). Demo mode puts it on a named volume so it stays off
+		// the host filesystem, where a bind mount crossing the Docker Desktop VM
+		// boundary makes seeding and startup drastically slower. Real deployments
+		// keep the bind mount, which lands the caches on CODERUNNER_HOST_DATA_DIR
+		// and leaves them visible to the operator.
+		const configVolume = config.demo ? codeVolumeName(workspace.id) : null;
+		if (configVolume) {
+			await this.ensureConfigVolume(configVolume, workspace.id);
+		}
 		this.storage.upsertCodeContainerLease({
 			workspaceId: workspace.id,
 			containerName: name,
@@ -587,7 +624,9 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			"--mount",
 			`type=bind,src=${toHostPath(config, workspace.project_path)},dst=/workspace/project`,
 			"--mount",
-			`type=bind,src=${toHostPath(config, homePath)},dst=/config`,
+			configVolume
+				? `type=volume,src=${configVolume},dst=/config`
+				: `type=bind,src=${toHostPath(config, homePath)},dst=/config`,
 		];
 
 		// Nest workspace containers under the control plane's compose project in
@@ -620,8 +659,12 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 
 		// A container thrashing against its memory limit re-reads its page cache
 		// from disk indefinitely; without a read cap that saturates the host's
-		// provisioned disk throughput and stalls everything on the VM.
-		const diskReadLimit = this.storage.config.codeDiskReadLimit;
+		// provisioned disk throughput and stalls everything on the VM. Demo mode
+		// runs a single workspace on someone's own machine, so there is no shared
+		// throughput to protect and the cap only slows seeding and builds down.
+		const diskReadLimit = config.demo
+			? null
+			: this.storage.config.codeDiskReadLimit;
 		if (diskReadLimit !== null) {
 			for (const device of this.blockDevices) {
 				args.push("--device-read-bps", `${device}:${diskReadLimit}`);
@@ -646,8 +689,12 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 			simPort,
 			vscodePort,
 			halsimPort,
-			diskReadLimit:
-				diskReadLimit === null
+			configMount: configVolume
+				? `volume ${configVolume} (demo mode)`
+				: `bind ${toHostPath(config, homePath)}`,
+			diskReadLimit: config.demo
+				? "(demo mode: uncapped)"
+				: diskReadLimit === null
 					? "(disabled)"
 					: this.blockDevices.length === 0
 						? "(no devices)"
