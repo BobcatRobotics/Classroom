@@ -68,6 +68,19 @@ export function containerHasPublishedPorts(
 	);
 }
 
+/**
+ * Type of the container's `/config` mount (`"bind"` or `"volume"`), or null when
+ * the inspect output carries no mount for it.
+ */
+export function configMountType(
+	container: DockerInspectContainer,
+): string | null {
+	const mount = container.Mounts?.find(
+		(entry) => entry.Destination === "/config",
+	);
+	return mount?.Type ?? null;
+}
+
 export function containerRuntimeState(
 	container: DockerInspectContainer,
 ): ContainerState {

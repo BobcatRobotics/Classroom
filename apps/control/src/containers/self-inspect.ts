@@ -56,7 +56,7 @@ export type SelfInspectOptions = {
 	// ── Injectable dependencies (defaults hit the real system) ──────────
 	/** Whether this process runs inside a container. */
 	dockerenvExists?: () => boolean;
-	/** `docker inspect` runner; returns null when the container can't be read. */
+	/** `docker inspect` runner; throws or returns null when it can't be read. */
 	inspect?: (id: string) => Promise<DockerInspectContainer | null>;
 	/** This container's id/hostname (compose sets the hostname to the id). */
 	hostname?: () => string;
@@ -253,8 +253,7 @@ function inspectFailureMessage(id: string, error?: unknown): string {
 			`its supplementary groups, none of which own /var/run/docker.sock. Set ` +
 			`CODERUNNER_DOCKER_GID in .env to the owning group — find it with ` +
 			`stat -c '%g' /var/run/docker.sock — then recreate the container with ` +
-			`docker compose up -d control. (Compose already adds root, which is what ` +
-			`Docker Desktop needs, so do not set this to 0.)`
+			`docker compose up -d control.`
 		);
 	}
 

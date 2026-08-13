@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { codeContainerName } from "../containers/metadata";
+import { codeContainerName, codeVolumeName } from "../containers/metadata";
 import { createFakeDocker, login, withApp, workspaceBySlug } from "./helpers";
 
 describe("container reconciliation", () => {
@@ -84,6 +84,60 @@ describe("container reconciliation", () => {
 				codeImage: "coderunner-workspace:test",
 				simPortRange: { start: 25832, end: 25833 },
 				vscodePortRange: { start: 33052, end: 33053 },
+			},
+		);
+	});
+
+	test("adoption rejects a bind-mounted /config when demo mode wants a volume", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				const workspace = workspaceBySlug(app, "demo");
+				const name = codeContainerName(workspace.id);
+
+				// A container created before demo mode moved /config onto a volume.
+				// Adopting it would leave the workspace on the slow bind mount.
+				fakeDocker.containers.set(name, {
+					name,
+					running: true,
+					labels: {
+						"frc-sim.managed": "true",
+						"frc-sim.version": "v2",
+						"frc-sim.role": "code",
+						"frc-sim.workspace": workspace.id,
+					},
+					// Otherwise adoptable: correct labels, all three loopback ports.
+					ports: [
+						{ hostPort: 25836, containerPort: 5810, hostIp: "127.0.0.1" },
+						{ hostPort: 33056, containerPort: 3000, hostIp: "127.0.0.1" },
+						{ hostPort: 34056, containerPort: 3300, hostIp: "127.0.0.1" },
+					],
+					mounts: [{ Type: "bind", Destination: "/config" }],
+				});
+
+				const status = await app.containers.ensureCodeContainer(workspace);
+				expect(status.state).toBe("running");
+				expect(fakeDocker.calls).toContainEqual(["rm", "-f", name]);
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				expect(runCall).toContain(
+					`type=volume,src=${codeVolumeName(workspace.id)},dst=/config`,
+				);
+				// And the replacement is adoptable, so a second pass does not churn.
+				await app.containers.ensureCodeContainer(workspace);
+				expect(
+					fakeDocker.calls.filter((call) => call[0] === "run"),
+				).toHaveLength(1);
+			},
+			{
+				demo: true,
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 25836, end: 25837 },
+				vscodePortRange: { start: 33056, end: 33057 },
+				halsimPortRange: { start: 34056, end: 34057 },
 			},
 		);
 	});

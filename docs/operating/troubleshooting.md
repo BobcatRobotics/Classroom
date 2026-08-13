@@ -52,12 +52,10 @@ containers ever start.
 **Cause.** The control container runs as a non-root user and needs the group
 that owns the socket added as a supplementary group to reach it.
 `CODERUNNER_DOCKER_GID` does not match that group. This is a Linux-host problem:
-compose always adds root as well, which is what Docker Desktop's socket needs, so
-Docker Desktop is unaffected.
+the `0` default matches Docker Desktop's root-owned socket, but a Linux host
+running Docker Engine natively owns the socket by its `docker` group instead.
 
-**Fix.** Look up the host's real `docker` group gid — the `1001` default does not
-match many distributions (Debian/Ubuntu often use `999`/`998`) — and set it in
-`.env`:
+**Fix.** Look up the host's real `docker` group gid and set it in `.env`:
 
 ```bash
 stat -c '%g' /var/run/docker.sock     # e.g. 999
@@ -73,9 +71,6 @@ Then recreate the container to pick up the corrected `group_add`:
 ```bash
 docker compose up -d control
 ```
-
-Do **not** set it to `0`: root is already in the list, and compose rejects a file
-with duplicate `group_add` entries.
 
 ---
 

@@ -94,6 +94,14 @@ export async function removeCodeVolume(
 	const result = await runDocker(dockerRunner, ["volume", "rm", volume], true);
 	if (result.exitCode === 0) {
 		log.info("removed config volume", { workspaceId, volume });
+		return;
+	}
+	// "no such volume" is the documented no-op. Anything else (usually the
+	// container not having fully released it) leaves an orphan no other path
+	// reaps, so it must not be silent.
+	const stderr = result.stderr.trim();
+	if (!/no such volume/i.test(stderr)) {
+		log.warn("failed to remove config volume", { workspaceId, volume, stderr });
 	}
 }
 

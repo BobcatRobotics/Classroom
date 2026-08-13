@@ -29,25 +29,38 @@ showed an indefinite spinner.
 
 ## Decision
 
-1. **`group_add` lists both the configured docker gid and root, always.**
-   Whichever does not apply to the host is inert. This is not scoped to demo
-   mode, because it does not need to be: supplementary groups do not affect the
+1. **`group_add` is a single entry, `${CODERUNNER_DOCKER_GID:-0}`.** The socket's
+   owner differs by platform — root inside Docker Desktop's VM, the `docker`
+   group on a Linux host running Docker Engine natively — but on any given host
+   exactly one of those applies, so listing both would only ever add a group that
+   is inert by construction. Defaulting the one entry to `0` makes Docker Desktop
+   zero-config, which is where the problem was.
+
+   Linux hosts must now always set the variable. In practice most already had to:
+   the previous `1001` default did not match stock Debian/Ubuntu (`999`/`998`),
+   and `deploy/cloud-init/user-data.yaml` has always written the real gid into
+   prod's `.env` at boot. The failure is self-describing — `selfInspect` names
+   `CODERUNNER_DOCKER_GID` and prints the `stat` command (see the last
+   consequence below).
+
+   This also keeps gid 0 off production. An audit of the control image found it
+   uniquely grants access to exactly three files — `dpkg/lock`,
+   `dpkg/lock-frontend`, `apt/archives/lock` — and nothing group-writable, and
+   the process already holds the root-equivalent Docker socket by design, so
+   granting it was never a real risk; but a Linux deployment that sets its own
+   gid now simply never receives it. Supplementary groups do not affect the
    ownership of files a process creates (that follows the primary gid), so
-   `./data` stays host-owned, which is the entire purpose of the non-root design
-   in [031](./031-containerized-control-plane.md). An audit of the control image
-   found gid 0 uniquely grants access to exactly three files — `dpkg/lock`,
-   `dpkg/lock-frontend`, `apt/archives/lock` — and nothing group-writable. The
-   process is also handed the Docker socket by design, which is already
-   root-equivalent on the host, so withholding gid 0 inside the container buys
-   nothing.
+   `./data` stays host-owned either way, which is the entire purpose of the
+   non-root design in [031](./031-containerized-control-plane.md).
 
    Considered and rejected: a `docker-compose.demo.yml` overlay, which would
    have reversed 031's "demo mode is an env passthrough, not an override file"
-   and cost every doc an extra `-f` flag, to avoid a risk the audit showed was
-   not there. `CODERUNNER_DEMO_MODE=1 docker compose up` is unchanged.
-
-   Cost: setting `CODERUNNER_DOCKER_GID=0` now duplicates the entry and compose
-   rejects the file. Documented where the variable is described.
+   and cost every doc an extra `-f` flag. `CODERUNNER_DEMO_MODE=1 docker compose
+   up` is unchanged. Also rejected: listing both gids, whether hard-coded or as a
+   second variable. `group_add` is `uniqueItems`, so any arrangement that can
+   produce a duplicate turns `CODERUNNER_DOCKER_GID=0` into a compose *schema*
+   failure that does not name the variable — and the older troubleshooting docs
+   had actively told Docker Desktop users to set exactly that.
 
 2. **`/config` is a named volume in demo mode**, a host bind mount otherwise.
    Everything under it is regenerable (Gradle caches, extensions, editor state,
@@ -61,6 +74,14 @@ showed an indefinite spinner.
    and backups read it from the host. Volume deletion is wired to workspace
    deletion only — container recycling must keep the volume, or every restart
    re-seeds.
+
+   A mount is fixed at container create, so adoption compares the existing
+   `/config` mount's type against the current mode and recreates on a mismatch.
+   Without that, a workspace created before this change — i.e. exactly the
+   population that hit the bug — would keep its bind mount forever, and one
+   created in demo mode and later run without it would keep a volume the operator
+   cannot see. The orphaned volume is left in place on a volume→bind switch;
+   workspace deletion still reaps it.
 
 3. **The disk read cap is skipped in demo mode.** Per 033 it exists to stop one
    thrashing container from saturating a shared VM's provisioned throughput. A
@@ -95,10 +116,14 @@ connection to the change.
 
 ## Consequences
 
-- The demo runs identically on Linux, macOS, WSL2, and native Windows with no
-  configuration. Native Windows remains unsuitable for real deployments, where
-  the caches sit on a host bind mount.
-- Resetting a demo now means clearing the volume as well as `./data`.
+- The demo needs no configuration on Docker Desktop (macOS, native Windows, WSL2
+  integration). A Linux host running Docker Engine natively sets
+  `CODERUNNER_DOCKER_GID`, as it generally had to before. Native Windows remains
+  unsuitable for real deployments, where the caches sit on a host bind mount.
+- Resetting a demo now means clearing the volume as well as `./data`, and that
+  needs `docker compose down --remove-orphans` first: workspace containers are
+  labelled into the compose project but are not services, and `volume prune`
+  skips a volume still attached to a stopped container.
 - Demo mode no longer exercises the same storage path as production. This is a
   deliberate fidelity trade, and an argument for keeping demo's divergence to
   these settings rather than letting it grow.

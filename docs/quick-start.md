@@ -13,7 +13,7 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 
 - **Docker**, up and running, with the **Compose plugin** (`docker compose version`). The control plane, each workspace, and the robot simulation all run inside containers, so Docker is the only hard requirement for the demo.
 - **Git.** Clone the repository (a plain ZIP download is fine too — the demo pulls prebuilt images and does not need submodules or Bun).
-- **The demo needs no configuration on any platform.** It runs the same on Linux, macOS, WSL2, and native Windows. A Unix-like environment still matters for everything past the demo — see [Platform support](#platform-support) below.
+- **On Docker Desktop the demo needs no configuration** — macOS, native Windows, and WSL2 integration all work as-is. On a **Linux host running Docker Engine natively**, the Docker socket belongs to the `docker` group rather than root, so set `CODERUNNER_DOCKER_GID` in `.env` to what `stat -c '%g' /var/run/docker.sock` prints. A Unix-like environment still matters for everything past the demo — see [Platform support](#platform-support) below.
 
 ## Steps
 
@@ -41,11 +41,14 @@ CODERUNNER_DEMO_MODE=1 docker compose up
 
 Student data (the SQLite DB and per-workspace projects) lives in `./data` in the checkout. Delete its **contents** (`rm -rf data/*`) to reset the demo — keep the directory itself, since the control plane reads its ownership to decide which user workspace containers run as. (Don't delete the directory: if Docker recreates it, it ends up root-owned, and because the control container now runs as your non-root user it can't write a root-owned `./data` — `chown` it back to yourself to recover.)
 
-Demo mode also keeps the workspace's editor and build caches in a Docker volume. They regenerate on their own, but to clear them too, stop the stack and run:
+Demo mode also keeps the workspace's editor and build caches in a Docker volume. They regenerate on their own, but to clear them too:
 
 ```bash
-docker volume prune -a --filter label=frc-sim.managed=true
+docker compose down --remove-orphans
+docker volume prune -a --force --filter label=frc-sim.managed=true
 ```
+
+`--remove-orphans` is what actually reaps the workspace containers — they are labelled into the compose project but are not compose services, and a volume still attached to a *stopped* container is skipped by the prune. `prune -a` needs Docker 23 or newer.
 
 :::note Running from source instead
 If you are developing CodeRunner (not just evaluating it), you can run the control plane directly on the host with `bun run dev:control` / `bun run dev:web`, or build a production bundle with `bun run build`. The host path needs Bun and — for a from-source AdvantageScope build — the submodule (`git submodule update --init --recursive`) and emscripten; `bun run setup:demo` downloads prebuilt assets to skip emscripten. See [Local Deployment](./deploying/local.md) and [Development Servers](./development/dev-servers.md).

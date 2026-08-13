@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type ControlAppOptions, createApp } from "../app";
 import { managedContainerStats } from "../containers/lifecycle";
-import { codeContainerName } from "../containers/metadata";
+import { codeContainerName, codeVolumeName } from "../containers/metadata";
 import {
 	cookieFrom,
 	createCatalogDir,
@@ -150,6 +150,64 @@ describe("code container orchestration", () => {
 				simPortRange: { start: 45912, end: 45912 },
 				vscodePortRange: { start: 46002, end: 46002 },
 				codeDiskReadLimit: null,
+				blockDevices: ["/dev/nvme0n1"],
+			},
+		);
+	});
+
+	test("demo mode backs /config with a labelled named volume", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				const workspace = workspaceBySlug(app, "demo");
+				await app.containers.ensureCodeContainer(workspace);
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				const volume = codeVolumeName(workspace.id);
+				expect(runCall).toContain(`type=volume,src=${volume},dst=/config`);
+				expect(runCall).not.toContain(
+					`type=bind,src=${join(app.storage.config.dataDir, "users", workspace.id, "home")},dst=/config`,
+				);
+
+				// Created explicitly so cleanup can reap it by label.
+				const volumeCall = fakeDocker.calls.find(
+					(call) => call[0] === "volume" && call[1] === "create",
+				);
+				expect(volumeCall).toBeTruthy();
+				expect(volumeCall).toContain("frc-sim.managed=true");
+				expect(volumeCall).toContain(`frc-sim.workspace=${workspace.id}`);
+				expect(volumeCall).toContain(volume);
+			},
+			{
+				demo: true,
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 45913, end: 45913 },
+				vscodePortRange: { start: 46003, end: 46003 },
+			},
+		);
+	});
+
+	test("demo mode skips the disk read cap even when one is configured", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				await app.containers.ensureCodeContainer(workspaceBySlug(app, "demo"));
+
+				const runCall = fakeDocker.calls.find((call) => call[0] === "run");
+				expect(runCall).toBeTruthy();
+				expect(runCall).not.toContain("--device-read-bps");
+			},
+			{
+				demo: true,
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 45914, end: 45914 },
+				vscodePortRange: { start: 46004, end: 46004 },
+				codeDiskReadLimit: "48mb",
 				blockDevices: ["/dev/nvme0n1"],
 			},
 		);

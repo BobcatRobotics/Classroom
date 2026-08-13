@@ -36,6 +36,7 @@ import {
 import {
 	codeContainerName,
 	codeVolumeName,
+	configMountType,
 	containerAttachedToNetwork,
 	containerHasPublishedPorts,
 	containerRuntimeState,
@@ -507,6 +508,25 @@ export class LocalDockerRuntimeProvider implements WorkspaceRuntimeProvider {
 		container: DockerInspectContainer,
 	): Promise<CodeContainerStatus | null> {
 		if (!v2LabelsMatch(container, workspace.id)) {
+			await this.runDocker(["rm", "-f", name], true);
+			return null;
+		}
+
+		// Demo mode backs /config with a named volume, every other mode with a host
+		// bind. Adopting across that boundary would silently leave the container on
+		// the previous mode's storage forever, since the mount is fixed at create.
+		// A container with no mount data reported is left adoptable.
+		const expectedConfigMount = this.storage.config.demo ? "volume" : "bind";
+		const actualConfigMount = configMountType(container);
+		if (
+			actualConfigMount !== null &&
+			actualConfigMount !== expectedConfigMount
+		) {
+			log.info("recreating code container for changed /config mount", {
+				workspaceId: workspace.id,
+				from: actualConfigMount,
+				to: expectedConfigMount,
+			});
 			await this.runDocker(["rm", "-f", name], true);
 			return null;
 		}
