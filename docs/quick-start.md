@@ -3,6 +3,9 @@ sidebar_position: 2
 title: Quick Start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Quick Start
 
 This is the fastest way to see CodeRunner running on your own machine. It uses **demo mode**, which skips all of the login and account setup so you can land directly in the editor and try things out. Demo mode is for evaluation only. See the caveats at the end before you put an instance in front of students.
@@ -26,11 +29,31 @@ cd coderunner
 
 Start CodeRunner in demo mode:
 
+<Tabs groupId="shell">
+<TabItem value="posix" label="Linux / macOS" default>
+
 ```bash
 CODERUNNER_DEMO_MODE=1 docker compose up
 ```
 
-(Equivalently, `bun run demo:docker`.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
+</TabItem>
+<TabItem value="powershell" label="Windows (PowerShell)">
+
+```powershell
+$env:CODERUNNER_DEMO_MODE = "1"; docker compose up
+```
+
+</TabItem>
+<TabItem value="cmd" label="Windows (cmd)">
+
+```bat
+set "CODERUNNER_DEMO_MODE=1" && docker compose up
+```
+
+</TabItem>
+</Tabs>
+
+(Equivalently, `bun run demo:docker` on any of the three — Bun runs package scripts through its own POSIX-style shell.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
 
 ## What that command does
 

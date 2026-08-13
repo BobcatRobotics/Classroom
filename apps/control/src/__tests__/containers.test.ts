@@ -2,8 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import type { WorkspaceId } from "@frc-coderunner/contracts";
 import { type ControlAppOptions, createApp } from "../app";
-import { managedContainerStats } from "../containers/lifecycle";
+import {
+	managedContainerStats,
+	removeCodeVolume,
+} from "../containers/lifecycle";
 import { codeContainerName, codeVolumeName } from "../containers/metadata";
 import {
 	cookieFrom,
@@ -188,6 +192,57 @@ describe("code container orchestration", () => {
 				vscodePortRange: { start: 46003, end: 46003 },
 			},
 		);
+	});
+
+	test("deleting a workspace removes the named volume after its container", async () => {
+		const fakeDocker = createFakeDocker();
+
+		await withApp(
+			async (app) => {
+				const workspace = workspaceBySlug(app, "demo");
+				await app.containers.ensureCodeContainer(workspace);
+				const name = codeContainerName(workspace.id);
+				const volume = codeVolumeName(workspace.id);
+
+				await app.containers.removeWorkspace(workspace.id);
+
+				expect(fakeDocker.containers.has(name)).toBe(false);
+				const removeIndex = fakeDocker.calls.findIndex(
+					(call) => call[0] === "rm" && call[1] === "-f" && call[2] === name,
+				);
+				const volumeIndex = fakeDocker.calls.findIndex(
+					(call) =>
+						call[0] === "volume" && call[1] === "rm" && call[2] === volume,
+				);
+				expect(removeIndex).toBeGreaterThanOrEqual(0);
+				// The container must release the volume before it can be removed.
+				expect(volumeIndex).toBeGreaterThan(removeIndex);
+			},
+			{
+				demo: true,
+				dockerRunner: fakeDocker.runner,
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 45915, end: 45915 },
+				vscodePortRange: { start: 46005, end: 46005 },
+			},
+		);
+	});
+
+	test("volume removal tolerates a missing volume and a failing docker", async () => {
+		const workspaceId = "ws-volume-cleanup" as WorkspaceId;
+		const volume = codeVolumeName(workspaceId);
+
+		for (const stderr of [`Error: No such volume: ${volume}`, "daemon boom"]) {
+			const calls: string[][] = [];
+			const runner = async (args: string[]) => {
+				calls.push(args);
+				return { exitCode: 1, stdout: "", stderr };
+			};
+
+			await removeCodeVolume(runner, workspaceId);
+
+			expect(calls).toEqual([["volume", "rm", volume]]);
+		}
 	});
 
 	test("demo mode skips the disk read cap even when one is configured", async () => {
