@@ -22,23 +22,6 @@ const config: Config = {
   projectName: 'CodeRunner',
   trailingSlash: false,
 
-  // Google Search Console ownership verification for the URL-prefix property
-  // https://mathewdunne.github.io/CodeRunner/, which the Google OAuth consent
-  // screen requires before it will accept this domain as an authorized domain.
-  // Uncomment and paste the token from Search Console → Add property → URL
-  // prefix → HTML tag. Preferred over the file-upload method because it lives
-  // in version control and survives rebuilds.
-  //
-  // headTags: [
-  //   {
-  //     tagName: 'meta',
-  //     attributes: {
-  //       name: 'google-site-verification',
-  //       content: 'PASTE_TOKEN_HERE',
-  //     },
-  //   },
-  // ],
-
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
   markdown: {
@@ -94,10 +77,10 @@ const config: Config = {
         },
       ],
     },
-    // The footer renders on every page, including the site root. Google's
-    // OAuth verification requires the privacy policy to be reachable from the
-    // application home page, so the Legal column is load-bearing — don't drop
-    // it. See docs/legal/.
+    // The footer renders on every page, including the site root, which is how
+    // the Legal pages stay reachable without a navbar slot. Most CodeRunner
+    // users are minors at schools, so keep the privacy policy one click away
+    // from anywhere on the site. See docs/legal/.
     footer: {
       style: 'dark',
       links: [
