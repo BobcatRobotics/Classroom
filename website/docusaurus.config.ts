@@ -78,7 +78,7 @@ const config: Config = {
       appId: '5BW22U91EM',
       apiKey: 'cfbf90d7a19db5b9dfa3397952873270',
       indexName: 'CodeRunner Docs',
-      contextualSearch: true,
+      contextualSearch: false,
       searchPagePath: 'search',
     },
     colorMode: {
