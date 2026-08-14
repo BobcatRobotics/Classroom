@@ -22,6 +22,18 @@ const config: Config = {
   projectName: 'CodeRunner',
   trailingSlash: false,
 
+  // Proves site ownership to the Algolia crawler. Injected into every page's
+  // <head>; the crawler reads it from the site root.
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'algolia-site-verification',
+        content: '772853D21F365831',
+      },
+    },
+  ],
+
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
   markdown: {
@@ -59,6 +71,16 @@ const config: Config = {
   ],
 
   themeConfig: {
+    // DocSearch, via the theme-search-algolia bundled in preset-classic. The
+    // apiKey here is Algolia's public search-only key and is safe to commit;
+    // the write/admin key is not and must never land in this repo.
+    algolia: {
+      appId: '5BW22U91EM',
+      apiKey: 'cfbf90d7a19db5b9dfa3397952873270',
+      indexName: 'CodeRunner Docs',
+      contextualSearch: true,
+      searchPagePath: 'search',
+    },
     colorMode: {
       defaultMode: 'dark',
       respectPrefersColorScheme: false,
