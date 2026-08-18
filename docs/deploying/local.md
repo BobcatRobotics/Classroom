@@ -91,9 +91,10 @@ govern that identity:
   `1000:1000` is correct for the first user created on most single-user hosts.
 - `CODERUNNER_DOCKER_GID` (default `0`) — the gid owning the Docker socket, added
   as a supplementary group so the non-root process can reach it. The `0` default
-  is right for Docker Desktop, whose socket is root-owned. On a **Linux host
-  running Docker Engine natively** the socket belongs to the `docker` group
-  instead, so look yours up:
+  is right for Docker Desktop on macOS and native Windows, whose socket is
+  root-owned. On **Linux and WSL2** — Docker Desktop's WSL2 integration included,
+  which behaves like a native Linux host — the socket belongs to the `docker`
+  group instead, so look yours up:
 
   ```bash
   stat -c '%g' /var/run/docker.sock

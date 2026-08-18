@@ -51,9 +51,10 @@ containers ever start.
 
 **Cause.** The control container runs as a non-root user and needs the group
 that owns the socket added as a supplementary group to reach it.
-`CODERUNNER_DOCKER_GID` does not match that group. This is a Linux-host problem:
-the `0` default matches Docker Desktop's root-owned socket, but a Linux host
-running Docker Engine natively owns the socket by its `docker` group instead.
+`CODERUNNER_DOCKER_GID` does not match that group. This is a Linux and WSL2
+problem: the `0` default matches Docker Desktop's root-owned socket on macOS and
+native Windows, but Linux and WSL2 own the socket by their `docker` group
+instead — including under Docker Desktop's WSL2 integration.
 
 **Fix.** Look up the host's real `docker` group gid and set it in `.env`:
 

@@ -14,7 +14,7 @@ CODERUNNER_DEMO_MODE=1 docker compose up
 
 Open [http://localhost:4000](http://localhost:4000). You land directly in the IDE as a single seeded admin user.
 
-**Prerequisites:** Docker with the Compose plugin (running). No Bun, submodules, or emscripten needed — the control image ships the web shell and AdvantageScope assets prebuilt. On Docker Desktop (macOS, native Windows, WSL2 integration) there is nothing to configure; on a Linux host running Docker Engine natively, set `CODERUNNER_DOCKER_GID` in `.env` to `stat -c '%g' /var/run/docker.sock`.
+**Prerequisites:** Docker with the Compose plugin (running). No Bun, submodules, or emscripten needed — the control image ships the web shell and AdvantageScope assets prebuilt. On macOS and native Windows there is nothing to configure; on **Linux and WSL2** (Docker Desktop's WSL2 integration included) the socket belongs to the `docker` group, so prefix the command with `CODERUNNER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)` or set that variable in `.env`.
 
 > **Warning:** Demo mode bypasses authentication entirely. Every visitor shares the same admin user and workspace. Do not expose a demo instance to the public internet. See [docs/quick-start.md](docs/quick-start.md) for full details and next steps.
 

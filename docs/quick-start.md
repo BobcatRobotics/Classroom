@@ -16,7 +16,7 @@ This is the fastest way to see CodeRunner running on your own machine. It uses *
 
 - **Docker**, up and running, with the **Compose plugin** (`docker compose version`). The control plane, each workspace, and the robot simulation all run inside containers, so Docker is the only hard requirement for the demo.
 - **Git.** Clone the repository (a plain ZIP download is fine too — the demo pulls prebuilt images and does not need submodules or Bun).
-- **On Docker Desktop the demo needs no configuration** — macOS, native Windows, and WSL2 integration all work as-is. On a **Linux host running Docker Engine natively**, the Docker socket belongs to the `docker` group rather than root, so set `CODERUNNER_DOCKER_GID` in `.env` to what `stat -c '%g' /var/run/docker.sock` prints. A Unix-like environment still matters for everything past the demo — see [Platform support](#platform-support) below.
+- **No configuration on macOS or native Windows** — Docker Desktop's socket is root-owned there, which is what the compose file assumes by default. On **Linux and WSL2** the socket belongs to the `docker` group instead, so the control plane needs that group's gid; the Linux / WSL2 command below passes it in for you. WSL2 is *not* a Docker Desktop free ride — it behaves exactly like a native Linux host here, whether you run Docker Engine inside the distro or use Docker Desktop's WSL2 integration. A Unix-like environment still matters for everything past the demo — see [Platform support](#platform-support) below.
 
 ## Steps
 
@@ -30,7 +30,14 @@ cd coderunner
 Start CodeRunner in demo mode:
 
 <Tabs groupId="shell">
-<TabItem value="posix" label="Linux / macOS" default>
+<TabItem value="linux" label="Linux / WSL2" default>
+
+```bash
+CODERUNNER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) CODERUNNER_DEMO_MODE=1 docker compose up
+```
+
+</TabItem>
+<TabItem value="macos" label="macOS">
 
 ```bash
 CODERUNNER_DEMO_MODE=1 docker compose up
@@ -53,7 +60,7 @@ set "CODERUNNER_DEMO_MODE=1" && docker compose up
 </TabItem>
 </Tabs>
 
-(Equivalently, `bun run demo:docker` on any of the three — Bun runs package scripts through its own POSIX-style shell.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
+(`bun run demo:docker` is the same command — Bun runs package scripts through its own POSIX-style shell, so it works on all four. It does not look up the socket gid, though, so on Linux / WSL2 put `CODERUNNER_DOCKER_GID` in `.env` first.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
 
 ## What that command does
 

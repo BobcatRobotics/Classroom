@@ -116,10 +116,13 @@ connection to the change.
 
 ## Consequences
 
-- The demo needs no configuration on Docker Desktop (macOS, native Windows, WSL2
-  integration). A Linux host running Docker Engine natively sets
-  `CODERUNNER_DOCKER_GID`, as it generally had to before. Native Windows remains
-  unsuitable for real deployments, where the caches sit on a host bind mount.
+- The demo needs no configuration on Docker Desktop for macOS and native
+  Windows. Linux and WSL2 set `CODERUNNER_DOCKER_GID`, as Linux generally had to
+  before. Native Windows remains unsuitable for real deployments, where the
+  caches sit on a host bind mount.
+  *(Corrected 2026-08-17: this originally listed WSL2 integration as zero-config
+  too. It is not — a WSL2 shell sees a `docker`-group-owned socket and behaves
+  like a native Linux host.)*
 - Resetting a demo now means clearing the volume as well as `./data`, and that
   needs `docker compose down --remove-orphans` first: workspace containers are
   labelled into the compose project but are not services, and `volume prune`

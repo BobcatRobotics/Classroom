@@ -37,8 +37,9 @@ services:
     # non-root too.
     #
     # The socket's owner differs by platform: root inside Docker Desktop's VM
-    # (hence the 0 default, which makes Docker Desktop zero-config), a `docker`
-    # group on Linux hosts running Docker Engine natively, where you must set
+    # on macOS and native Windows (hence the 0 default, which makes those
+    # zero-config), a `docker` group on Linux and WSL2 (WSL2 integration
+    # included), where you must set
     # CODERUNNER_DOCKER_GID — find it with `stat -c '%g' /var/run/docker.sock`
     # (prod writes it into .env from cloud-init). Supplementary groups do not
     # affect the ownership of files the process creates, so ./data stays
