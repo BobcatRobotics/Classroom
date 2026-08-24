@@ -43,6 +43,39 @@ CodeRunner ships with lesson modules that take beginners from plain Java all the
 
 CodeRunner is designed to run on hardware you already have: a spare classroom machine during the season, or a small cloud VM when you want students to reach it from home. You decide who can log in, and student data lives on your own disk.
 
+## Video walkthrough
+
+A recorded overview of CodeRunner, with some basic demos and high-level info on how it works.
+
+<div
+  style={{
+    position: 'relative',
+    paddingBottom: '56.25%',
+    height: 0,
+    margin: '1.5rem 0',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    border: '1px solid var(--ifm-color-emphasis-200)',
+    boxShadow: 'var(--ifm-global-shadow-lw)',
+  }}
+>
+  <iframe
+    src="https://www.youtube-nocookie.com/embed/xnYzocVwkq8"
+    title="CodeRunner overview"
+    loading="lazy"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowFullScreen
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      border: 0,
+    }}
+  />
+</div>
+
 ## Next steps
 
 - [Quick Start](./quick-start.md): get a demo instance running locally in a few commands.
