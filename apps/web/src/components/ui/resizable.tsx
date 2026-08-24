@@ -48,3 +48,4 @@ function ResizableHandle({
 }
 
 export { ResizableHandle, ResizablePanel, ResizablePanelGroup };
+export const useResizableLayout = ResizablePrimitive.useDefaultLayout;

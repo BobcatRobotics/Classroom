@@ -17,6 +17,7 @@ describe("IDELayout", () => {
 
 	afterEach(() => {
 		globalThis.ResizeObserver = originalResizeObserver;
+		sessionStorage.clear();
 	});
 
 	test("renders editor, scope, and Driver Station in robot mode", () => {
@@ -50,5 +51,29 @@ describe("IDELayout", () => {
 		expect(
 			screen.getByText(/Run this lesson from the editor/),
 		).toBeInTheDocument();
+	});
+
+	test("restores persisted pane sizes from sessionStorage", () => {
+		sessionStorage.setItem(
+			"react-resizable-panels:ide-rows",
+			JSON.stringify({ "ide-workbench": 30, "ide-console": 70 }),
+		);
+		sessionStorage.setItem(
+			"react-resizable-panels:ide-columns",
+			JSON.stringify({ "ide-editor": 65, "ide-scope": 35 }),
+		);
+
+		render(
+			<IDELayout
+				editor={<div>Editor</div>}
+				scope={<div>Scope</div>}
+				driverStation={<div>Driver Station</div>}
+			/>,
+		);
+
+		expect(document.getElementById("ide-workbench")?.style.flexGrow).toBe("30");
+		expect(document.getElementById("ide-console")?.style.flexGrow).toBe("70");
+		expect(document.getElementById("ide-editor")?.style.flexGrow).toBe("65");
+		expect(document.getElementById("ide-scope")?.style.flexGrow).toBe("35");
 	});
 });

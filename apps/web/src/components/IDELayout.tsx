@@ -4,6 +4,7 @@ import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
+	useResizableLayout,
 } from "@/components/ui/resizable";
 
 interface IDELayoutProps {
@@ -24,6 +25,16 @@ export function IDELayout({
 	driverStation,
 	showSimPanels = true,
 }: IDELayoutProps) {
+	// Pane sizes survive a refresh but not a new tab/session.
+	const rows = useResizableLayout({
+		id: "ide-rows",
+		storage: sessionStorage,
+	});
+	const columns = useResizableLayout({
+		id: "ide-columns",
+		storage: sessionStorage,
+	});
+
 	if (!showSimPanels) {
 		return (
 			<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -44,10 +55,23 @@ export function IDELayout({
 		<ResizablePanelGroup
 			orientation="vertical"
 			className="min-h-0 flex-1 overflow-hidden"
+			defaultLayout={rows.defaultLayout}
+			onLayoutChanged={rows.onLayoutChanged}
 		>
-			<ResizablePanel defaultSize={75} minSize={20} className="min-h-0">
-				<ResizablePanelGroup orientation="horizontal" className="min-h-0">
+			<ResizablePanel
+				id="ide-workbench"
+				defaultSize={75}
+				minSize={20}
+				className="min-h-0"
+			>
+				<ResizablePanelGroup
+					orientation="horizontal"
+					className="min-h-0"
+					defaultLayout={columns.defaultLayout}
+					onLayoutChanged={columns.onLayoutChanged}
+				>
 					<ResizablePanel
+						id="ide-editor"
 						defaultSize={50}
 						minSize={25}
 						data-pane="editor"
@@ -57,6 +81,7 @@ export function IDELayout({
 					</ResizablePanel>
 					<ResizableHandle withHandle data-pane="scope-handle" />
 					<ResizablePanel
+						id="ide-scope"
 						defaultSize={50}
 						minSize={25}
 						className="hidden min-h-0 min-[901px]:block"
@@ -68,6 +93,7 @@ export function IDELayout({
 			</ResizablePanel>
 			<ResizableHandle withHandle />
 			<ResizablePanel
+				id="ide-console"
 				defaultSize={25}
 				minSize={5}
 				data-pane="console"
