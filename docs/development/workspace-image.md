@@ -7,7 +7,7 @@ title: Workspace Image
 
 The workspace image (`ghcr.io/mathewdunne/coderunner-workspace`) is the
 per-student container that runs
-openvscode-server, Java 17, and the WPILib simulation stack in a single
+VSCodium reh-web (`codium-server`), Java 17, and the WPILib simulation stack in a single
 Docker image. The [workspace container overview](../about/workspace-container.md)
 explains the runtime contract from the application's perspective; the
 [container README](https://github.com/mathewdunne/CodeRunner/blob/main/containers/code/README.md)
@@ -20,7 +20,7 @@ development.
 ## Image size
 
 The built image is approximately 4.5 GiB uncompressed. That includes JDK 17
-(~300 MB), openvscode-server, nine VS Code extensions (~200 MB), and the
+(~300 MB), the VSCodium reh-web runtime, nine VS Code extensions (~200 MB), and the
 primed Gradle/WPILib dependency cache (~1 GB) baked in so first builds inside
 the container take seconds rather than minutes.
 

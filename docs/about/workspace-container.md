@@ -18,13 +18,13 @@ published ports, labels, environment variables, and first-run behavior) is the
 
 The image (`ghcr.io/mathewdunne/coderunner-workspace:latest` by default,
 overridden via `CODE_IMAGE`) is
-built on [linuxserver/openvscode-server](https://github.com/linuxserver/docker-openvscode-server)
+built on [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web)
 (Ubuntu 24.04 with s6-overlay process supervision) and adds the following on
 top:
 
 | Component | Version |
 |---|---|
-| openvscode-server | 1.109.5 |
+| VSCodium reh-web (`codium-server`) | 1.126.04524 |
 | Adoptium Temurin JDK | 17.0.15+6 (x64) |
 | redhat.java (JDT Language Server) | 1.38.0 |
 | vscode-wpilib (WPILib extension) | 2026.1.1 |
@@ -81,7 +81,7 @@ Three ports are used inside the container:
 
 | Container port | Purpose |
 |---|---|
-| 3000 | openvscode-server (HTTP + WebSocket) |
+| 3000 | codium-server (HTTP + WebSocket) — overrides the base image's 8000 |
 | 3300 | HALSim WebSocket server (robot enable/disable and mode) |
 | 5810 | NT4 NetworkTables server (telemetry) |
 

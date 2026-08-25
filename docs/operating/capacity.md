@@ -27,7 +27,7 @@ container exceeds its limit, the Linux OOM killer terminates a process inside it
 The student typically sees a failed run; the container itself keeps running.
 
 Be careful lowering this: a cold Gradle build plus the Java language server and
-openvscode-server together approach 4 GB. A container pinned at its limit does
+codium-server together approach 4 GB. A container pinned at its limit does
 not always OOM — when most of its memory is reclaimable page cache, the kernel
 evicts and re-reads the container's files (jars, class files) in a loop
 instead. That thrashing generates sustained disk reads that can saturate the

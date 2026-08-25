@@ -51,7 +51,7 @@ A one-line map of the top-level directories you'll touch most:
 - `apps/control/`: Bun control plane (HTTP, WebSocket, sessions, container orchestration, the editor/run/telemetry proxies).
 - `apps/web/`: React + Vite browser IDE shell.
 - `packages/contracts/`: shared API schemas, message types, and path rules consumed by both sides.
-- `containers/code/`: the merged openvscode-server + simulator Docker image (see [Workspace Image](./workspace-image.md)).
+- `containers/code/`: the merged VSCodium + simulator Docker image (see [Workspace Image](./workspace-image.md)).
 - `catalog/`: bundled, zero-config lesson catalog baked into the workspace image.
 - `e2e/`: Playwright end-to-end tests and fixtures.
 - `scripts/`: TypeScript utility scripts run by Bun (build, backup, cleanup, user admin).

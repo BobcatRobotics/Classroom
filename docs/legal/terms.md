@@ -103,7 +103,7 @@ it or for the data on it.
 
 ## 10. Third-party software
 
-CodeRunner bundles third-party software, including AdvantageScope, openvscode-server, WPILib,
+CodeRunner bundles third-party software, including AdvantageScope, VSCodium, WPILib,
 and the Java toolchain, each under its own license. Your use of those components is subject to
 their terms. See [Licenses](./licenses.md). None of those projects endorse or are affiliated
 with CodeRunner.

@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based IDE for learning FRC robot programming. Students write Java, click Run, and watch their robot simulate in real time with telemetry rendered by AdvantageScope Lite. Each student gets a per-student openvscode-server container with bundled redhat.java and wpilibsuite.vscode-wpilib extensions for full VS Code editor features.
+A browser-based IDE for learning FRC robot programming. Students write Java, click Run, and watch their robot simulate in real time with telemetry rendered by AdvantageScope Lite. Each student gets a per-student VSCodium container with bundled redhat.java and wpilibsuite.vscode-wpilib extensions for full VS Code editor features.
 
 Architecture and design details: [`docs/about/architecture.md`](./docs/about/architecture.md). Decision logs live in [`docs/decisions/`](./docs/decisions/).
 
@@ -10,7 +10,7 @@ Architecture and design details: [`docs/about/architecture.md`](./docs/about/arc
 
 All non-container code is **TypeScript on Bun**. Use Bun for package management, TypeScript script execution, and the control-plane runtime. Keep `tsc --noEmit`/project references for typechecking.
 
-Inside the V2 code container, Java/Gradle/WPILib, openvscode-server, `redhat.java`, and `wpilibsuite.vscode-wpilib` are the relevant stacks.
+Inside the V2 code container, Java/Gradle/WPILib, VSCodium, `redhat.java`, and `wpilibsuite.vscode-wpilib` are the relevant stacks.
 
 ## Repo Layout
 
@@ -24,7 +24,7 @@ apps/control/src/metrics.ts      Prometheus registry, metric handles, route-temp
 apps/control/src/metrics-collector.ts  15s Docker stats poller that writes per-container gauges
 apps/web/                      React + Vite browser IDE shell
 packages/contracts/            Shared API schemas, message types, and path rules
-containers/code/               V2 merged openvscode-server + sim container
+containers/code/               V2 merged VSCodium + sim container
 containers/control/            Control-plane image: multi-stage build burying the emsdk/AdvantageScope compile, the coderunner dispatching entrypoint
 catalog/                       Bundled (zero-config) lesson catalog: modules.json + modules/<id>/, baked into the code image
 lessons-repo-root/             Staging for the standalone remote lessons repo (will move out of this repo); not used by the app build
@@ -45,12 +45,12 @@ data/                          Runtime data, gitignored
 - [x] V2-1: merged code container image
 - [x] V2-2: authenticated editor proxy
 - [x] V2-3: orchestrator merge and run-path migration
-- [x] V2-4: web shell swap to hosted openvscode editor
+- [x] V2-4: web shell swap to hosted editor
 - [x] V2-5: file API and contracts cleanup
 - [x] V2-6: lifecycle, labels, and reconciliation
 - [x] V2-7: acceptance pass
 
-V2 is complete. The system uses per-student merged containers (`coderunner-workspace`) running openvscode-server with bundled Java and WPILib extensions. The control plane proxies editor, run, and telemetry traffic through authenticated routes.
+V2 is complete. The system uses per-student merged containers (`coderunner-workspace`) running VSCodium with bundled Java and WPILib extensions. The control plane proxies editor, run, and telemetry traffic through authenticated routes.
 
 **Lessons & Modules (post-V2):** first-login template seeding is removed —
 workspaces start empty and the student fills them via the topbar **Switch
@@ -148,13 +148,13 @@ Three test tiers, all runnable without Docker:
 
 - **`bun run test`** — Bun unit/integration tests for the control plane (~350 tests). Covers auth, runs, proxy, containers, the lessons catalog + load pipeline, security, reconciliation, property-based tests, and metrics route-templating cardinality.
 - **`bun run test:web`** — Vitest frontend tests (~80 tests). Covers React hooks (`useSession`, `useLessons`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`), DriverStation components, Zustand store, keyboard/gamepad mappings.
-- **`bun run e2e`** — Playwright E2E mocked tier (~55 tests). Full login→editor→run→telemetry→DS flows against in-process `ControlApp` with fake openvscode-server, HALSim, and NT4 backends. No Docker required.
+- **`bun run e2e`** — Playwright E2E mocked tier (~55 tests). Full login→editor→run→telemetry→DS flows against in-process `ControlApp` with fake codium-server, HALSim, and NT4 backends. No Docker required.
 - **`bun run e2e:security`** — Playwright security specs (~8 tests): CSRF, XSS output encoding, response headers.
 
 E2E tests use a custom Playwright fixture (`e2e/fixtures/app.ts`) that creates an isolated `ControlApp` per test with its own random port, SQLite DB, and fake upstream servers. Auth is seeded via `loginAs()` which writes user/session rows and HMAC-signs cookies.
 
 Key E2E fixtures:
-- `e2e/fixtures/fake-vscode.ts` — Fake openvscode-server (HTTP + WS upgrade)
+- `e2e/fixtures/fake-vscode.ts` — Fake codium-server (HTTP + WS upgrade)
 - `e2e/fixtures/fake-halsim.ts` — Fake HALSim bridge (WS, supports stop/restart)
 - `e2e/fixtures/fake-nt4.ts` — Fake NT4 server for topic announcement
 - `e2e/fixtures/gamepad-shim.ts` — Playwright addInitScript gamepad override

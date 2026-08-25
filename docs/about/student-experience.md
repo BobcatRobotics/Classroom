@@ -30,7 +30,7 @@ their workspace.
 After signing in the student lands in the workspace shell, a full-page web
 application built around three panes:
 
-- **Editor** (left): openvscode-server embedded in an iframe. This is a
+- **Editor** (left): VSCodium embedded in an iframe. This is a
   real VS Code environment in the browser, complete with the
   [Red Hat Java](https://marketplace.visualstudio.com/items?itemName=redhat.java)
   language server, the WPILib extension, IntelliSense, and a terminal.
