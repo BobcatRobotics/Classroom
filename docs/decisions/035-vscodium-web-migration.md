@@ -1,8 +1,8 @@
 # 035 — Editor migration: openvscode-server → VSCodium reh-web
 
-Status: **Accepted (not yet implemented)** — 2026-08-24
+Status: **Accepted and implemented** — 2026-08-24
 
-Implementation is planned in
+Implementation followed
 [`../superpowers/plans/2026-08-24-vscodium-web-migration.md`](../superpowers/plans/2026-08-24-vscodium-web-migration.md).
 Supersedes the editor choice in
 [`017-linuxserver-base-migration.md`](./017-linuxserver-base-migration.md) and
@@ -124,6 +124,63 @@ Build-time VSIX sideloading is likewise unchanged: `--install-extension
 cleanly onto 1.126.04524 at their currently pinned versions —
 `wpilibsuite.vscode-wpilib@2026.1.1` and `redhat.java@1.38.0`.
 
+### 5. Workspace trust: diagnosed, not fixed
+
+The spike workbench opened in **Restricted Mode**, which holds `redhat.java` in
+Lightweight Mode and blocks a full project import. The repository configures
+workspace trust nowhere — no setting in `catalog/`, `containers/`, or
+`apps/control/src`. The spike posed this as an open question gated on
+implementation-time verification; verification has now run it down, and the
+answer is a third outcome — neither of the two branches originally planned for.
+
+**Confirmed as the cause.** A headless Chromium session polling the built
+image's workbench every 20 seconds for 3 minutes showed `Restricted Mode` and
+`Java: Lightweight Mode` on every single poll, with only a syntax-server
+workspace (`ss_ws`) present container-side and no `jdt_ws` — confirmed twice,
+independently. Manually clicking "Trust" in the UI fixes it immediately: a real
+`jdt_ws` import follows and the status item reaches `Java: Ready` in about 40
+seconds.
+
+**The proposed fix does not work.** Seeding
+`"security.workspace.trust.enabled": false` into
+`/config/data/User/settings.json` — the fix originally specified above —
+changed nothing. Tested twice, once on a completely fresh container with no
+cached trust state anywhere under `/config`; Restricted Mode persisted
+identically both times. The likely explanation, found by inspecting the served
+workbench bundle: `security.workspace.trust.enabled` is read through VS Code's
+`applicationConfiguration` path, kept separate from the
+`localUserConfiguration`/`remoteUserConfiguration` VS Code merges into effective
+settings — the same scoping rule that greys the setting out in Remote-SSH
+windows. In a purely browser-hosted deployment there appears to be no route
+from a server-side `settings.json` write into that application-scoped read,
+though the exact mechanism was not fully pinned down without instrumenting the
+server.
+
+**It is not a regression.** The currently published production image
+(`ghcr.io/mathewdunne/coderunner-workspace:latest`, openvscode-server-based,
+revision `ffa7b47`, built 2026-08-13) was run through the identical
+observation and behaved identically: Restricted Mode, Lightweight Mode, only
+`ss_ws`, no `jdt_ws`. Neither editor's `product.json` disables workspace trust,
+and the repository has never configured it either way. This predates the
+migration; it is simply the first time anyone looked closely enough to notice.
+
+**No change was made.** `init-frc-setup` was not edited for trust — the
+proposed `jq` addition above was never applied. Since the tested fix doesn't
+work and the behaviour is pre-existing rather than migration-caused, forcing a
+fix through under this migration's review would have made an unrelated
+regression risk hard to disentangle from the editor swap. A working fix, if
+wanted, needs one of: a mechanism that actually reaches the application-scoped
+setting from the server side (candidates worth investigating: VSCodium's
+`product.json` `configurationDefaults`, which overrides a setting's *default*
+rather than writing a user override and so may not be subject to the same
+scope rule; a `codium-server` CLI flag or environment variable, if one exists;
+or an enterprise policy file); seeding trust *state* directly rather than the
+setting (a pre-populated trust-decision cache keyed to `/workspace/project`);
+or, more simply, documenting the one-time "Trust" click as an expected
+first-run step for students and instructors. Any candidate needs the same
+verification used here: a clean container, a multi-minute poll, and a
+container-side `jdt_ws` check.
+
 ## What was verified, and what was not
 
 Verified hands-on against the real tarball on 2026-08-24, including a headless
@@ -134,37 +191,59 @@ extensions, the `data/{User,Machine}` layout, and **extension host activation** 
 zero failed requests and zero console errors. `--accept-server-license-terms` is
 not required; that flag belongs to Microsoft's proprietary server build.
 
-Not verified, and deliberately deferred to implementation: that `redhat.java`
-progresses past Lightweight to **Standard Mode** with a full Gradle import. The
-spike machine had no JDK, so the language server could not start. The built
-image has JDK 17 and a primed Gradle cache, which is where this must be
-confirmed. This is the one finding that could still invalidate the migration.
+Re-verified against the actual built image once Tasks 1–2 landed (container
+`cr-smoke`, since torn down), with the same results plus the piece the spike
+couldn't reach: the workbench serves under `/u/smoke/vscode/` with absolute
+prefixed asset URLs
+(`/u/smoke/vscode/stable-4c0b0c6cc561d2d3636d1ec250935431876ce4dc/static/out/vs/code/browser/workbench/workbench.js`),
+WebSocket upgrade under the base path returns `101 Switching Protocols`,
+`--user-data-dir` **is** honoured — settings landed at `/config/data/{User,
+Machine}` and `/config/data/data/` does not exist, so the flag caveat decision
+4 above originally carried did not bite and the run script keeps
+`--user-data-dir "${HOME}/data"` unchanged. Machine settings carry
+`"workbench.colorTheme": "Default Dark Modern"`; User settings carry the
+`java.jdt.ls.vmargs` and Gradle keys. Ownership after Task 2's scoped `lsiown`
+is `abc:abc` on `/config/.gradle`, `/config/extensions`, both settings files,
+and `/config/sim.log`. The JDK is `openjdk version "17.0.15"` (Temurin
+17.0.15+6); all three sim scripts are present and executable. All nine bundled
+extensions install cleanly under `codium-server --install-extension`. The base
+image facts behind decision 2 were confirmed by direct inspection too:
+`/etc/s6-overlay/s6-rc.d/svc-vscodium-web/` ships `type` (longrun) and
+`notification-fd` from the base image, so our image overrides only `run`; s6
+brings services up in order `init-vscodium-web → init-config-end →
+init-frc-setup → svc-vscodium-web`; and the base's own init runs `find /config
+-path /config/workspace -prune -o -exec lsiown abc:abc {} +` every boot, which
+is what justifies decision 033's concern and Task 2's scoping.
 
-## Open question: workspace trust
+Page-load health improved over the outgoing image. The new image produced 1
+console error and 1 failed request on the same workbench page — both the same
+benign cause, a 404 from
+`https://open-vsx.org/vscode/gallery/richardwillis/vscode-spotless-gradle/latest`
+(an update check for an extension actually sourced from the Microsoft
+Marketplace, so Open VSX has no record of it). The outgoing openvscode-server
+image, checked side by side on the identical page, produced 3 console errors
+and 5 failed requests, including a missing
+`static/node_modules/vsda/rust/web/vsda_bg.wasm` and `vsda.js`, and an aborted
+external `vscode-cdn.net` webview fetch.
 
-The spike workbench opened in **Restricted Mode**, which holds `redhat.java` in
-Lightweight Mode and blocks a full project import. The repository configures
-workspace trust nowhere — no setting in `catalog/`, `containers/`, or
-`apps/control/src`.
+**Not verified: the three Java editing behaviours decision 011 recorded as its
+evidence.** `redhat.java` never left Lightweight Mode on its own during
+verification — see decision 5, above — so WPILib type completions,
+auto-import on completion, and Ctrl-click into library source were not
+individually exercised. A manual workspace-trust click did carry the language
+server to `Java: Ready` in about 40 seconds with a real Gradle import, so the
+underlying redhat.java/Gradle/WPILib pipeline is confirmed healthy end to end —
+but that is not the same as confirming the three specific editing behaviours
+011 documented still work on this editor. Decision 011 therefore has only a
+partial successor. Closing this out needs a follow-up: open `Robot.java` in a
+pre-trusted workspace and exercise completions, auto-import, and Ctrl-click
+directly.
 
-This is not VSCodium-specific; it would behave identically on openvscode-server
-or code-server, and may already be the behaviour today. It is recorded because
-it is precisely what a "the migration broke Java" report would look like, and
-because diagnosing it from scratch mid-migration would waste a day.
-
-If verification shows trust is the blocker, the fix belongs in
-`init-frc-setup`'s existing settings merge as
-`"security.workspace.trust.enabled": false`, seeded with `//=` so a student's
-own choice survives. It must go in **User** settings: the setting is
-`application`-scoped in VS Code, so seeding it into Machine or Workspace scope
-would silently do nothing — a failure mode that looks like the fix not working
-rather than being misplaced. It must also stay out of project scope, since
-`/workspace/project/.vscode/settings.json` is student-owned and gets committed
-to team repositories.
-
-The fix is gated behind verification rather than applied pre-emptively, so we do
-not ship a security-relevant default to work around a problem we have not
-confirmed we have.
+The regression gate confirms nothing outside the editor moved: `bun run
+typecheck` exits 0; `bun run check` exits 0 across 264 files; `bun run test` is
+376 pass / 0 fail; `bun run test:web` is 85 pass; `bun run e2e` is 56 pass;
+`bun run e2e:security` is 8 pass. No control-plane source file changed as part
+of this migration.
 
 ## Consequences
 
@@ -172,12 +251,17 @@ confirmed we have.
   openvscode-server spike — `?folder=` boot, `additionalTextEdits` on tab,
   `jdt://` navigation — for an editor we no longer ship. It stays as history;
   this decision plus the plan's verification steps replace it.
-- **AGENTS.md's re-verification rule now fires.** It says not to re-verify
-  upstream extension-owned behaviour "unless editor or extension versions
-  changed." The editor version changes from 1.109.5 to 1.126.04524, so the Java
-  editing behaviours 011 recorded are exactly what must be re-checked once —
-  auto-import on completion and Ctrl-click into library source, not just "the
-  extension loads."
+- **AGENTS.md's re-verification rule now fires, and is only partly closed.** It
+  says not to re-verify upstream extension-owned behaviour "unless editor or
+  extension versions changed." The editor version changes from 1.109.5 to
+  1.126.04524, so the Java editing behaviours 011 recorded are exactly what
+  must be re-checked once — auto-import on completion and Ctrl-click into
+  library source, not just "the extension loads." Verification attempted this
+  but was blocked by workspace trust (decision 5): only the underlying
+  Lightweight → Standard Mode transition after a manual trust click was
+  confirmed, not the three specific editing behaviours themselves. See "What
+  was verified, and what was not," above — this rule stays open until a
+  follow-up completes it.
 - **Each base bump crosses a wider delta than before.** VSCodium releases jump
   4–5 minor versions at a time, against openvscode-server's old roughly monthly
   single-version cadence. At 2–3 bumps a year that is acceptable, but every bump
@@ -202,3 +286,16 @@ confirmed we have.
   `THIRD_PARTY_NOTICES.md` already flags as a terms-of-use problem. It shares
   the extension-sourcing code path and was deliberately excluded from this
   migration so a regression in either would be unambiguous.
+- **Another pre-existing issue, found during verification and also left
+  standing.** Four bundled extensions install at versions above their
+  `ARG *_VERSION` pins: `redhat.java` (pinned `1.38.0`, installs `1.55.0`),
+  `vscjava.vscode-gradle` (pinned `3.17.3`, installs `3.18.0`),
+  `vscjava.vscode-java-dependency` (pinned `0.27.2`, installs `0.27.6`), and
+  `vscjava.vscode-java-test` (pinned `0.45.0`, installs `0.46.0`). Isolated by
+  direct test: installing the `vscjava.vscode-java-pack` VSIX makes the editor
+  fetch all six pack members from the Open VSX gallery at latest, overwriting
+  the pinned installs; a pinned VSIX installed alone honours its version
+  exactly. The old openvscode-server image does the same thing, so this
+  predates the migration and is not caused by it. The plan's own follow-up #2
+  (drop `vscode-java-pack`, which nothing in the image depends on) is the fix;
+  out of scope here for the same reason as the spotless-gradle issue above.

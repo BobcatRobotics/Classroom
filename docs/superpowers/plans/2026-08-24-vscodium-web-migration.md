@@ -87,7 +87,7 @@ These were confirmed hands-on against a real `vscodium-reh-web-linux-x64-1.126.0
 - Consumes: nothing from earlier tasks.
 - Produces: a workspace image whose editor binary is `/app/vscodium-web/bin/codium-server`, listening on container port 3000, honoring the `VSCODE_BASE_PATH` env var via `--server-base-path`, with extensions at `/config/extensions` and user data at `/config/data`. Tasks 3–5 depend on all of those exact values.
 
-- [ ] **Step 1: Update the failing test**
+- [x] **Step 1: Update the failing test**
 
 In `apps/control/src/__tests__/containers.test.ts`, replace the test at line 298 in full:
 
@@ -112,13 +112,13 @@ In `apps/control/src/__tests__/containers.test.ts`, replace the test at line 298
 	});
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `bun test apps/control/src/__tests__/containers.test.ts -t "codium-server"`
 
 Expected: FAIL with `ENOENT: no such file or directory` for the `svc-vscodium-web/run` path.
 
-- [ ] **Step 3: Create the new s6 service directory**
+- [x] **Step 3: Create the new s6 service directory**
 
 ```bash
 cd /home/matt/dev/CodeRunner
@@ -157,7 +157,7 @@ exec \
 EOF
 ```
 
-- [ ] **Step 4: Delete the old service directory**
+- [x] **Step 4: Delete the old service directory**
 
 ```bash
 rm -rf containers/code/root/etc/s6-overlay/s6-rc.d/svc-openvscode-server
@@ -183,7 +183,7 @@ containers/code/root/etc/s6-overlay/s6-rc.d/user/contents.d/init-frc-setup
 
 (The `dependencies.d/init-frc-setup` marker under `svc-vscodium-web` and the `user/contents.d` marker are both empty files.)
 
-- [ ] **Step 5: Update the Dockerfile base image**
+- [x] **Step 5: Update the Dockerfile base image**
 
 In `containers/code/Dockerfile`, replace the header comment block and `FROM` line:
 
@@ -196,7 +196,7 @@ In `containers/code/Dockerfile`, replace the header comment block and `FROM` lin
 FROM linuxserver/vscodium-web:1.126.04524-ls35
 ```
 
-- [ ] **Step 6: Update the Dockerfile chmod and extension-install paths**
+- [x] **Step 6: Update the Dockerfile chmod and extension-install paths**
 
 Replace the `chmod` line so it targets the renamed service:
 
@@ -211,7 +211,7 @@ Then replace the editor binary in the extension-install step (the `RUN mkdir -p 
     && /app/vscodium-web/bin/codium-server \
 ```
 
-- [ ] **Step 7: Update the stale code comments**
+- [x] **Step 7: Update the stale code comments**
 
 `apps/control/src/app/workspace-routes.ts` — replace the comment block above the editor route (line 223):
 
@@ -231,19 +231,19 @@ Then replace the editor binary in the extension-install step (the `RUN mkdir -p 
 
 `apps/control/src/__tests__/proxy.test.ts` — replace both occurrences of the marker string `"openvscode-test"` with `"codium-test"` (there is one in the fake upstream's response header and one in the matching assertion; `sed -i 's/openvscode-test/codium-test/g'` on that file is safe).
 
-- [ ] **Step 8: Run the test to verify it passes**
+- [x] **Step 8: Run the test to verify it passes**
 
 Run: `bun test apps/control/src/__tests__/containers.test.ts -t "codium-server"`
 
 Expected: PASS.
 
-- [ ] **Step 9: Lint and format**
+- [x] **Step 9: Lint and format**
 
 Run: `bun run check:fix`
 
 Expected: exits 0, may reformat touched TypeScript.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add containers/code apps/control/src/__tests__ apps/control/src/app/workspace-routes.ts e2e/fixtures/fake-vscode.ts
@@ -263,7 +263,7 @@ git commit -m "feat(workspace): swap editor to VSCodium reh-web via linuxserver/
 - Consumes: nothing from Task 1 beyond the service layout (this script's path does not change).
 - Produces: an init that recursively chowns the seed trees only on first boot and otherwise touches only the specific files it writes. Task 3 Step 5b verifies ownership comes out right in the built image.
 
-- [ ] **Step 1: Chown the seed trees inside the first-boot branches**
+- [x] **Step 1: Chown the seed trees inside the first-boot branches**
 
 Add a scoped `lsiown -R` to each seed branch, so the expensive recursion runs only when the copy actually happened:
 
@@ -283,7 +283,7 @@ if [[ -d /opt/frc-extensions-cache ]] && [[ -z "$(ls -A "${EXTENSIONS_DIR}" 2>/d
 fi
 ```
 
-- [ ] **Step 2: Replace the trailing recursive pass with an explicit file list**
+- [x] **Step 2: Replace the trailing recursive pass with an explicit file list**
 
 Replace the final block:
 
@@ -314,7 +314,7 @@ lsiown -R abc:abc /workspace/project
 
 Keep the `/workspace/project` recursion — the bind mount is where UID migration for pre-existing student files still matters, and the project-settings merge writes there. Pre-existing wrong-UID files under `/config` (e.g. after a PUID change) are covered by the upstream init, which runs before this one.
 
-- [ ] **Step 3: Sanity-check and commit**
+- [x] **Step 3: Sanity-check and commit**
 
 Run: `bun run test` — the `code-container-defaults` and `containers` suites read this script and must still pass.
 
@@ -333,13 +333,13 @@ git commit -m "perf(workspace): scope init-frc-setup ownership fix to files it c
 - Consumes: the image produced by Tasks 1–2, and its guarantees (port 3000, `VSCODE_BASE_PATH` → `--server-base-path`, extensions at `/config/extensions`, user data at `/config/data`).
 - Produces: confidence that the proxy contract holds. Task 4 reuses the running `cr-smoke` container.
 
-- [ ] **Step 1: Build the workspace image**
+- [x] **Step 1: Build the workspace image**
 
 Run: `bun run docker:build:workspace`
 
 Expected: build succeeds. It is slow — the Gradle/WPILib cache priming runs a full `./gradlew build`. Note the tag it prints; the default is `ghcr.io/mathewdunne/coderunner-workspace:latest` unless `CODE_IMAGE` or `CODERUNNER_TAG` is set. Use that tag as `$IMAGE` below.
 
-- [ ] **Step 2: Start a throwaway container against a scratch project**
+- [x] **Step 2: Start a throwaway container against a scratch project**
 
 ```bash
 IMAGE=ghcr.io/mathewdunne/coderunner-workspace:latest
@@ -361,7 +361,7 @@ Expected: logs show the FRC init seeding Gradle cache and extensions, then `Web 
 
 Copying to `/tmp` first is deliberate — bind-mounting `catalog/` directly would let the container write build output into the repo.
 
-- [ ] **Step 3: Verify the workbench serves under the base path with prefixed assets**
+- [x] **Step 3: Verify the workbench serves under the base path with prefixed assets**
 
 ```bash
 curl -s http://127.0.0.1:33999/u/smoke/vscode/ | grep -oE '/u/smoke/vscode/stable-[a-f0-9]+/static/out/vs/code/browser/workbench/workbench\.js'
@@ -369,7 +369,7 @@ curl -s http://127.0.0.1:33999/u/smoke/vscode/ | grep -oE '/u/smoke/vscode/stabl
 
 Expected: prints the matching path. An empty result means asset URLs are not being prefixed — stop and escalate, the base-path contract is broken.
 
-- [ ] **Step 4: Verify WebSocket upgrade under the base path**
+- [x] **Step 4: Verify WebSocket upgrade under the base path**
 
 ```bash
 curl -s -i --max-time 5 \
@@ -382,7 +382,7 @@ curl -s -i --max-time 5 \
 
 Expected: `HTTP/1.1 101 Switching Protocols`
 
-- [ ] **Step 5: Verify extensions and settings were seeded**
+- [x] **Step 5: Verify extensions and settings were seeded**
 
 ```bash
 docker exec cr-smoke ls /config/extensions
@@ -394,7 +394,9 @@ Expected: the extensions listing includes `redhat.java-1.38.0` and `wpilibsuite.
 
 If the settings files are missing and a `/config/data/data/` directory exists, `codium-server` ignored `--user-data-dir` (see the flag caveat in Background): switch the run script to `--server-data-dir "${HOME}"`, rebuild, and repeat this task.
 
-- [ ] **Step 5b: Verify ownership after the scoped lsiown (Task 2)**
+> **Actual:** the `--user-data-dir` caveat did not occur — `/config/data/data/` does not exist, and both settings files are present with the expected content. `wpilibsuite.vscode-wpilib-2026.1.1` matched exactly. But `redhat.java` installed as `redhat.java-1.55.0-linux-x64`, not the expected `1.38.0` — along with three other pinned extensions at newer versions (`vscjava.vscode-gradle` 3.18.0 vs pinned 3.17.3, `vscjava.vscode-java-dependency` 0.27.6 vs 0.27.2, `vscjava.vscode-java-test` 0.46.0 vs 0.45.0). Cause (isolated later, not fixed): installing the `vscjava.vscode-java-pack` VSIX makes the editor fetch all six pack members from Open VSX at latest, overwriting the pinned installs. Confirmed pre-existing on the old openvscode-server image too — not a migration regression. See decision 035's Consequences section and the plan's Follow-up #2.
+
+- [x] **Step 5b: Verify ownership after the scoped lsiown (Task 2)**
 
 ```bash
 docker exec cr-smoke stat -c '%U:%G %n' /config/.gradle /config/extensions \
@@ -403,7 +405,7 @@ docker exec cr-smoke stat -c '%U:%G %n' /config/.gradle /config/extensions \
 
 Expected: every line reports `abc:abc`.
 
-- [ ] **Step 6: Verify the JDK and sim scripts still work**
+- [x] **Step 6: Verify the JDK and sim scripts still work**
 
 ```bash
 docker exec cr-smoke java -version
@@ -412,7 +414,7 @@ docker exec cr-smoke ls -l /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh
 
 Expected: `openjdk version "17.0.15"`; all three scripts present and executable.
 
-- [ ] **Step 7: Record the evidence**
+- [x] **Step 7: Record the evidence**
 
 Paste the outputs of Steps 3–6 into the task's completion notes. Task 7 cites them in the decision log. Leave `cr-smoke` running for Task 4.
 
@@ -427,26 +429,34 @@ Paste the outputs of Steps 3–6 into the task's completion notes. Task 7 cites 
 - Consumes: the running `cr-smoke` container from Task 3.
 - Produces: either a confirmed-good Java path, or an `init-frc-setup` that seeds `security.workspace.trust.enabled: false` into **User** settings. That setting is `application`-scoped in VS Code, so it cannot live in Machine or Workspace settings — User is the only scope that takes effect.
 
-- [ ] **Step 1: Open the workbench in a browser**
+- [x] **Step 1: Open the workbench in a browser**
 
 Open `http://127.0.0.1:33999/u/smoke/vscode/?folder=/workspace/project`.
 
-- [ ] **Step 2: Observe the Java status item**
+> **Actual:** done via headless Chromium (Playwright), not a manual browser — same URL and folder param.
+
+- [x] **Step 2: Observe the Java status item**
 
 Watch the status bar. `redhat.java` starts in `Java: Lightweight Mode` and should transition to `Java: Standard Mode` (or show a build/import progress notification) within roughly 1–3 minutes, since the Gradle cache is primed.
 
-- [ ] **Step 3: Decide the branch**
+> **Actual:** it did not transition. Polled every 20s for a full 3 minutes; status bar showed `Restricted Mode` + `Java: Lightweight Mode` on all 9 polls, no import progress ever appeared.
+
+- [x] **Step 3: Decide the branch**
 
 - **Standard Mode reached, and opening `src/main/java/frc/robot/Robot.java` gives completions on WPILib types** → workspace trust is not blocking anything. Skip Steps 4–7, go to Step 8.
 - **Stuck in Lightweight Mode, or the window shows "Restricted Mode"** → continue to Step 4.
 
-- [ ] **Step 4: Confirm the cause before changing anything**
+> **Actual:** the second branch — stuck in Lightweight/Restricted Mode.
+
+- [x] **Step 4: Confirm the cause before changing anything**
 
 ```bash
 docker exec cr-smoke sh -c 'cat /config/data/User/settings.json'
 ```
 
 Then, in the browser, click **Manage** on the Restricted Mode banner and choose to trust the folder. If Java then reaches Standard Mode, workspace trust is confirmed as the cause. Proceed to Step 5. If it does **not**, stop — the problem is something else and this plan's assumption is wrong; escalate rather than applying an unrelated fix.
+
+> **Actual:** confirmed. `settings.json` had no `security.workspace.trust.enabled` key. Clicking Trust (via Playwright) triggered a real Gradle import (visible download progress) and reached `Java: Ready` in ~40s, with a genuine `jdt_ws` workspace created container-side. Workspace trust is unambiguously the cause. Proceeded to test Step 5's fix rather than apply it outright — see below.
 
 - [ ] **Step 5: Seed the trust setting in `init-frc-setup`**
 
@@ -465,6 +475,8 @@ with:
 
 The `//=` keeps this a default only — a student who turns trust back on keeps their choice. The `project` guard keeps it out of `/workspace/project/.vscode/settings.json`, which is student-owned and gets committed to their team repo.
 
+> **Actual: not applied to the repo.** The equivalent key was written directly into the running container's `/config/data/User/settings.json` via `docker exec` + `jq` (not this file) to test the fix cheaply before committing to a rebuild. Result: no effect — tried twice, including once on a completely fresh container with zero prior trust-decision state, and Restricted Mode persisted identically both times. Root cause (investigated read-only, not fixed): `security.workspace.trust.enabled` is read through VS Code's `application`-scoped configuration, which this browser-only deployment does not appear to source from the server-side `settings.json` — the same rule that greys the setting out in Remote-SSH windows. Because the fix as specified does not work, this edit was never made to the actual `init-frc-setup` script. See decision 035 §5 for the full account and candidate alternatives.
+
 - [ ] **Step 6: Rebuild and re-verify**
 
 ```bash
@@ -476,6 +488,8 @@ Then repeat Task 3 Step 2 and this task's Steps 1–2.
 
 Expected: no Restricted Mode banner; Java reaches Standard Mode.
 
+> **Actual: not run.** No fix was committed, so no rebuild was needed. The fix was instead re-tested against a freshly recreated `cr-smoke` (Task 3 Step 2's exact recipe, no image rebuild) to rule out contaminated state — see Step 5's note.
+
 - [ ] **Step 7: Commit the fix**
 
 ```bash
@@ -483,12 +497,16 @@ git add containers/code/root/etc/s6-overlay/s6-rc.d/init-frc-setup/run
 git commit -m "fix(workspace): trust the seeded project so redhat.java leaves Lightweight Mode"
 ```
 
+> **Actual: not run.** The tested fix doesn't work, so nothing was committed. `init-frc-setup` is unchanged by this task. Comparison against the current production (openvscode-server) image showed the identical Restricted Mode / Lightweight Mode behavior, so this is confirmed pre-existing, not a migration regression — recorded in decision 035 §5 rather than fixed here.
+
 - [ ] **Step 8: Tear down the smoke container**
 
 ```bash
 docker rm -f cr-smoke
 rm -rf /tmp/cr-smoke
 ```
+
+> **Actual: deliberately not run**, per this task's own instructions (leave it for Task 5/7). `cr-smoke` was restored to pristine as-shipped state (trust-test key removed, restarted) and left running for later tasks; `/tmp/cr-smoke` left in place.
 
 ---
 
@@ -500,37 +518,37 @@ rm -rf /tmp/cr-smoke
 - Consumes: everything from Tasks 1–4.
 - Produces: proof that the control plane, web shell, and E2E tiers are unaffected — which is the plan's central claim.
 
-- [ ] **Step 1: Typecheck**
+- [x] **Step 1: Typecheck**
 
 Run: `bun run typecheck`
 Expected: exits 0.
 
-- [ ] **Step 2: Lint and format check**
+- [x] **Step 2: Lint and format check**
 
 Run: `bun run check`
 Expected: exits 0.
 
-- [ ] **Step 3: Control-plane tests**
+- [x] **Step 3: Control-plane tests**
 
 Run: `bun run test`
 Expected: all pass (~350 tests). The `svc-vscodium-web` assertion from Task 1 passes here.
 
-- [ ] **Step 4: Frontend tests**
+- [x] **Step 4: Frontend tests**
 
 Run: `bun run test:web`
 Expected: all pass (~80 tests).
 
-- [ ] **Step 5: E2E mocked tier**
+- [x] **Step 5: E2E mocked tier**
 
 Run: `bun run e2e`
 Expected: all pass (~55 tests). These run against the in-process `ControlApp` with `fake-vscode`, so they exercise the proxy contract without Docker.
 
-- [ ] **Step 6: E2E security tier**
+- [x] **Step 6: E2E security tier**
 
 Run: `bun run e2e:security`
 Expected: all pass (~8 tests).
 
-- [ ] **Step 7: Commit only if a test needed adjusting**
+- [x] **Step 7: Commit only if a test needed adjusting**
 
 If every suite passed with no edits, there is nothing to commit — say so and move on. If a test required a change, commit it alone:
 
@@ -551,7 +569,7 @@ git commit -m "test: update editor naming after VSCodium migration"
 - Consumes: the pinned versions from Task 1 (`linuxserver/vscodium-web:1.126.04524-ls35`, VSCodium `1.126.04524`).
 - Produces: accurate attribution. The image redistributes VSCodium, so its notice must travel with it — `THIRD_PARTY_NOTICES.md` ships inside the image at `/usr/share/coderunner/`.
 
-- [ ] **Step 1: Fetch VSCodium's exact copyright line**
+- [x] **Step 1: Fetch VSCodium's exact copyright line**
 
 ```bash
 curl -sS https://raw.githubusercontent.com/VSCodium/vscodium/1.126.04524/LICENSE | head -5
@@ -559,7 +577,7 @@ curl -sS https://raw.githubusercontent.com/VSCodium/vscodium/1.126.04524/LICENSE
 
 Copy the real copyright line from the output. Do not invent one.
 
-- [ ] **Step 2: Update the `THIRD_PARTY_NOTICES.md` summary table**
+- [x] **Step 2: Update the `THIRD_PARTY_NOTICES.md` summary table**
 
 Replace these two rows:
 
@@ -575,11 +593,11 @@ with:
 | [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web) image | 1.126.04524-ls35 | GPL-3.0 | base image, unmodified |
 ```
 
-- [ ] **Step 3: Update the MIT section heading and attribution**
+- [x] **Step 3: Update the MIT section heading and attribution**
 
 Rename the `## openvscode-server and Code – OSS` heading to `## VSCodium and Code – OSS`. Keep the existing MIT licence text and its `Copyright (c) 2015 - present Microsoft Corporation` line (Code – OSS is still Microsoft's). Immediately below that copyright line, add VSCodium's own copyright line from Step 1, so both are represented.
 
-- [ ] **Step 4: Update the copyleft section**
+- [x] **Step 4: Update the copyleft section**
 
 Replace the `linuxserver/openvscode-server` bullet:
 
@@ -590,11 +608,11 @@ Replace the `linuxserver/openvscode-server` bullet:
 
 Note the branch is `main`, not `master`.
 
-- [ ] **Step 5: Update `docs/legal/licenses.md`**
+- [x] **Step 5: Update `docs/legal/licenses.md`**
 
 Replace the two openvscode-server rows with the VSCodium equivalents, matching the wording used in Step 2.
 
-- [ ] **Step 6: Update `containers/code/README.md`**
+- [x] **Step 6: Update `containers/code/README.md`**
 
 Replace the intro line:
 
@@ -624,7 +642,7 @@ The container uses s6-overlay for process supervision. The upstream `linuxserver
 - **`svc-vscodium-web`** (upstream, run script overridden): Launches `codium-server` as `abc` user with health check, custom extensions/data dirs, port 3000, and server-base-path.
 ```
 
-- [ ] **Step 7: Update the remaining prose references**
+- [x] **Step 7: Update the remaining prose references**
 
 ```bash
 grep -rn "openvscode" README.md .env.example docs/ | grep -v docs/decisions
@@ -634,7 +652,7 @@ Work through each hit, replacing the product name with VSCodium / `codium-server
 
 Leave `docs/decisions/**` untouched — decision logs are historical records.
 
-- [ ] **Step 8: Verify no stale references outside decision logs**
+- [x] **Step 8: Verify no stale references outside decision logs**
 
 ```bash
 grep -rn "openvscode" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=decisions --exclude-dir=graphify-out . | grep -v "apps/control/migrations/"
@@ -642,12 +660,12 @@ grep -rn "openvscode" --exclude-dir=node_modules --exclude-dir=.git --exclude-di
 
 Expected: no output. The migrations exclusion is deliberate — `004_v2_code_container.sql` must keep its historical wording.
 
-- [ ] **Step 9: Confirm the docs site still builds**
+- [x] **Step 9: Confirm the docs site still builds**
 
 Run: `bun run docs:build`
 Expected: exits 0.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add THIRD_PARTY_NOTICES.md README.md .env.example docs/ containers/code/README.md
@@ -682,7 +700,7 @@ git commit -m "docs: retarget editor attribution and naming to VSCodium reh-web"
 - **Verification:** the evidence from Task 3 Steps 3–6 and the Task 4 outcome.
 - **Workspace trust:** record whichever branch Task 4 took, and why the setting must live in User scope (it is `application`-scoped).
 
-- [ ] **Step 1b: Fill in the verification outcomes**
+- [x] **Step 1b: Fill in the verification outcomes**
 
 The log currently states what was verified in the pre-implementation spike and
 flags Standard Mode as deferred. Update two places with real results:
@@ -699,6 +717,15 @@ flags Standard Mode as deferred. Update two places with real results:
 Also re-check the AGENTS.md re-verification consequence: once Task 4 confirms
 auto-import on completion and Ctrl-click into library source still behave, note
 that in the log so 011's evidence has an explicit successor.
+
+> **Actual:** neither of the two anticipated branches occurred — Standard Mode
+> was never reached without a manual trust click, and the trust-setting fix was
+> tested and found not to work (see Task 4's step notes above). "What was
+> verified, and what was not" now speaks from the built image and states
+> plainly that the three 011 editing behaviours were not individually
+> exercised, so 011's evidence has only a partial successor. "Open question:
+> workspace trust" became decision 035 §5 — a numbered decision to leave the
+> repo unchanged, not a decision that the fix was necessary and applied.
 
 - [x] **Step 2: Confirm it is excluded from the published site** — done 2026-08-24. `bun run docs:build` exits 0; `decisions/` and `superpowers/` produce no routes in `website/build/`. Re-run after editing:
 
