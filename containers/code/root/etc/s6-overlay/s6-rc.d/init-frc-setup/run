@@ -21,12 +21,14 @@ mkdir -p "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" "${HOME}/data/Machine" "${HOM
 if [[ -d /opt/frc-gradle-cache && ! -d "${GRADLE_USER_HOME}/caches" ]]; then
   echo "Seeding Gradle cache from image..."
   cp -a /opt/frc-gradle-cache/. "${GRADLE_USER_HOME}"/
+  lsiown -R abc:abc "${GRADLE_USER_HOME}"
 fi
 
 # Seed extensions on first run.
 if [[ -d /opt/frc-extensions-cache ]] && [[ -z "$(ls -A "${EXTENSIONS_DIR}" 2>/dev/null)" ]]; then
   echo "Seeding VS Code extensions from image..."
   cp -a /opt/frc-extensions-cache/. "${EXTENSIONS_DIR}"/
+  lsiown -R abc:abc "${EXTENSIONS_DIR}"
 fi
 
 GRADLE_PROPERTIES="${GRADLE_USER_HOME}/gradle.properties"
@@ -115,8 +117,15 @@ if [[ ! -d /workspace/project ]]; then
   echo "WARNING: Mounted project directory /workspace/project does not exist."
 fi
 
-# Fix ownership for /config and /workspace (linuxserver convention).
+# Fix ownership of what this script created as root. The base image's init
+# already chowns /config recursively every boot — do not reintroduce a second
+# recursive pass over ${HOME}; the Gradle cache alone is ~1 GB of traversal
+# (decision 033).
 echo "setting permissions::config"
-lsiown -R abc:abc "${HOME}"
+lsiown abc:abc \
+  "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" \
+  "${HOME}/data" "${HOME}/data/Machine" "${HOME}/data/User" \
+  "${GRADLE_PROPERTIES}" "${USER_SETTINGS}" "${MACHINE_SETTINGS}" \
+  "${SIM_LOG_FILE}"
 echo "setting permissions::workspace"
 lsiown -R abc:abc /workspace/project
