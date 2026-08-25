@@ -104,8 +104,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 MIT License
 
-Copyright (c) 2015 - present Microsoft Corporation
 Copyright (c) 2018-present The VSCodium contributors
+Copyright (c) 2018-present Peter Squicciarini
+Copyright (c) 2015 - present Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
