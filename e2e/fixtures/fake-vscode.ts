@@ -1,5 +1,5 @@
 /**
- * In-process HTTP+WS server that impersonates openvscode-server.
+ * In-process HTTP+WS server that impersonates the workspace editor.
  *
  * Records every HTTP request's headers and every WS frame so tests can assert
  * proxy behavior (hop-by-hop strip, base-path mounting, WS upgrade payload).

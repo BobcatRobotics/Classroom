@@ -220,10 +220,10 @@ export async function handleWorkspaceRoute(
 		}
 	}
 
-	// --- Editor proxy: openvscode-server ---
+	// --- Editor proxy: codium-server (VSCodium reh-web) ---
 	// Match /vscode or /vscode/* (the suffix starts with /vscode).
 	// The full URL path including /u/<slug>/vscode/ is passed through
-	// unchanged because openvscode-server is launched with
+	// unchanged because codium-server is launched with
 	// --server-base-path /u/<slug>/vscode/.
 	if (suffix === "/vscode" || suffix.startsWith("/vscode/")) {
 		const fullPath = url.pathname + (url.search || "");

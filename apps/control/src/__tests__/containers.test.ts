@@ -295,7 +295,7 @@ describe("code container orchestration", () => {
 		);
 	});
 
-	test("s6 service script launches openvscode-server as primary process", async () => {
+	test("s6 service script launches codium-server as primary process", async () => {
 		const serviceScript = await readFile(
 			join(
 				process.cwd(),
@@ -305,12 +305,13 @@ describe("code container orchestration", () => {
 				"etc",
 				"s6-overlay",
 				"s6-rc.d",
-				"svc-openvscode-server",
+				"svc-vscodium-web",
 				"run",
 			),
 			"utf8",
 		);
-		expect(serviceScript).toContain("openvscode-server");
+		expect(serviceScript).toContain("/app/vscodium-web/bin/codium-server");
+		expect(serviceScript).toContain("--server-base-path");
 	});
 
 	test("restarted control plane rediscovers a labeled code container", async () => {

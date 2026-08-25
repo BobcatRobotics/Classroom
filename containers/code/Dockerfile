@@ -1,9 +1,9 @@
 # V2 merged code container
-# Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/openvscode-server
-# Base already provides: openvscode-server, s6-overlay, abc user, PUID/PGID support
-# See docs/decisions/017-linuxserver-base-migration.md
-
-FROM linuxserver/openvscode-server:1.109.5
+# Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
+# Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
+# PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
+# docs/decisions/035-vscodium-web-migration.md
+FROM linuxserver/vscodium-web:1.126.04524-ls35
 
 # ── System dependencies ────────────────────────────────────────────────
 # Ubuntu 24.04 ships GLIBCXX_3.4.32+ natively — no PPA needed.
@@ -49,10 +49,10 @@ RUN sed -i 's/\r$//' /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/
     && chmod +x /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/local/bin/stop-sim.sh
 
 # ── s6-overlay service definitions (additive to upstream) ─────────────
-# Adds init-frc-setup oneshot and overrides svc-openvscode-server run script.
+# Adds init-frc-setup oneshot and overrides svc-vscodium-web run script.
 COPY containers/code/root/ /
 RUN chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
-             /etc/s6-overlay/s6-rc.d/svc-openvscode-server/run
+             /etc/s6-overlay/s6-rc.d/svc-vscodium-web/run
 
 # ── Download and install VS Code extensions ────────────────────────────
 ARG REDHAT_JAVA_VERSION=1.38.0
@@ -88,7 +88,7 @@ RUN mkdir -p /tmp/exts \
 
 # Install to a baked cache directory; the init script seeds per-workspace configs.
 RUN mkdir -p /opt/frc-extensions-cache \
-    && /app/openvscode-server/bin/openvscode-server \
+    && /app/vscodium-web/bin/codium-server \
                      --install-extension /tmp/exts/redhat.java.vsix \
                      --install-extension /tmp/exts/vscode-wpilib.vsix \
                      --install-extension /tmp/exts/vscode-java-debug.vsix \
@@ -129,7 +129,7 @@ RUN mkdir -p /opt/frc-gradle-cache \
     && rm -rf /config/.gradle /workspace/template
 
 # ── License notices ───────────────────────────────────────────────────
-# This image redistributes openvscode-server, Temurin, WPILib, and the bundled
+# This image redistributes VSCodium reh-web, Temurin, WPILib, and the bundled
 # extensions; the BSD-3-Clause components require their notice to accompany
 # the distribution. Placed after the Gradle priming so notice edits don't
 # invalidate that layer.
