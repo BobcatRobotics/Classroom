@@ -5,7 +5,6 @@
 GRADLE_USER_HOME="${HOME}/.gradle"
 EXTENSIONS_DIR="${HOME}/extensions"
 MACHINE_SETTINGS="${HOME}/data/Machine/settings.json"
-USER_SETTINGS="${HOME}/data/User/settings.json"
 PROJECT_SETTINGS="/workspace/project/.vscode/settings.json"
 SIM_LOG_FILE="${SIM_LOG_FILE:-${HOME}/sim.log}"
 DEFAULT_JDT_LS_VMARGS="-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xms64m -Xmx512m -XX:ReservedCodeCacheSize=96m -Xlog:disable"
@@ -22,6 +21,11 @@ if [[ -d /opt/frc-gradle-cache && ! -d "${GRADLE_USER_HOME}/caches" ]]; then
   echo "Seeding Gradle cache from image..."
   cp -a /opt/frc-gradle-cache/. "${GRADLE_USER_HOME}"/
   lsiown -R abc:abc "${GRADLE_USER_HOME}"
+fi
+
+# Add the wrapper-path alias to homes created before it was baked into the image.
+if [[ -d "${GRADLE_USER_HOME}/wrapper" && ! -e "${GRADLE_USER_HOME}/permwrapper" && ! -L "${GRADLE_USER_HOME}/permwrapper" ]]; then
+  ln -s wrapper "${GRADLE_USER_HOME}/permwrapper"
 fi
 
 # Seed extensions on first run.
@@ -84,7 +88,9 @@ merge_vscode_settings() {
       | ."gradle.autoDetect" //= "off"
       | ."java.import.gradle.jvmArguments" //= $gradleJvmargs
       | ."java.import.gradle.arguments" //= $gradleArgs
-      | (if $mode == "project" then . else ."workbench.startupEditor" //= "readme" end)
+      | (if $mode == "project" then . else
+          ."workbench.colorTheme" //= "Default Dark Modern"
+        end)
     ' "${settings_file}" > "${tmp_settings}"; then
     mv "${tmp_settings}" "${settings_file}"
   else
@@ -93,21 +99,9 @@ merge_vscode_settings() {
   fi
 }
 
-merge_vscode_settings "${USER_SETTINGS}" defaults
+merge_vscode_settings "${MACHINE_SETTINGS}" defaults
 if [[ -f "${PROJECT_SETTINGS}" ]]; then
   merge_vscode_settings "${PROJECT_SETTINGS}" project
-fi
-
-if [[ ! -s "${MACHINE_SETTINGS}" ]]; then
-  printf '{}\n' > "${MACHINE_SETTINGS}"
-fi
-
-tmp_settings="$(mktemp)"
-if jq '."workbench.colorTheme" //= "Default Dark Modern"' "${MACHINE_SETTINGS}" > "${tmp_settings}"; then
-  mv "${tmp_settings}" "${MACHINE_SETTINGS}"
-else
-  rm -f "${tmp_settings}"
-  echo "WARNING: Could not update VS Code machine settings; leaving ${MACHINE_SETTINGS} unchanged."
 fi
 
 touch "${SIM_LOG_FILE}"
@@ -125,7 +119,7 @@ echo "setting permissions::config"
 lsiown abc:abc \
   "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" \
   "${HOME}/data" "${HOME}/data/Machine" "${HOME}/data/User" \
-  "${GRADLE_PROPERTIES}" "${USER_SETTINGS}" "${MACHINE_SETTINGS}" \
+  "${GRADLE_PROPERTIES}" "${MACHINE_SETTINGS}" \
   "${SIM_LOG_FILE}"
 echo "setting permissions::workspace"
 lsiown -R abc:abc /workspace/project

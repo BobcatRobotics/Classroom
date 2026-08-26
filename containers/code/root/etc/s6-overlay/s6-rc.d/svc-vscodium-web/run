@@ -22,6 +22,7 @@ codium_args=(
   --port 3000
   --without-connection-token
   --disable-telemetry
+  --disable-workspace-trust
   --extensions-dir "${EXTENSIONS_DIR}"
   --server-data-dir "${HOME}"
 )

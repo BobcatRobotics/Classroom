@@ -10,7 +10,15 @@ const initScript = resolve(
 );
 
 describe("Code container VS Code defaults", () => {
-	test("seeds the remote machine settings with the dark theme id", async () => {
+	test("adds the WPILib wrapper alias to existing Gradle homes", async () => {
+		const contents = await readFile(initScript, "utf8");
+
+		expect(contents).toContain(
+			'ln -s wrapper "$' + '{GRADLE_USER_HOME}/permwrapper"',
+		);
+	});
+
+	test("seeds workbench and Java defaults as remote machine settings", async () => {
 		const contents = await readFile(initScript, "utf8");
 
 		expect(contents).toContain(
@@ -19,5 +27,9 @@ describe("Code container VS Code defaults", () => {
 		expect(contents).toContain(
 			'"workbench.colorTheme" //= "Default Dark Modern"',
 		);
+		expect(contents).toContain(
+			'merge_vscode_settings "$' + '{MACHINE_SETTINGS}" defaults',
+		);
+		expect(contents).not.toContain("USER_SETTINGS=");
 	});
 });

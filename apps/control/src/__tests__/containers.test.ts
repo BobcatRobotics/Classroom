@@ -317,6 +317,7 @@ describe("code container orchestration", () => {
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: matches literal shell text
 		expect(serviceScript).toContain('--server-data-dir "${HOME}"');
 		expect(serviceScript).not.toContain('--user-data-dir "');
+		expect(serviceScript).toContain("--disable-workspace-trust");
 	});
 
 	test("restarted control plane rediscovers a labeled code container", async () => {

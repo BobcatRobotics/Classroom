@@ -111,7 +111,7 @@ arch-independent). See `docs/decisions/035-multi-arch-images-and-workflow-split.
 - Do not use query-param user identity in production routes.
 - Do not expose per-user editor or NT4 ports directly to the browser.
 - Keep AS Lite patches source-level and repeatable.
-- Do not re-verify upstream extension-owned behavior unless editor or extension versions changed. Decision 011 is the evidence record.
+- Do not re-verify upstream extension-owned behavior unless editor or extension versions changed. Decisions 011 and 036 record the editor-specific evidence.
 - Keep metrics instrumentation backend-agnostic. The control plane only speaks Prometheus exposition at `/metrics`; deploy-specific shipping (Alloy → Grafana Cloud, or whatever replaces it) lives outside `apps/control/`. Decision 023 is the record.
 - Run `bun run check:fix` before finalizing any code change. It applies Biome's safe lint fixes, formatting, and import organization in one pass. `bun run verify` gates on `biome ci` so unfixed issues will fail CI.
 - Documentation for users and operators lives in `docs/` (the Docusaurus site); update the relevant page when changing behavior. Decision logs stay in `docs/decisions/` and are not published to the site.
@@ -119,7 +119,7 @@ arch-independent). See `docs/decisions/035-multi-arch-images-and-workflow-split.
 ## Key References
 
 - `docs/` + `website/` — docs site content and Docusaurus config; published at `https://mathewdunne.github.io/CodeRunner/`; run `bun run docs:dev` to browse locally, `bun run docs:build` to build.
-- `docs/decisions/` — all architecture decision logs (011–036 active; 001–010 archived under `docs/decisions/archive/`).
+- `docs/decisions/` — all architecture decision logs (011–037 active; 001–010 archived under `docs/decisions/archive/`).
 - Pinned AdvantageScope submodule: `vendor/AdvantageScope` at tag `v26.0.2`.
 
 ## Commands

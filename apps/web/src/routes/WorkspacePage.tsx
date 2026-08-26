@@ -33,8 +33,7 @@ export function WorkspacePage() {
 		[slug],
 	);
 
-	// Bumped after a project swap so the session refetches and the editor iframe
-	// remounts (so VS Code reopens the new folder and fires the README preview).
+	// Bumped after a project swap so the session refetches and the editor remounts.
 	const [reloadNonce, setReloadNonce] = useState(0);
 	const sessionState = useSession(workspaceSlug, reloadNonce);
 

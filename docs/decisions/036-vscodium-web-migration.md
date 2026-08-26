@@ -170,6 +170,12 @@ server.
 > must be re-run against an image carrying the `--server-data-dir` fix before
 > concluding anything about workspace trust.
 
+> **Follow-up:** the rebuilt image confirmed that User settings, Machine
+> settings, and `product.json` defaults cannot override this
+> application-scoped setting. Decision
+> [`037`](./037-gradle-wrapper-alias-and-extension-pins.md) closes the issue with
+> codium-server's `--disable-workspace-trust` flag.
+
 **It is not a regression.** The currently published production image
 (`ghcr.io/mathewdunne/coderunner-workspace:latest`, openvscode-server-based,
 revision `ffa7b47`, built 2026-08-13) was run through the identical
@@ -178,7 +184,7 @@ observation and behaved identically: Restricted Mode, Lightweight Mode, only
 and the repository has never configured it either way. This predates the
 migration; it is simply the first time anyone looked closely enough to notice.
 
-**No change was made.** `init-frc-setup` was not edited for trust — the
+**No change was made in this migration.** `init-frc-setup` was not edited for trust — the
 proposed `jq` addition above was never applied. Since the tested fix doesn't
 work and the behaviour is pre-existing rather than migration-caused, forcing a
 fix through under this migration's review would have made an unrelated
@@ -286,12 +292,9 @@ instead of `--user-data-dir`, which derives `/config/data/{User,Machine}` and
 a default extensions dir of `/config/extensions` — bit-identical to the layout
 everything else already assumes. `containers.test.ts` pins the flag (and the
 absence of `--user-data-dir`). Sections 4 and 5 and the verification account
-above carry inline corrections; the §5 workspace-trust experiment is void and
-needs a re-run against a rebuilt image. The re-verification checklist for that
-rebuild: `ls /config/.vscodium-server/data/User/` must not exist (or be
-empty), the workbench must come up dark-themed (the cheapest proof the Machine
-settings are read), and `ps` inside the container must show JDT LS running
-with `-Xmx512m`.
+above carry inline corrections. The follow-up re-run and final workspace-trust
+fix are recorded in decision
+[`037`](./037-gradle-wrapper-alias-and-extension-pins.md).
 
 ## Consequences
 

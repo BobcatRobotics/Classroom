@@ -403,8 +403,7 @@ export class ImportManager {
 				"-c",
 				"lsiown -R abc:abc /workspace/project",
 			]);
-			// Clear the editor workspace cache so redhat.java rebuilds its project
-			// model and the new README re-opens on the next folder open.
+			// Clear the editor workspace cache so redhat.java rebuilds its project model.
 			await this.runtimeExec(workspace.id, [
 				"rm",
 				"-rf",

@@ -25,7 +25,7 @@ top:
 | Component | Version |
 |---|---|
 | VSCodium reh-web (`codium-server`) | 1.126.04524 |
-| Adoptium Temurin JDK | 17.0.15+6 (x64) |
+| Adoptium Temurin JDK | 17.0.15+6 (x64/aarch64) |
 | redhat.java (JDT Language Server) | 1.38.0 |
 | vscode-wpilib (WPILib extension) | 2026.1.1 |
 | Java Extension Pack | debugger, test runner, Maven/Gradle, project manager |
@@ -131,8 +131,8 @@ script runs before the editor starts:
    `/config/.gradle/`.
 2. Copies the pre-installed VS Code extensions from `/opt/frc-extensions-cache/`
    into `/config/extensions/`.
-3. Seeds bounded JVM and Gradle settings into editor configuration files.
-4. Sets the default VS Code color theme to `Default Dark Modern`.
+3. Seeds bounded Java/Gradle settings and the dark theme into the editor's
+   Remote/Machine configuration.
 
 On subsequent starts these copies are skipped because the directories already
 exist. A settings-migration step still runs to lower any legacy `-Xmx8G` JDT

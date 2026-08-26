@@ -115,8 +115,7 @@ On first start with an empty `/config`, the init script:
 
 1. Copies the primed Gradle cache from `/opt/frc-gradle-cache/` into `/config/.gradle/`.
 2. Copies pre-installed VS Code extensions from `/opt/frc-extensions-cache/` into `/config/extensions/`.
-3. Seeds Gradle and Java extension settings with the bounded runtime defaults above.
-4. Seeds `/config/data/Machine/settings.json` with `workbench.colorTheme: Default Dark Modern` when no Machine theme is already set.
+3. Seeds `/config/data/Machine/settings.json` with the bounded Java/Gradle defaults and dark theme.
 
 Subsequent starts skip these copies (directories already populated from the bind mount).
 Settings migration still runs on later starts so existing imported WPILib projects with `java.jdt.ls.vmargs` set to `-Xmx8G` are lowered to the container default.

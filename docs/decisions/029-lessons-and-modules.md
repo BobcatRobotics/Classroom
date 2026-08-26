@@ -53,13 +53,20 @@ See `Lessons-Design.md` for the full rationale.
    README preview re-fires — giving exactly the D6 behaviour with no client-side
    command plumbing. No-ops gracefully when a module ships no `README.md`.
 
+   **VSCodium follow-up (2026-08-26):** this mechanism does not work in the
+   browser workbench. Server-side User settings are browser-owned, and moving
+   the setting to Remote/Machine still loses to startup and walkthrough state.
+   Decision [`037`](./037-gradle-wrapper-alias-and-extension-pins.md) removes
+   the ineffective seed. Reliable auto-open needs a workbench default patch or
+   an explicit editor URL payload.
+
 5. **`workspaceStorage` is cleared on every destructive project swap.** Module
    load, lesson reset, and team import all `rm -rf /config/data/User/workspaceStorage`
-   inside the container before/after replacing `/workspace/project`. This (a)
-   stops redhat.java reusing a stale Gradle/invisible-project model across a
-   `robot ↔ plain-java` switch on the stable `/workspace/project` URI (§4.3), and
-   (b) lets `startupEditor` re-open the new README (4). The rest of `/config`
-   (git credentials, editor prefs) is left intact (D5/§5.5).
+   inside the container before/after replacing `/workspace/project`. This stops
+   redhat.java reusing a stale Gradle/invisible-project model across a
+   `robot ↔ plain-java` switch on the stable `/workspace/project` URI (§4.3).
+   The rest of `/config` (git credentials and editor state) is left intact
+   (D5/§5.5).
 
 6. **First-login picker uses a computed `projectEmpty` flag**, not a stored
    "source" column. The session payload exposes `projectEmpty` (host-side

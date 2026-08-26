@@ -74,7 +74,7 @@ ARG JAVA_DEPS_VERSION=0.27.2
 ARG JAVA_PACK_VERSION=0.30.5
 ARG SPOTLESS_GRADLE_VERSION=1.2.1
 
-# Download extensions from pinned Open VSX, GitHub Release, and Marketplace artifacts.
+# Download pinned Open VSX, GitHub Release, and Marketplace artifacts.
 RUN mkdir -p /tmp/exts \
     && wget -q "https://open-vsx.org/api/redhat/java/${REDHAT_JAVA_VERSION}/file/redhat.java-${REDHAT_JAVA_VERSION}.vsix" \
        -O /tmp/exts/redhat.java.vsix \
@@ -95,9 +95,11 @@ RUN mkdir -p /tmp/exts \
     && wget -q "https://richardwillis.gallery.vsassets.io/_apis/public/gallery/publisher/richardwillis/extension/vscode-spotless-gradle/${SPOTLESS_GRADLE_VERSION}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage" \
        -O /tmp/exts/vscode-spotless-gradle.vsix
 
-# Install to a baked cache directory; the init script seeds per-workspace configs.
+# Do not resolve extension packs or dependencies from the gallery; every required
+# Java extension is installed explicitly below.
 RUN mkdir -p /opt/frc-extensions-cache \
     && /app/vscodium-web/bin/codium-server \
+                     --do-not-include-pack-dependencies \
                      --install-extension /tmp/exts/redhat.java.vsix \
                      --install-extension /tmp/exts/vscode-wpilib.vsix \
                      --install-extension /tmp/exts/vscode-java-debug.vsix \
@@ -108,6 +110,10 @@ RUN mkdir -p /opt/frc-extensions-cache \
                      --install-extension /tmp/exts/vscode-java-pack.vsix \
                      --install-extension /tmp/exts/vscode-spotless-gradle.vsix \
                      --extensions-dir /opt/frc-extensions-cache \
+    && jq -e \
+       --argjson expected '["redhat.java@'"${REDHAT_JAVA_VERSION}"'","wpilibsuite.vscode-wpilib@'"${WPILIB_EXT_VERSION}"'","vscjava.vscode-java-debug@'"${JAVA_DEBUG_VERSION}"'","vscjava.vscode-java-test@'"${JAVA_TEST_VERSION}"'","vscjava.vscode-maven@'"${MAVEN_VERSION}"'","vscjava.vscode-gradle@'"${GRADLE_VERSION}"'","vscjava.vscode-java-dependency@'"${JAVA_DEPS_VERSION}"'","vscjava.vscode-java-pack@'"${JAVA_PACK_VERSION}"'","richardwillis.vscode-spotless-gradle@'"${SPOTLESS_GRADLE_VERSION}"'"]' \
+       'length == ($expected | length) and all(.[]; .metadata.source == "vsix" and .metadata.pinned == true) and ([.[] | "\(.identifier.id)@\(.version)"] | sort) == ($expected | sort)' \
+       /opt/frc-extensions-cache/extensions.json > /dev/null \
     && rm -rf /tmp/exts
 
 # ── Bundled lesson catalog ────────────────────────────────────────────
@@ -133,8 +139,13 @@ RUN ./gradlew --no-daemon --stop; \
     rm -rf /workspace/template/build /workspace/template/.gradle
 
 USER root
+# WPILib templates use permwrapper/dists while the catalog uses wrapper/dists.
+# Gradle keys distributions by URL, so both paths can share the primed cache.
 RUN mkdir -p /opt/frc-gradle-cache \
     && cp -a /config/.gradle/. /opt/frc-gradle-cache/ \
+    && test ! -e /opt/frc-gradle-cache/permwrapper \
+    && test ! -L /opt/frc-gradle-cache/permwrapper \
+    && ln -s wrapper /opt/frc-gradle-cache/permwrapper \
     && rm -rf /config/.gradle /workspace/template
 
 # ── License notices ───────────────────────────────────────────────────

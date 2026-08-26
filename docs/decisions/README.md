@@ -4,13 +4,14 @@ Record active architecture decisions here.
 
 ## Active (V2 and post-V2)
 
-011–036 are the current decision logs (see files in this directory). The latest:
+011–037 are the current decision logs (see files in this directory). The latest:
 
 - [`032-canonical-image-naming.md`](032-canonical-image-naming.md) — one canonical name per image, derived from `CODERUNNER_IMAGE_NS` + `CODERUNNER_TAG`.
 - [`033-workspace-disk-read-limit.md`](033-workspace-disk-read-limit.md) — workspace containers get a per-device `--device-read-bps` cap (`CODE_DISK_READ_LIMIT`) so one memory-thrashing container cannot saturate host disk throughput and freeze the VM; `CODE_MEMORY_LIMIT` default raised to `4096m`.
 - [`034-demo-mode-portability.md`](034-demo-mode-portability.md) — the demo runs unconfigured on Docker Desktop: `group_add` uses the Docker socket's owning group and defaults to root (the Docker Desktop case), and demo mode keeps `/config` on a named volume and skips the disk read cap so performance no longer depends on the host filesystem.
 - [`035-multi-arch-images-and-workflow-split.md`](035-multi-arch-images-and-workflow-split.md) — both images publish linux/amd64 + linux/arm64 manifest lists built on native runners and merged by digest; the single deploy pipeline splits into CI (verify on PR/main), Release (on `v*` tag push), and Deploy (manual dispatch of a published tag); the emsdk stage builds once on amd64 and feeds the arm64 control build via a named build context.
 - [`036-vscodium-web-migration.md`](036-vscodium-web-migration.md) — the workspace editor moves from the abandoned openvscode-server to VSCodium `reh-web` via `linuxserver/vscodium-web`; chosen over `code-server` because `codium-server` keeps `--server-base-path`, so the pass-through proxy contract survives unchanged.
+- [`037-gradle-wrapper-alias-and-extension-pins.md`](037-gradle-wrapper-alias-and-extension-pins.md) — shares the primed Gradle distribution across wrapper layouts, enforces the pinned extension manifest, and disables workspace trust in the hosted workbench.
 
 ## Archive
 

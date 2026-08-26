@@ -34,7 +34,7 @@ This directory documents the VS Code extensions bundled into the V2 code contain
 
 - **vscode-wpilib 2026.1.1**: Published by wpilibsuite on GitHub Releases. WPILib Kickoff release for the 2026 season. Pure JS/TS extension. Verified in Stage 0 spike (Decision 011).
 
-- **Java Extension Pack + sub-extensions**: Published by Microsoft/vscjava on Open VSX. The pack is a meta-extension that declares `extensionPack` dependencies. We install both the pack and all its sub-extensions explicitly to ensure they are available offline.
+- **Java Extension Pack + sub-extensions**: Published by Microsoft/vscjava on Open VSX. The pack and all required extensions are installed from pinned VSIXs for offline use. The image build disables gallery dependency resolution and verifies the resulting extension manifest, preventing the pack or `extensionDependencies` from replacing those pins.
 
 - **Spotless Gradle 1.2.1**: Published by Richard Willis on the VS Code Marketplace. The extension has not been updated in several years, so the image pins the current Marketplace package version directly instead of using the mutable `latest` asset URL.
 
