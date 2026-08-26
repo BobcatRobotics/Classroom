@@ -2,7 +2,7 @@
 # Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
 # Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
 # PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
-# docs/decisions/035-vscodium-web-migration.md
+# docs/decisions/036-vscodium-web-migration.md
 FROM linuxserver/vscodium-web:1.126.04524-ls35
 
 # ── System dependencies ────────────────────────────────────────────────

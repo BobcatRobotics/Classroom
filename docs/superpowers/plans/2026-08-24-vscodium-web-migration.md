@@ -55,7 +55,7 @@ These were confirmed hands-on against a real `vscodium-reh-web-linux-x64-1.126.0
 **Created:**
 - `containers/code/root/etc/s6-overlay/s6-rc.d/svc-vscodium-web/run` — editor launch script (replaces the openvscode-server one)
 - `containers/code/root/etc/s6-overlay/s6-rc.d/svc-vscodium-web/dependencies.d/init-frc-setup` — empty marker file ordering the editor after FRC setup
-- `docs/decisions/035-vscodium-web-migration.md` — decision record
+- `docs/decisions/036-vscodium-web-migration.md` — decision record
 
 **Deleted:**
 - `containers/code/root/etc/s6-overlay/s6-rc.d/svc-openvscode-server/` — entire directory. **Mandatory**: leaving it behind creates a service dir with a `run` but no `type` (the base image no longer supplies one), which fails s6-rc compilation at container start.
@@ -192,7 +192,7 @@ In `containers/code/Dockerfile`, replace the header comment block and `FROM` lin
 # Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
 # Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
 # PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
-# docs/decisions/035-vscodium-web-migration.md
+# docs/decisions/036-vscodium-web-migration.md
 FROM linuxserver/vscodium-web:1.126.04524-ls35
 ```
 
@@ -677,13 +677,13 @@ git commit -m "docs: retarget editor attribution and naming to VSCodium reh-web"
 ### Task 7: Record decision log 035
 
 > **Mostly done already — do not write a second decision log.**
-> `docs/decisions/035-vscodium-web-migration.md` was written on 2026-08-24,
+> `docs/decisions/036-vscodium-web-migration.md` was written on 2026-08-24,
 > ahead of implementation, and `docs/decisions/README.md` and `AGENTS.md` were
 > updated at the same time. Steps 1 and 3 are complete. What remains is Step 1b:
 > fill in the verification outcomes once Tasks 3–5 have actually run.
 
 **Files:**
-- Modify: `docs/decisions/035-vscodium-web-migration.md` (already exists)
+- Modify: `docs/decisions/036-vscodium-web-migration.md` (already exists)
 
 **Interfaces:**
 - Consumes: the evidence recorded in Task 3 Step 7 and the Task 4 branch outcome.
@@ -740,7 +740,7 @@ Expected: build exits 0, grep prints nothing.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/decisions/035-vscodium-web-migration.md docs/decisions/README.md AGENTS.md docs/superpowers/ website/docusaurus.config.ts
+git add docs/decisions/036-vscodium-web-migration.md docs/decisions/README.md AGENTS.md docs/superpowers/ website/docusaurus.config.ts
 git commit -m "docs: record decision 035 — VSCodium reh-web editor migration"
 ```
 

@@ -1,4 +1,4 @@
-# 035 — Editor migration: openvscode-server → VSCodium reh-web
+# 036 — Editor migration: openvscode-server → VSCodium reh-web
 
 Status: **Accepted and implemented** — 2026-08-24
 
