@@ -4,9 +4,18 @@
 #
 # Port 3000 is deliberate: the LinuxServer base exposes 8000, but keeping 3000
 # means VSCODE_CONTAINER_PORT and the control plane need no changes.
+#
+# This override intentionally drops the upstream run script's CONNECTION_TOKEN /
+# CONNECTION_TOKEN_FILE / CODE_ARGS handling — auth is the control plane's
+# proxy, not a connection token.
+#
+# --server-data-dir, not --user-data-dir: unpatched upstream codium-server
+# parses --user-data-dir but unconditionally overwrites it with
+# <server-data-dir>/data (src/vs/server/node/server.main.ts). openvscode-server
+# only honoured --user-data-dir via a Gitpod patch. --server-data-dir ${HOME}
+# yields /config/data/{User,Machine} — the same layout init-frc-setup seeds.
 
 EXTENSIONS_DIR="${HOME}/extensions"
-DATA_DIR="${HOME}/data"
 
 codium_args=(
   --host 0.0.0.0
@@ -14,7 +23,7 @@ codium_args=(
   --without-connection-token
   --disable-telemetry
   --extensions-dir "${EXTENSIONS_DIR}"
-  --user-data-dir "${DATA_DIR}"
+  --server-data-dir "${HOME}"
 )
 
 if [[ -n "${VSCODE_BASE_PATH:-}" && "${VSCODE_BASE_PATH:-/}" != "/" ]]; then

@@ -112,12 +112,18 @@ benefit.
 
 ### 4. Settings and extension paths do not move
 
-`codium-server` accepts the same `--user-data-dir` and `--extensions-dir` flags,
-and `--server-data-dir <dir>` produces `<dir>/data/User/` and
-`<dir>/data/Machine/` — structurally identical to the current layout. So
+`codium-server` parses `--user-data-dir` but — unlike openvscode-server, which
+carried a Gitpod patch honouring it — unpatched upstream unconditionally
+overwrites it with `<server-data-dir>/data`
+(`src/vs/server/node/server.main.ts`; VSCodium patches neither that file nor
+the default, and `product.json`'s `serverDataFolderName` is
+`.vscodium-server`). The run script therefore passes `--server-data-dir
+"${HOME}"`, which yields `/config/data/User/` and `/config/data/Machine/` —
+structurally identical to the previous layout. So
 `/config/data/{User,Machine}/settings.json` and `/config/extensions` are
 unchanged, `init-frc-setup` needs no path edits, and 026's Machine-scoped theme
-seeding continues to work through the same mechanism.
+seeding continues to work through the same mechanism. (This section originally
+claimed `--user-data-dir` was honoured; see the post-review correction below.)
 
 Build-time VSIX sideloading is likewise unchanged: `--install-extension
 <path.vsix>` is stock upstream behaviour. Both critical extensions installed
@@ -155,6 +161,14 @@ windows. In a purely browser-hosted deployment there appears to be no route
 from a server-side `settings.json` write into that application-scoped read,
 though the exact mechanism was not fully pinned down without instrumenting the
 server.
+
+> **Post-review correction (2026-08-26):** this experiment wrote to
+> `/config/data/User/settings.json` — a file the server never read, because
+> the `--user-data-dir` flag the image relied on is ignored by unpatched
+> codium-server (see the correction section below). The negative result and
+> the `applicationConfiguration` theory above are both void. The experiment
+> must be re-run against an image carrying the `--server-data-dir` fix before
+> concluding anything about workspace trust.
 
 **It is not a regression.** The currently published production image
 (`ghcr.io/mathewdunne/coderunner-workspace:latest`, openvscode-server-based,
@@ -197,10 +211,12 @@ couldn't reach: the workbench serves under `/u/smoke/vscode/` with absolute
 prefixed asset URLs
 (`/u/smoke/vscode/stable-4c0b0c6cc561d2d3636d1ec250935431876ce4dc/static/out/vs/code/browser/workbench/workbench.js`),
 WebSocket upgrade under the base path returns `101 Switching Protocols`,
-`--user-data-dir` **is** honoured — settings landed at `/config/data/{User,
-Machine}` and `/config/data/data/` does not exist, so the flag caveat decision
-4 above originally carried did not bite and the run script keeps
-`--user-data-dir "${HOME}/data"` unchanged. Machine settings carry
+settings were present at `/config/data/{User,Machine}` and `/config/data/data/`
+did not exist — observations this doc originally read as "`--user-data-dir` is
+honoured". That inference was wrong: `init-frc-setup` writes those files
+itself, so their presence proves nothing about what the server *reads*, and
+the actual miss path was `/config/.vscodium-server/data/`, which was never
+checked. See the post-review correction below. Machine settings carry
 `"workbench.colorTheme": "Default Dark Modern"`; User settings carry the
 `java.jdt.ls.vmargs` and Gradle keys. Ownership after Task 2's scoped `lsiown`
 is `abc:abc` on `/config/.gradle`, `/config/extensions`, both settings files,
@@ -244,6 +260,38 @@ typecheck` exits 0; `bun run check` exits 0 across 264 files; `bun run test` is
 376 pass / 0 fail; `bun run test:web` is 85 pass; `bun run e2e` is 56 pass;
 `bun run e2e:security` is 8 pass. No control-plane source file changed as part
 of this migration.
+
+## Post-review correction (2026-08-26): `--user-data-dir` is ignored
+
+An adversarial review of this branch traced the shipped
+`vscodium-reh-web-linux-x64-1.126.04524` bundle and upstream source and found
+the original run script's `--user-data-dir "${HOME}/data"` was silently
+discarded: stock VS Code server computes `USER_DATA_PATH =
+join(REMOTE_DATA_FOLDER, 'data')` and unconditionally overwrites the parsed
+flag (`src/vs/server/node/server.main.ts`, identical at 1.109/1.120/1.126),
+and VSCodium applies no patch there. openvscode-server honoured the flag only
+because Gitpod patched exactly that line
+(`USER_DATA_PATH = args['user-data-dir'] || ...`). With no `--server-data-dir`
+passed, the real data root was `/config/.vscodium-server/data/` — so every
+setting `init-frc-setup` seeds (bounded `java.jdt.ls.vmargs`,
+`java.gradle.buildServer.enabled: off`, `gradle.autoDetect: off`, the Machine
+dark theme, `workbench.startupEditor`) would never have been read, and the
+control plane's `imports.ts` purge of `/config/data/User/workspaceStorage` on
+lesson switch would have been a silent no-op. Gradle-side limits in
+`gradle.properties` were unaffected (read via `GRADLE_USER_HOME`, not the
+editor).
+
+**Fix applied:** the run script now passes `--server-data-dir "${HOME}"`
+instead of `--user-data-dir`, which derives `/config/data/{User,Machine}` and
+a default extensions dir of `/config/extensions` — bit-identical to the layout
+everything else already assumes. `containers.test.ts` pins the flag (and the
+absence of `--user-data-dir`). Sections 4 and 5 and the verification account
+above carry inline corrections; the §5 workspace-trust experiment is void and
+needs a re-run against a rebuilt image. The re-verification checklist for that
+rebuild: `ls /config/.vscodium-server/data/User/` must not exist (or be
+empty), the workbench must come up dark-themed (the cheapest proof the Machine
+settings are read), and `ps` inside the container must show JDT LS running
+with `-Xmx512m`.
 
 ## Consequences
 

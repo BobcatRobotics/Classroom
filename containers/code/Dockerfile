@@ -59,8 +59,9 @@ RUN sed -i 's/\r$//' /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/
 # ── s6-overlay service definitions (additive to upstream) ─────────────
 # Adds init-frc-setup oneshot and overrides svc-vscodium-web run script.
 COPY containers/code/root/ /
-RUN chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
-             /etc/s6-overlay/s6-rc.d/svc-vscodium-web/run
+RUN find /etc/s6-overlay/s6-rc.d/init-frc-setup /etc/s6-overlay/s6-rc.d/svc-vscodium-web -type f -exec sed -i 's/\r$//' {} + \
+    && chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
+                /etc/s6-overlay/s6-rc.d/svc-vscodium-web/run
 
 # ── Download and install VS Code extensions ────────────────────────────
 ARG REDHAT_JAVA_VERSION=1.38.0

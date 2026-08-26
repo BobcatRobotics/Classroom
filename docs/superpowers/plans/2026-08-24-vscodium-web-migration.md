@@ -8,7 +8,7 @@
 
 **Tech Stack:** Docker, s6-overlay, LinuxServer.io base images, VSCodium reh-web (`codium-server`), Bun + TypeScript control plane, Bun test, Vitest, Playwright.
 
-**Spec:** No separate spec document — this plan is self-contained. The verified findings that justify it are in **Background** below; Task 7 records them permanently as decision log 035. Prior context: [`docs/decisions/017-linuxserver-base-migration.md`](../../decisions/017-linuxserver-base-migration.md) (why we're on the LinuxServer base) and [`docs/decisions/026-editor-default-theme.md`](../../decisions/026-editor-default-theme.md) (Machine-settings theme seeding).
+**Spec:** No separate spec document — this plan is self-contained. The verified findings that justify it are in **Background** below; Task 7 records them permanently as decision log 036. Prior context: [`docs/decisions/017-linuxserver-base-migration.md`](../../decisions/017-linuxserver-base-migration.md) (why we're on the LinuxServer base) and [`docs/decisions/026-editor-default-theme.md`](../../decisions/026-editor-default-theme.md) (Machine-settings theme seeding).
 
 ---
 
@@ -48,7 +48,7 @@ These were confirmed hands-on against a real `vscodium-reh-web-linux-x64-1.126.0
 - **Preserve LinuxServer conventions:** `abc` user, `PUID`/`PGID`, `lsiown`, `HOME=/config`. These are load-bearing (decision 017).
 - **Run `bun run check:fix`** before finalizing any code change. `bun run verify` gates on `biome ci`.
 - **Docs:** user/operator docs live in `docs/` (published via Docusaurus). Decision logs live in `docs/decisions/` and are excluded from the site, as is `docs/superpowers/`.
-- **Next decision log number is 035.** `034-demo-mode-portability.md` already exists.
+- **Next decision log number is 036.** `035-multi-arch-images-and-workflow-split.md` already exists on `main` (the plan originally assumed 035; the log landed as 036 after merging main).
 
 ## File Structure
 
@@ -394,7 +394,7 @@ Expected: the extensions listing includes `redhat.java-1.38.0` and `wpilibsuite.
 
 If the settings files are missing and a `/config/data/data/` directory exists, `codium-server` ignored `--user-data-dir` (see the flag caveat in Background): switch the run script to `--server-data-dir "${HOME}"`, rebuild, and repeat this task.
 
-> **Actual:** the `--user-data-dir` caveat did not occur — `/config/data/data/` does not exist, and both settings files are present with the expected content. `wpilibsuite.vscode-wpilib-2026.1.1` matched exactly. But `redhat.java` installed as `redhat.java-1.55.0-linux-x64`, not the expected `1.38.0` — along with three other pinned extensions at newer versions (`vscjava.vscode-gradle` 3.18.0 vs pinned 3.17.3, `vscjava.vscode-java-dependency` 0.27.6 vs 0.27.2, `vscjava.vscode-java-test` 0.46.0 vs 0.45.0). Cause (isolated later, not fixed): installing the `vscjava.vscode-java-pack` VSIX makes the editor fetch all six pack members from Open VSX at latest, overwriting the pinned installs. Confirmed pre-existing on the old openvscode-server image too — not a migration regression. See decision 035's Consequences section and the plan's Follow-up #2.
+> **Actual:** the `--user-data-dir` caveat was recorded as "did not occur" — `/config/data/data/` does not exist, and both settings files are present with the expected content. **Post-review correction (2026-08-26): the caveat DID occur.** `/config/data/data/` was the wrong sentinel (that path presumed the server treated `--user-data-dir` as a server-data-dir); the real miss path was `/config/.vscodium-server/data/`, and the settings files were present because `init-frc-setup` writes them, not because the server read them. The run script now passes `--server-data-dir "${HOME}"` as this caveat prescribed — see decision 036's post-review correction section. `wpilibsuite.vscode-wpilib-2026.1.1` matched exactly. But `redhat.java` installed as `redhat.java-1.55.0-linux-x64`, not the expected `1.38.0` — along with three other pinned extensions at newer versions (`vscjava.vscode-gradle` 3.18.0 vs pinned 3.17.3, `vscjava.vscode-java-dependency` 0.27.6 vs 0.27.2, `vscjava.vscode-java-test` 0.46.0 vs 0.45.0). Cause (isolated later, not fixed): installing the `vscjava.vscode-java-pack` VSIX makes the editor fetch all six pack members from Open VSX at latest, overwriting the pinned installs. Confirmed pre-existing on the old openvscode-server image too — not a migration regression. See decision 036's Consequences section and the plan's Follow-up #2.
 
 - [x] **Step 5b: Verify ownership after the scoped lsiown (Task 2)**
 
@@ -475,7 +475,7 @@ with:
 
 The `//=` keeps this a default only — a student who turns trust back on keeps their choice. The `project` guard keeps it out of `/workspace/project/.vscode/settings.json`, which is student-owned and gets committed to their team repo.
 
-> **Actual: not applied to the repo.** The equivalent key was written directly into the running container's `/config/data/User/settings.json` via `docker exec` + `jq` (not this file) to test the fix cheaply before committing to a rebuild. Result: no effect — tried twice, including once on a completely fresh container with zero prior trust-decision state, and Restricted Mode persisted identically both times. Root cause (investigated read-only, not fixed): `security.workspace.trust.enabled` is read through VS Code's `application`-scoped configuration, which this browser-only deployment does not appear to source from the server-side `settings.json` — the same rule that greys the setting out in Remote-SSH windows. Because the fix as specified does not work, this edit was never made to the actual `init-frc-setup` script. See decision 035 §5 for the full account and candidate alternatives.
+> **Actual: not applied to the repo.** The equivalent key was written directly into the running container's `/config/data/User/settings.json` via `docker exec` + `jq` (not this file) to test the fix cheaply before committing to a rebuild. Result: no effect — tried twice, including once on a completely fresh container with zero prior trust-decision state, and Restricted Mode persisted identically both times. Root cause (investigated read-only, not fixed): `security.workspace.trust.enabled` is read through VS Code's `application`-scoped configuration, which this browser-only deployment does not appear to source from the server-side `settings.json` — the same rule that greys the setting out in Remote-SSH windows. Because the fix as specified does not work, this edit was never made to the actual `init-frc-setup` script. See decision 036 §5 for the full account and candidate alternatives.
 
 - [ ] **Step 6: Rebuild and re-verify**
 
@@ -497,7 +497,7 @@ git add containers/code/root/etc/s6-overlay/s6-rc.d/init-frc-setup/run
 git commit -m "fix(workspace): trust the seeded project so redhat.java leaves Lightweight Mode"
 ```
 
-> **Actual: not run.** The tested fix doesn't work, so nothing was committed. `init-frc-setup` is unchanged by this task. Comparison against the current production (openvscode-server) image showed the identical Restricted Mode / Lightweight Mode behavior, so this is confirmed pre-existing, not a migration regression — recorded in decision 035 §5 rather than fixed here.
+> **Actual: not run.** The tested fix doesn't work, so nothing was committed. `init-frc-setup` is unchanged by this task. Comparison against the current production (openvscode-server) image showed the identical Restricted Mode / Lightweight Mode behavior, so this is confirmed pre-existing, not a migration regression — recorded in decision 036 §5 rather than fixed here.
 
 - [ ] **Step 8: Tear down the smoke container**
 
@@ -674,7 +674,7 @@ git commit -m "docs: retarget editor attribution and naming to VSCodium reh-web"
 
 ---
 
-### Task 7: Record decision log 035
+### Task 7: Record decision log 036
 
 > **Mostly done already — do not write a second decision log.**
 > `docs/decisions/036-vscodium-web-migration.md` was written on 2026-08-24,
@@ -724,7 +724,7 @@ that in the log so 011's evidence has an explicit successor.
 > verified, and what was not" now speaks from the built image and states
 > plainly that the three 011 editing behaviours were not individually
 > exercised, so 011's evidence has only a partial successor. "Open question:
-> workspace trust" became decision 035 §5 — a numbered decision to leave the
+> workspace trust" became decision 036 §5 — a numbered decision to leave the
 > repo unchanged, not a decision that the fix was necessary and applied.
 
 - [x] **Step 2: Confirm it is excluded from the published site** — done 2026-08-24. `bun run docs:build` exits 0; `decisions/` and `superpowers/` produce no routes in `website/build/`. Re-run after editing:
@@ -741,7 +741,7 @@ Expected: build exits 0, grep prints nothing.
 
 ```bash
 git add docs/decisions/036-vscodium-web-migration.md docs/decisions/README.md AGENTS.md docs/superpowers/ website/docusaurus.config.ts
-git commit -m "docs: record decision 035 — VSCodium reh-web editor migration"
+git commit -m "docs: record decision 036 — VSCodium reh-web editor migration"
 ```
 
 ---
@@ -751,7 +751,7 @@ git commit -m "docs: record decision 035 — VSCodium reh-web editor migration"
 Do not bundle these in. They are real but separate, and mixing them makes the migration harder to review or revert:
 
 - **Bumping any bundled extension version.** Every `ARG *_VERSION` in the Dockerfile stays pinned exactly as-is. Changing an extension version at the same time as the editor would make any regression ambiguous.
-- **Switching to `code-server`, or to the raw tarball on `baseimage-ubuntu`.** Both were evaluated and rejected; we stay on the LinuxServer base. The tarball route is documented in decision 035 as the fallback if LinuxServer deprecates `vscodium-web`.
+- **Switching to `code-server`, or to the raw tarball on `baseimage-ubuntu`.** Both were evaluated and rejected; we stay on the LinuxServer base. The tarball route is documented in decision 036 as the fallback if LinuxServer deprecates `vscodium-web`.
 - **Everything in Follow-ups below.**
 
 ## Follow-ups (senior review, 2026-08-24 — NOT part of this implementation)

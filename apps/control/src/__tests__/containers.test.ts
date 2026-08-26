@@ -312,6 +312,11 @@ describe("code container orchestration", () => {
 		);
 		expect(serviceScript).toContain("/app/vscodium-web/bin/codium-server");
 		expect(serviceScript).toContain("--server-base-path");
+		// codium-server ignores --user-data-dir (unpatched upstream overwrites it
+		// with <server-data-dir>/data); the settings layout depends on this flag.
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: matches literal shell text
+		expect(serviceScript).toContain('--server-data-dir "${HOME}"');
+		expect(serviceScript).not.toContain('--user-data-dir "');
 	});
 
 	test("restarted control plane rediscovers a labeled code container", async () => {
