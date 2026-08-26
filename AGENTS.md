@@ -86,6 +86,17 @@ into the image) instead of `bun scripts/<name>.ts`. The image build runs the
 emsdk/AdvantageScope compile in a build stage. See
 `docs/decisions/031-containerized-control-plane.md`.
 
+**CI, release, and multi-arch images (post-V2):** three workflows —
+`ci.yml` runs `bun run verify` on PRs and pushes to main; `release.yml`
+(on `v*` tag push) verifies, then publishes both images to GHCR as
+multi-arch manifest lists (linux/amd64 + linux/arm64, built on native
+runners and merged by digest) and uploads the web/ascope dist tarballs
+to the GitHub release; `deploy.yml` (manual dispatch) preflights that a
+tag is fully published, then rolls GCE/Cloudflare. The emsdk stage has
+no arm64 image, so the arm64 control build reuses the amd64 job's
+AdvantageScope dist via a named build context (the wasm output is
+arch-independent). See `docs/decisions/035-multi-arch-images-and-workflow-split.md`.
+
 ## Working Principles
 
 - Prefer boring, explicit TypeScript over clever abstractions.

@@ -1,0 +1,368 @@
+name: Build & Release
+
+# Publishes multi-arch (linux/amd64 + linux/arm64) images to GHCR and attaches
+# the web/ascope dist tarballs to a GitHub release. Triggered by pushing a
+# semver tag that points into main's history. Deploying a published tag is a
+# separate manual step (deploy.yml).
+#
+# Build strategy: one native runner per architecture (no QEMU — the workspace
+# image runs a full Gradle/JVM build), each pushing by digest, then a merge job
+# stitches the digests into one multi-arch tag with `imagetools create`. The
+# control image's arm64 build reuses the amd64 job's AdvantageScope dist via a
+# named build context because emscripten/emsdk has no arm64 image (the wasm
+# output is architecture-independent). See docs/decisions/032.
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  WORKSPACE_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-workspace
+  CONTROL_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-control
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+      tag_sha: ${{ steps.validate.outputs.tag_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag and main ancestry
+        id: validate
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if ! echo "$TAG" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            echo "Refusing to release '$TAG'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease; build metadata (+...) is not allowed."
+            exit 1
+          fi
+
+          git fetch --force origin "+refs/heads/main:refs/remotes/origin/main"
+
+          TAG_SHA="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          if ! git merge-base --is-ancestor "$TAG_SHA" origin/main; then
+            echo "Tag $TAG ($TAG_SHA) is not reachable from origin/main."
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=$TAG_SHA" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bun --bun playwright install chromium
+
+      - name: Verify
+        run: bun run verify
+
+  build-workspace:
+    needs: [validate, verify]
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push workspace image by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/code/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.validate.outputs.tag_sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.tag }}
+          outputs: type=image,name=${{ env.WORKSPACE_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=workspace-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=workspace-${{ matrix.arch }}
+
+      - name: Export digest
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-workspace-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  build-control-amd64:
+    needs: [validate, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push control image by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/control/Dockerfile
+          platforms: linux/amd64
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.validate.outputs.tag_sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.tag }}
+          outputs: type=image,name=${{ env.CONTROL_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=control-amd64
+          cache-to: type=gha,mode=max,scope=control-amd64
+
+      # Harvest the prebuilt dists straight from the build cache via the
+      # dist-export stage (near-instant cache hit against the push above).
+      # They feed three consumers: the GitHub release tarballs, the
+      # deploy-cloudflare job, and the arm64 control build below, which reuses
+      # ascope-dist instead of rerunning the emsdk stage.
+      - name: Export dists from build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/control/Dockerfile
+          target: dist-export
+          outputs: type=local,dest=dist-out
+          cache-from: type=gha,scope=control-amd64
+
+      - name: Package release artifacts
+        run: |
+          set -euo pipefail
+          tar -czf web-dist.tar.gz -C dist-out/web-dist .
+          tar -czf ascope-dist.tar.gz -C dist-out/ascope-dist .
+
+      - name: Export digest
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-control-amd64
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ascope-dist
+          path: dist-out/ascope-dist
+          if-no-files-found: error
+          retention-days: 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dists
+          path: |
+            web-dist.tar.gz
+            ascope-dist.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  build-control-arm64:
+    needs: [validate, build-control-amd64]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ascope-dist
+          path: ${{ runner.temp }}/ascope-dist
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The ascope-dist build context substitutes the Dockerfile's ascope-dist
+      # stage with the amd64 job's output, skipping the emsdk stage (which has
+      # no arm64 image). The wasm/JS dist is architecture-independent.
+      - name: Build and push control image by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/control/Dockerfile
+          platforms: linux/arm64
+          build-contexts: |
+            ascope-dist=${{ runner.temp }}/ascope-dist
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.validate.outputs.tag_sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.tag }}
+          outputs: type=image,name=${{ env.CONTROL_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=control-arm64
+          cache-to: type=gha,mode=max,scope=control-arm64
+
+      - name: Export digest
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-control-arm64
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [validate, build-workspace, build-control-amd64, build-control-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    env:
+      TAG: ${{ needs.validate.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-workspace-*
+          path: ${{ runner.temp }}/digests/workspace
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-control-*
+          path: ${{ runner.temp }}/digests/control
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifests
+        run: |
+          set -euo pipefail
+
+          cd "${{ runner.temp }}/digests/workspace"
+          docker buildx imagetools create \
+            -t "$WORKSPACE_IMAGE:$TAG" \
+            -t "$WORKSPACE_IMAGE:latest" \
+            $(printf "$WORKSPACE_IMAGE@sha256:%s " *)
+
+          cd "${{ runner.temp }}/digests/control"
+          docker buildx imagetools create \
+            -t "$CONTROL_IMAGE:$TAG" \
+            -t "$CONTROL_IMAGE:latest" \
+            $(printf "$CONTROL_IMAGE@sha256:%s " *)
+
+      - name: Inspect manifests
+        run: |
+          set -euo pipefail
+          for image in "$WORKSPACE_IMAGE" "$CONTROL_IMAGE"; do
+            out="$(docker buildx imagetools inspect "$image:$TAG")"
+            echo "$out"
+            for platform in linux/amd64 linux/arm64; do
+              if ! echo "$out" | grep -q "$platform"; then
+                echo "$image:$TAG is missing $platform"
+                exit 1
+              fi
+            done
+          done
+
+  release:
+    needs: [validate, merge]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.validate.outputs.tag }}
+      TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dists
+
+      - name: Upload release artifacts
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --target "$TAG_SHA" \
+              --title "$TAG" \
+              --notes "CodeRunner release $TAG"
+          fi
+          gh release upload "$TAG" web-dist.tar.gz ascope-dist.tar.gz --clobber

@@ -62,7 +62,17 @@ RUN git config --global --add safe.directory '*'
 # the wasm step re-prepends the emsdk paths itself (envWithEmsdk).
 RUN PATH="/usr/bin:${PATH}" bun scripts/build-ascope-lite.ts
 
-# ── Stage 3: dist export (CI only) ─────────────────────────────────────
+# ── Stage 3: ascope dist hand-off ──────────────────────────────────────
+# Filesystem-only stage holding the built AdvantageScope Lite dist. Downstream
+# stages copy from here instead of ascope-build so CI can substitute a prebuilt
+# dist via a named build context (`--build-context ascope-dist=<dir>`), which
+# skips the emsdk stage entirely. That's how the arm64 image build reuses the
+# amd64 job's wasm output — emscripten/emsdk publishes no arm64 image, and the
+# wasm/JS output is architecture-independent anyway.
+FROM scratch AS ascope-dist
+COPY --from=ascope-build /repo/dist/advantagescope /
+
+# ── Stage 4: dist export (CI only) ─────────────────────────────────────
 # A filesystem-only stage holding just the built web shell + AdvantageScope
 # Lite dists. CI builds this with `--target dist-export --output type=local`
 # to harvest the release tarballs (web-dist/ascope-dist) straight from the
@@ -72,9 +82,9 @@ RUN PATH="/usr/bin:${PATH}" bun scripts/build-ascope-lite.ts
 # default last stage), so local builds are unaffected.
 FROM scratch AS dist-export
 COPY --from=web-build /repo/apps/web/dist /web-dist
-COPY --from=ascope-build /repo/dist/advantagescope /ascope-dist
+COPY --from=ascope-dist / /ascope-dist
 
-# ── Stage 4: runtime (default build target) ────────────────────────────
+# ── Stage 5: runtime (default build target) ────────────────────────────
 FROM oven/bun:${BUN_VERSION}
 
 # Docker CLI only — the daemon is the host's, reached through the bind-mounted
@@ -100,7 +110,7 @@ COPY apps/control/ apps/control/
 COPY scripts/ scripts/
 COPY catalog/ catalog/
 COPY --from=web-build /repo/apps/web/dist apps/web/dist
-COPY --from=ascope-build /repo/dist/advantagescope dist/advantagescope
+COPY --from=ascope-dist / dist/advantagescope
 
 # License texts travel with the image, not just the repo: this image ships a
 # patched AdvantageScope build, and BSD-3-Clause requires the notice to

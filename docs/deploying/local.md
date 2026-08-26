@@ -27,6 +27,7 @@ contains the web shell and AdvantageScope Lite assets.
 | **CPU** | 4 cores | 6+ cores |
 | **Disk** | 20 GB free | 50+ GB free |
 | **OS** | Linux (Ubuntu 22.04+), Windows + WSL2 | Ubuntu 22.04+ native |
+| **CPU architecture** | x86-64 or arm64 (images are multi-arch) | n/a |
 
 You also need at least one OAuth provider configured before students can sign in.
 Register your GitHub or Google OAuth app first; see [OAuth Credentials](./oauth-credentials.md).
