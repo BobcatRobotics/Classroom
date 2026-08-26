@@ -195,7 +195,7 @@ so it can come up before any deploy. Run the workflow against a published
 release tag (see [Releasing](#releasing)) to pin a specific version:
 
 ```bash
-gh workflow run "Deploy to GCE" --ref main -f tag=v2.0.0
+gh workflow run "Deploy" --ref main -f tag=v2.0.0
 ```
 
 ### 10. Become the first admin
@@ -281,10 +281,10 @@ The **Release** workflow (`.github/workflows/release.yml`) runs automatically:
 **2. Deploy** — dispatch the deploy workflow against the published tag:
 
 ```bash
-gh workflow run "Deploy to GCE" --ref main -f tag=v2.4.0
+gh workflow run "Deploy" --ref main -f tag=v2.4.0
 ```
 
-The **Deploy to GCE** workflow (`.github/workflows/deploy.yml`):
+The **Deploy** workflow (`.github/workflows/deploy.yml`):
 
 1. Checks the GitHub release exists and both images are published for the tag
 2. `scp`s the compose files to the VM, pins `CODERUNNER_TAG=<tag>` in
@@ -338,10 +338,10 @@ Follow the existing pattern for `BETTER_AUTH_SECRET`.
 Redeploy an earlier tag:
 
 ```bash
-gh workflow run "Deploy to GCE" --ref main -f tag=v2.3.0
+gh workflow run "Deploy" --ref main -f tag=v2.3.0
 ```
 
-Or use the GitHub Actions UI: **Deploy to GCE → Run workflow → enter the
+Or use the GitHub Actions UI: **Deploy → Run workflow → enter the
 previous tag**.
 
 ## Verification checklist

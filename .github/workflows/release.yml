@@ -1,4 +1,4 @@
-name: Release
+name: Build & Release
 
 # Publishes multi-arch (linux/amd64 + linux/arm64) images to GHCR and attaches
 # the web/ascope dist tarballs to a GitHub release. Triggered by pushing a

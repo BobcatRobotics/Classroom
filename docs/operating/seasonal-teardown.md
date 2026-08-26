@@ -175,7 +175,7 @@ A freshly rebuilt VM has an empty `apps/web/dist` until the first deploy:
 latest release tag:
 
 ```bash
-gh workflow run "Deploy to GCE" --ref main -f tag=vX.Y.Z
+gh workflow run "Deploy" --ref main -f tag=vX.Y.Z
 ```
 
 ### Step 5. Verify, then clean up

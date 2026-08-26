@@ -150,7 +150,7 @@ Release workflow, same as the GCE deploy). The `deploy-cloudflare` job in
 whenever `CF_ACCOUNT_ID` is set as a repo variable:
 
 ```bash
-gh workflow run "Deploy to GCE" --ref main -f tag=v2.5.0
+gh workflow run "Deploy" --ref main -f tag=v2.5.0
 ```
 
 Both the GCE VM and the Cloudflare Pages project are updated in the same
@@ -163,7 +163,7 @@ Same as the GCE rollback: redeploy an older tag. Both jobs run from the same
 tag:
 
 ```bash
-gh workflow run "Deploy to GCE" --ref main -f tag=v2.4.0
+gh workflow run "Deploy" --ref main -f tag=v2.4.0
 ```
 
 ## Disabling Cloudflare mode
