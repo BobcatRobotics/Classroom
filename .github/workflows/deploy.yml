@@ -1,10 +1,14 @@
 name: Deploy to GCE
 
+# Deploys an already-published release tag. Images and release artifacts are
+# produced by release.yml on tag push; this workflow only checks they exist
+# and rolls them out (GCE always; Cloudflare Pages when configured).
+
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Semver git tag to deploy (for example v2.4.0)"
+        description: "Published release tag to deploy (for example v2.4.0)"
         required: true
         type: string
 
@@ -17,168 +21,52 @@ env:
   CONTROL_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-control
 
 jobs:
-  validate:
+  preflight:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read
     outputs:
-      tag: ${{ steps.validate.outputs.tag }}
-      tag_sha: ${{ steps.validate.outputs.tag_sha }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Validate release tag and main ancestry
-        id: validate
-        env:
-          INPUT_TAG: ${{ inputs.tag }}
-          GITHUB_REF_NAME_SAFE: ${{ github.ref }}
-        run: |
-          set -euo pipefail
-
-          if [ "$GITHUB_REF_NAME_SAFE" != "refs/heads/main" ]; then
-            echo "Deploy to GCE must be dispatched from refs/heads/main; got $GITHUB_REF_NAME_SAFE."
-            exit 1
-          fi
-
-          TAG="$INPUT_TAG"
-          if ! echo "$TAG" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
-            echo "Refusing to deploy '$TAG'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease; build metadata (+...) is not allowed."
-            exit 1
-          fi
-
-          git fetch --force origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
-            "+refs/tags/$TAG:refs/tags/$TAG"
-
-          TAG_SHA="$(git rev-parse "refs/tags/$TAG^{commit}")"
-          if ! git merge-base --is-ancestor "$TAG_SHA" origin/main; then
-            echo "Tag $TAG ($TAG_SHA) is not reachable from origin/main."
-            exit 1
-          fi
-
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "tag_sha=$TAG_SHA" >> "$GITHUB_OUTPUT"
-
-  verify:
-    needs: validate
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
-          submodules: recursive
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Install Playwright Chromium
-        run: bun --bun playwright install chromium
-
-      - name: Verify
-        run: bun run verify
-
-  publish:
-    needs: [validate, verify]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
+      tag: ${{ steps.check.outputs.tag }}
     env:
-      TAG: ${{ needs.validate.outputs.tag }}
-      TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
+      TAG: ${{ inputs.tag }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
-          submodules: recursive
-
-      - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push workspace image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: containers/code/Dockerfile
-          push: true
-          tags: |
-            ${{ env.WORKSPACE_IMAGE }}:${{ env.TAG }}
-            ${{ env.WORKSPACE_IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ env.TAG_SHA }}
-            org.opencontainers.image.version=${{ env.TAG }}
-          cache-from: type=gha,scope=workspace
-          cache-to: type=gha,mode=max,scope=workspace
-
-      # The control image builds the web shell and AdvantageScope Lite (incl.
-      # the emsdk/wasm step) inside its own stages, so the runner no longer
-      # installs emsdk — one build, one source of truth.
-      - name: Build and push control image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: containers/control/Dockerfile
-          push: true
-          tags: |
-            ${{ env.CONTROL_IMAGE }}:${{ env.TAG }}
-            ${{ env.CONTROL_IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ env.TAG_SHA }}
-            org.opencontainers.image.version=${{ env.TAG }}
-          cache-from: type=gha,scope=control
-          cache-to: type=gha,mode=max,scope=control
-
-      # Harvest the prebuilt dists straight from the build cache via the
-      # dist-export stage, so the GitHub release keeps shipping
-      # web-dist/ascope-dist tarballs (consumed by the deploy-cloudflare job and
-      # by scripts/fetch-dist.ts for emsdk-free dev). This shares every upstream
-      # layer with the push above, so it's a near-instant cache hit — and it
-      # avoids loading the full multi-hundred-MB runtime image into the daemon.
-      - name: Export release artifacts from build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: containers/control/Dockerfile
-          target: dist-export
-          outputs: type=local,dest=dist-out
-          cache-from: type=gha,scope=control
-
-      - name: Package release artifacts
+      - name: Check release and multi-arch images exist
+        id: check
         run: |
           set -euo pipefail
-          tar -czf web-dist.tar.gz -C dist-out/web-dist .
-          tar -czf ascope-dist.tar.gz -C dist-out/ascope-dist .
 
-      - name: Upload release artifacts
-        run: |
-          set -euo pipefail
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" \
-              --target "$TAG_SHA" \
-              --title "$TAG" \
-              --notes "CodeRunner release $TAG"
+          if ! echo "$TAG" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            echo "Refusing to deploy '$TAG'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease."
+            exit 1
           fi
-          gh release upload "$TAG" web-dist.tar.gz ascope-dist.tar.gz --clobber
+
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null; then
+            echo "No GitHub release for $TAG. Push the tag and let release.yml publish it first."
+            exit 1
+          fi
+
+          for image in "$WORKSPACE_IMAGE" "$CONTROL_IMAGE"; do
+            out="$(docker buildx imagetools inspect "$image:$TAG")"
+            for platform in linux/amd64 linux/arm64; do
+              if ! echo "$out" | grep -q "$platform"; then
+                echo "$image:$TAG is missing $platform. Did release.yml finish for this tag?"
+                exit 1
+              fi
+            done
+          done
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   deploy-cloudflare:
-    needs: [validate, publish, deploy]
+    needs: [preflight, deploy]
     # Only runs when CF_ACCOUNT_ID is set as a repo variable.
     # Depends on deploy (GCE) so the backend is always updated before the
     # frontend goes live — prevents the client from running ahead of the server.
@@ -188,12 +76,12 @@ jobs:
     permissions:
       contents: read
     env:
-      TAG: ${{ needs.validate.outputs.tag }}
+      TAG: ${{ needs.preflight.outputs.tag }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate.outputs.tag }}
+          ref: ${{ needs.preflight.outputs.tag }}
 
       - name: Download web-dist from release
         run: gh release download "$TAG" --pattern web-dist.tar.gz
@@ -215,7 +103,7 @@ jobs:
           command: pages deploy --commit-dirty=true --branch main --project-name=coderunner
 
   deploy:
-    needs: [validate, publish]
+    needs: preflight
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -229,7 +117,7 @@ jobs:
       VM_NAME: ${{ vars.GCP_VM_NAME || 'coderunner' }}
       DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
       WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-      TAG: ${{ needs.validate.outputs.tag }}
+      TAG: ${{ needs.preflight.outputs.tag }}
     steps:
       - name: Check required GCP variables
         run: |
@@ -247,7 +135,7 @@ jobs:
       # would delete the WIF credential file auth writes there.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate.outputs.tag }}
+          ref: ${{ needs.preflight.outputs.tag }}
 
       - id: auth
         name: Authenticate to GCP via Workload Identity Federation

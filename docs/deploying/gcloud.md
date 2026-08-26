@@ -191,8 +191,8 @@ long-lived service account keys.
 ### 9. Deploy for the first time
 
 On first boot the VM fetches the compose files and pulls the `:latest` images,
-so it can come up before any deploy. Run the workflow against a valid release tag
-to pin a specific version:
+so it can come up before any deploy. Run the workflow against a published
+release tag (see [Releasing](#releasing)) to pin a specific version:
 
 ```bash
 gh workflow run "Deploy to GCE" --ref main -f tag=v2.0.0
@@ -256,29 +256,42 @@ dashboards), see [Monitoring](../operating/monitoring.md).
 
 ## Releasing
 
-Create a semver tag on a commit reachable from `main`, then dispatch the
-workflow:
+Releasing is two steps: publish a tag, then deploy it.
+
+**1. Publish** — push a semver tag on a commit reachable from `main`:
+
+```bash
+git tag v2.4.0 && git push origin v2.4.0
+```
+
+The **Release** workflow (`.github/workflows/release.yml`) runs automatically:
+
+1. Validates the tag format and that it is reachable from `main`
+2. Runs `bun run verify` (Biome, typecheck, unit tests, E2E)
+3. Builds and pushes `ghcr.io/<owner>/coderunner-workspace:<tag>` and
+   `ghcr.io/<owner>/coderunner-control:<tag>` (both `:latest` too) to GHCR as
+   **multi-arch images** (`linux/amd64` + `linux/arm64`), built on native
+   runners per architecture and merged into one manifest per tag. The control
+   image builds the web shell and AdvantageScope Lite (emsdk runs inside a
+   build stage), so nothing is compiled on a plain runner.
+4. Extracts `web-dist.tar.gz` + `ascope-dist.tar.gz` from the built control
+   image and uploads them to the GitHub Release (consumed by the Cloudflare job
+   and by `scripts/fetch-dist.ts`)
+
+**2. Deploy** — dispatch the deploy workflow against the published tag:
 
 ```bash
 gh workflow run "Deploy to GCE" --ref main -f tag=v2.4.0
 ```
 
-The **Deploy to GCE** workflow (defined in `.github/workflows/deploy.yml`):
+The **Deploy to GCE** workflow (`.github/workflows/deploy.yml`):
 
-1. Validates the tag format and that it is reachable from `main`
-2. Runs `bun run verify` (Biome, typecheck, unit tests, E2E)
-3. Builds and pushes `ghcr.io/<owner>/coderunner-workspace:<tag>` and
-   `ghcr.io/<owner>/coderunner-control:<tag>` (both `:latest` too) to GHCR. The
-   control image builds the web shell and AdvantageScope Lite (emsdk runs inside
-   a build stage), so nothing is compiled on a plain runner.
-4. Extracts `web-dist.tar.gz` + `ascope-dist.tar.gz` from the built control
-   image and uploads them to the GitHub Release (consumed by the Cloudflare job
-   and by `scripts/fetch-dist.ts`)
-5. `scp`s the compose files to the VM, pins `CODERUNNER_TAG=<tag>` in
+1. Checks the GitHub release exists and both images are published for the tag
+2. `scp`s the compose files to the VM, pins `CODERUNNER_TAG=<tag>` in
    `/opt/coderunner/.env`, runs `docker compose pull` + `up -d`, then recycles
    managed workspace containers (student data is preserved; only containers are
    removed) via `docker compose exec control coderunner rebuild-workspaces`
-6. Polls `/healthz` until the service is healthy
+3. Polls `/healthz` until the service is healthy
 
 Nothing is built on the VM; emsdk, Node, and Bun are not installed there.
 

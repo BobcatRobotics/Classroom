@@ -144,7 +144,8 @@ mode.
 
 ## Ongoing releases
 
-No change to the deploy command. The `deploy-cloudflare` job in
+No change to the deploy command (the tag must already be published by the
+Release workflow, same as the GCE deploy). The `deploy-cloudflare` job in
 `.github/workflows/deploy.yml` runs automatically after the GCE deploy job
 whenever `CF_ACCOUNT_ID` is set as a repo variable:
 

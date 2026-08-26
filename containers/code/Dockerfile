@@ -26,12 +26,20 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# ── JDK 17 (Adoptium Temurin, Linux x64) ──────────────────────────────
+# ── JDK 17 (Adoptium Temurin) ─────────────────────────────────────────
+# TARGETARCH (amd64/arm64, set by buildx) picks the Temurin arch classifier.
+ARG TARGETARCH
 ARG JDK_VERSION=17.0.15+6
-ARG JDK_URL=https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.15%2B6/OpenJDK17U-jdk_x64_linux_hotspot_17.0.15_6.tar.gz
 
-RUN mkdir -p /usr/lib/jvm \
-    && wget -q "${JDK_URL}" -O /tmp/jdk.tar.gz \
+RUN case "${TARGETARCH}" in \
+        amd64) JDK_ARCH=x64 ;; \
+        arm64) JDK_ARCH=aarch64 ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && JDK_TAG="jdk-$(echo "${JDK_VERSION}" | sed 's/+/%2B/')" \
+    && JDK_FILE="OpenJDK17U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK_VERSION}" | tr + _).tar.gz" \
+    && mkdir -p /usr/lib/jvm \
+    && wget -q "https://github.com/adoptium/temurin17-binaries/releases/download/${JDK_TAG}/${JDK_FILE}" -O /tmp/jdk.tar.gz \
     && tar xzf /tmp/jdk.tar.gz -C /usr/lib/jvm \
     && rm /tmp/jdk.tar.gz \
     && ln -s /usr/lib/jvm/jdk-* /usr/lib/jvm/jdk-17
