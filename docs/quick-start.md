@@ -80,8 +80,10 @@ docker volume prune -a --force --filter label=frc-sim.managed=true
 
 `--remove-orphans` is what actually reaps the workspace containers — they are labelled into the compose project but are not compose services, and a volume still attached to a *stopped* container is skipped by the prune. `prune -a` needs Docker 23 or newer.
 
-:::note Running from source instead
+:::note[Running from source instead]
+
 If you are developing CodeRunner (not just evaluating it), you can run the control plane directly on the host with `bun run dev:control` / `bun run dev:web`, or build a production bundle with `bun run build`. The host path needs Bun and — for a from-source AdvantageScope build — the submodule (`git submodule update --init --recursive`) and emscripten; `bun run setup:demo` downloads prebuilt assets to skip emscripten. See [Local Deployment](./deploying/local.md) and [Development Servers](./development/dev-servers.md).
+
 :::
 
 ## Platform support

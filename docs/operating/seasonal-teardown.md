@@ -16,10 +16,12 @@ pull, fully rebuilt by `terraform apply`. The data disk holds the SQLite
 database and every student's project files; it must be captured in a manual
 snapshot before deletion.
 
-:::note Local deployments
+:::note[Local deployments]
+
 This procedure is for the Google Cloud VM. For a local classroom machine,
 simply stop the stack (`docker compose stop`) and optionally archive student
 work with `docker compose exec control coderunner backup`.
+
 :::
 
 ## Why stopping the VM is not enough

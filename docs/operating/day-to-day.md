@@ -9,7 +9,8 @@ This page covers the routine tasks a mentor performs during an active season:
 starting and stopping the app, managing who can sign in, and keeping an eye on
 what the system is doing.
 
-:::note Running ops commands
+::::note[Running ops commands]
+
 The maintenance commands in this page (`allowlist`, `users`, `audit-prune`,
 `backup`, `restore`) run **inside the control container** via the `coderunner`
 CLI:
@@ -26,7 +27,8 @@ from-source host checkout with Bun you can instead use the `bun run <name>`
 aliases shown in `package.json`. The examples below use the `bun run` short form;
 substitute the `docker compose exec control coderunner <subcommand>` form for a
 containerized deployment.
-:::
+
+::::
 
 ## Starting and stopping
 

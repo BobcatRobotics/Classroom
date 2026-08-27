@@ -27,7 +27,8 @@ AdvantageScope from source (it needs emscripten), run `bun run setup:demo` (or
 `bun run fetch:dist`) to download the prebuilt web shell and AdvantageScope
 assets from the latest release into `apps/web/dist` and `dist/advantagescope`.
 
-:::note Dev runs use published host ports, not a Docker network
+:::note[Dev runs use published host ports, not a Docker network]
+
 The dev loop runs the control plane as a host Bun process, which reaches each
 workspace container over a loopback port (`FRC_CONTAINER_NETWORK` unset). This is
 unchanged from before containerization — the shared-network mode is only used
@@ -35,13 +36,16 @@ when the control plane *itself* runs in a container (see
 [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md)).
 A host process can't resolve container DNS names, so don't set
 `FRC_CONTAINER_NETWORK` for `bun run dev:control`.
+
 :::
 
-:::note Windows
+:::note[Windows]
+
 On Windows the AdvantageScope step may appear to hang the first time (it stalls
 while bundling/minifying the large `hub.js` renderer, often for a minute or two).
 If it seems stuck, cancel and re-run the build. The second run usually proceeds
 quickly. Building under WSL avoids the slowdown entirely.
+
 :::
 
 ## Repo layout

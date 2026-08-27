@@ -27,7 +27,8 @@ The server backup is not a substitute for version control. See
 [Team Import](../lessons/team-import.md) for how students commit and push from
 their workspace.
 
-:::note Containerized deployments
+::::note[Containerized deployments]
+
 `backup`/`restore` run inside the control container via the `coderunner` CLI,
 which sees the data directory at `/data`:
 
@@ -43,7 +44,8 @@ must be a path **inside** `/data` (the container can't see arbitrary host
 paths). On the VM, prefix with `cd /opt/coderunner && sudo`. The `bun run
 backup` / `bun run restore` forms below apply to a from-source host checkout;
 the paths and options are identical.
-:::
+
+::::
 
 ## Creating a backup
 

@@ -109,7 +109,8 @@ changing roles later.
 
 ### Manual bootstrap and later changes
 
-:::note Running these commands
+:::note[Running these commands]
+
 On a containerized deployment (the default) the `allowlist` and `users`
 commands run **inside the control container** via the `coderunner` CLI:
 
@@ -123,6 +124,7 @@ plane is stopped. On the Google Cloud VM the compose project lives in
 `/opt/coderunner` and needs `sudo` (`cd /opt/coderunner && sudo docker compose
 exec -T control …`). The `bun run …` short forms shown below are equivalent
 and apply to a from-source host checkout with Bun.
+
 :::
 
 ### 1. Allowlist the emails that may sign in
