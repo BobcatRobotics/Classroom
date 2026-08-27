@@ -29,8 +29,8 @@ copyright notice and permission notice are included. It comes with no warranty.
 | Component | License | Where it ships |
 | --- | --- | --- |
 | [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) (**modified**) | BSD-3-Clause | Telemetry view, compiled into the control image |
-| [openvscode-server](https://github.com/gitpod-io/openvscode-server) / Code – OSS | MIT | The editor, base of the workspace image |
-| [linuxserver/openvscode-server](https://github.com/linuxserver/docker-openvscode-server) image | GPL-3.0 | Workspace base image, unmodified |
+| [VSCodium](https://github.com/VSCodium/vscodium) / Code – OSS (**modified**) | MIT | The editor (`reh-web` build), base of the workspace image |
+| [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web) image | GPL-3.0 | Workspace base image, unmodified |
 | [Eclipse Temurin JDK 17](https://adoptium.net/) | GPL-2.0 with Classpath Exception | Java toolchain in the workspace image |
 | [WPILib](https://github.com/wpilibsuite/allwpilib) | BSD-3-Clause | Robot libraries and simulator |
 | [vscode-wpilib](https://github.com/wpilibsuite/vscode-wpilib) | BSD-3-Clause | WPILib editor tooling |
@@ -51,8 +51,13 @@ alongside the bundled telemetry view.
 CodeRunner redistributes a **modified** build of AdvantageScope. The change is kept as a
 source-level patch in
 [`patches/advantagescope/`](https://github.com/mathewdunne/CodeRunner/tree/main/patches/advantagescope)
-and injects an NT4 endpoint so the telemetry view can run embedded in the CodeRunner page. No
-other bundled component is modified.
+and injects an NT4 endpoint so the telemetry view can run embedded in the CodeRunner page.
+
+The workspace image also ships a **modified** VSCodium build: it rewrites one stale VS Code
+revision string in the editor's webview configuration so extension webviews can load their
+local assets. The GPL-3.0 `linuxserver/vscodium-web` layer itself is unmodified.
+
+No other bundled component is modified.
 
 ## What this means for you
 

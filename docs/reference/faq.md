@@ -23,7 +23,7 @@ What does require internet: pulling the control and workspace Docker images for 
 
 ### Can students accidentally break each other's work?
 
-No. Each student gets an isolated workspace container with their own openvscode-server instance and file system. Containers are namespaced; students cannot see or modify each other's files. The control plane routes each authenticated user only to their own container.
+No. Each student gets an isolated workspace container with their own VSCodium instance and file system. Containers are namespaced; students cannot see or modify each other's files. The control plane routes each authenticated user only to their own container.
 
 ### Can students push code to GitHub?
 
@@ -45,7 +45,7 @@ Switching to a different lesson or resetting a project intentionally discards th
 
 ### Is a Chromebook sufficient for students?
 
-Yes. All computation (Java compilation, Gradle builds, the WPILib simulator, and the openvscode-server editor) runs inside Docker containers on the CodeRunner server. The browser receives a proxied editor session over HTTP. A Chromebook, tablet with a keyboard, or any device with a modern browser is sufficient. No local Java or VS Code installation is required on the student's device.
+Yes. All computation (Java compilation, Gradle builds, the WPILib simulator, and the VSCodium editor) runs inside Docker containers on the CodeRunner server. The browser receives a proxied editor session over HTTP. A Chromebook, tablet with a keyboard, or any device with a modern browser is sufficient. No local Java or VS Code installation is required on the student's device.
 
 ### Can I write my own lessons?
 

@@ -12,8 +12,8 @@ endorse or are affiliated with CodeRunner.
 | Component | Version | License | Where it ships |
 | --- | --- | --- | --- |
 | [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) (**modified**) | v26.0.2 | BSD-3-Clause | AS Lite assets compiled into the control image |
-| [openvscode-server](https://github.com/gitpod-io/openvscode-server) / Code – OSS | 1.109.5 | MIT | base of the workspace image |
-| [linuxserver/openvscode-server](https://github.com/linuxserver/docker-openvscode-server) image | 1.109.5 | GPL-3.0 | base image, unmodified |
+| [VSCodium](https://github.com/VSCodium/vscodium) / Code – OSS (**modified**) | 1.126.04524 | MIT | `reh-web` build, base of the workspace image |
+| [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web) image | 1.126.04524-ls35 | GPL-3.0 | base image, unmodified |
 | [Eclipse Temurin JDK](https://adoptium.net/) | 17.0.15+6 | GPL-2.0 with Classpath Exception | installed in the workspace image |
 | [WPILib](https://github.com/wpilibsuite/allwpilib) | 2026 | BSD-3-Clause | jars primed into the workspace image's Gradle cache |
 | [vscode-wpilib](https://github.com/wpilibsuite/vscode-wpilib) | 2026.1.1 | BSD-3-Clause | extension bundled in the workspace image |
@@ -34,7 +34,18 @@ dependency license list as `ThirdPartyLicenses.txt` alongside the AS Lite bundle
 CodeRunner redistributes a **modified** build of AdvantageScope. The patch is kept at
 source level in [`patches/advantagescope/001-lite-nt4-endpoint-injection.patch`](./patches/advantagescope/)
 and injects an NT4 endpoint so AS Lite can run embedded in the CodeRunner page
-(`/scope/?frcEndpoint=postMessage`). No other bundled component is modified.
+(`/scope/?frcEndpoint=postMessage`).
+
+CodeRunner also redistributes a **modified** VSCodium `reh-web` build. The
+workspace image rewrites the stale VS Code revision in
+`webviewContentExternalBaseUrlTemplate` — in `product.json` and in the compiled
+`out/` where VSCodium inlines it — to the revision VSCodium 1.126 was actually
+built from, so extension webviews can load their local assets. The edit is a
+single revision string, applied in `containers/code/Dockerfile`; see
+[`docs/decisions/036-vscodium-web-migration.md`](./docs/decisions/036-vscodium-web-migration.md).
+The GPL-3.0 `linuxserver/vscodium-web` layer itself is unmodified.
+
+No other bundled component is modified.
 
 ---
 
@@ -100,10 +111,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 
-## openvscode-server and Code – OSS
+## VSCodium and Code – OSS
 
 MIT License
 
+Copyright (c) 2018-present The VSCodium contributors
+Copyright (c) 2018-present Peter Squicciarini
 Copyright (c) 2015 - present Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -137,20 +150,18 @@ These ship unmodified inside the workspace container image and are not linked in
 derived from CodeRunner's own code. Their full license texts are distributed with the
 components themselves and are available upstream:
 
-- **`linuxserver/openvscode-server` container image** — GNU General Public License v3.0.
-  <https://github.com/linuxserver/docker-openvscode-server/blob/master/LICENSE>
+- **`linuxserver/vscodium-web` container image** — GNU General Public License v3.0.
+  <https://github.com/linuxserver/docker-vscodium-web/blob/main/LICENSE>
 - **Eclipse Temurin JDK 17** — GNU General Public License v2.0 with the Classpath
   Exception, which explicitly permits linking independent modules.
   <https://openjdk.org/legal/gplv2+ce.html>
 - **`redhat.java` (Language Support for Java by Red Hat)** — Eclipse Public License 2.0.
   <https://github.com/redhat-developer/vscode-java/blob/master/LICENSE>
 
-## Known sourcing issue
+## Extension artifact sourcing
 
-`containers/code/Dockerfile` currently downloads the `vscode-spotless-gradle` VSIX from
-`richardwillis.gallery.vsassets.io`, a Microsoft Visual Studio Marketplace host. The
-Marketplace terms of use restrict Marketplace-served extensions to Microsoft's own Visual
-Studio products, and openvscode-server is not one of them. This is a terms-of-service
-matter rather than a license incompatibility; the extension itself is MIT licensed. The
-fix is to re-source that VSIX from Open VSX or the publisher's GitHub releases, as every
-other bundled extension already is.
+`vscode-spotless-gradle` is not published to Open VSX and its publisher does
+not attach VSIX artifacts to GitHub releases. The workspace image therefore
+builds version 1.2.1 from the publisher's pinned MIT-licensed source commit in
+a throwaway Docker stage. No Visual Studio Marketplace artifact is downloaded
+or redistributed.

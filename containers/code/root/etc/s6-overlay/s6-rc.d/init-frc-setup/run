@@ -5,15 +5,13 @@
 GRADLE_USER_HOME="${HOME}/.gradle"
 EXTENSIONS_DIR="${HOME}/extensions"
 MACHINE_SETTINGS="${HOME}/data/Machine/settings.json"
-USER_SETTINGS="${HOME}/data/User/settings.json"
 PROJECT_SETTINGS="/workspace/project/.vscode/settings.json"
 SIM_LOG_FILE="${SIM_LOG_FILE:-${HOME}/sim.log}"
 DEFAULT_JDT_LS_VMARGS="-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xms64m -Xmx512m -XX:ReservedCodeCacheSize=96m -Xlog:disable"
 DEFAULT_GRADLE_JVMARGS="-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
-DEFAULT_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
+LEGACY_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
 CODERUNNER_JDT_LS_VMARGS="${CODERUNNER_JDT_LS_VMARGS:-${DEFAULT_JDT_LS_VMARGS}}"
 CODERUNNER_GRADLE_JVMARGS="${CODERUNNER_GRADLE_JVMARGS:-${DEFAULT_GRADLE_JVMARGS}}"
-CODERUNNER_GRADLE_ARGS="${CODERUNNER_GRADLE_ARGS:-${DEFAULT_GRADLE_ARGS}}"
 
 mkdir -p "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" "${HOME}/data/Machine" "${HOME}/data/User"
 
@@ -21,12 +19,19 @@ mkdir -p "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" "${HOME}/data/Machine" "${HOM
 if [[ -d /opt/frc-gradle-cache && ! -d "${GRADLE_USER_HOME}/caches" ]]; then
   echo "Seeding Gradle cache from image..."
   cp -a /opt/frc-gradle-cache/. "${GRADLE_USER_HOME}"/
+  lsiown -R abc:abc "${GRADLE_USER_HOME}"
+fi
+
+# Add the wrapper-path alias to homes created before it was baked into the image.
+if [[ -d "${GRADLE_USER_HOME}/wrapper" && ! -e "${GRADLE_USER_HOME}/permwrapper" && ! -L "${GRADLE_USER_HOME}/permwrapper" ]]; then
+  ln -s wrapper "${GRADLE_USER_HOME}/permwrapper"
 fi
 
 # Seed extensions on first run.
 if [[ -d /opt/frc-extensions-cache ]] && [[ -z "$(ls -A "${EXTENSIONS_DIR}" 2>/dev/null)" ]]; then
   echo "Seeding VS Code extensions from image..."
   cp -a /opt/frc-extensions-cache/. "${EXTENSIONS_DIR}"/
+  lsiown -R abc:abc "${EXTENSIONS_DIR}"
 fi
 
 GRADLE_PROPERTIES="${GRADLE_USER_HOME}/gradle.properties"
@@ -60,7 +65,8 @@ merge_vscode_settings() {
   if jq \
     --arg jdtVmargs "${CODERUNNER_JDT_LS_VMARGS}" \
     --arg gradleJvmargs "${CODERUNNER_GRADLE_JVMARGS}" \
-    --arg gradleArgs "${CODERUNNER_GRADLE_ARGS}" \
+    --arg defaultGradleJvmargs "${DEFAULT_GRADLE_JVMARGS}" \
+    --arg legacyGradleArgs "${LEGACY_GRADLE_ARGS}" \
     --arg mode "${mode}" \
     '
       def oldJdtVmargs:
@@ -80,9 +86,25 @@ merge_vscode_settings() {
       end
       | ."java.gradle.buildServer.enabled" //= "off"
       | ."gradle.autoDetect" //= "off"
-      | ."java.import.gradle.jvmArguments" //= $gradleJvmargs
-      | ."java.import.gradle.arguments" //= $gradleArgs
-      | (if $mode == "project" then . else ."workbench.startupEditor" //= "readme" end)
+      # vscode-gradle 3.17.3 passes this setting to Tooling API
+      # BuildLauncher.setJvmArguments(), which Gradle 8.11 rejects as build
+      # arguments. gradle.properties already applies the same daemon limits.
+      | if $mode != "project" or
+          ."java.import.gradle.jvmArguments" == $gradleJvmargs or
+          ."java.import.gradle.jvmArguments" == $defaultGradleJvmargs
+        then del(."java.import.gradle.jvmArguments")
+        else .
+        end
+      # These build arguments are also redundant with gradle.properties, and
+      # --no-daemon is not supported by Tooling API BuildLauncher arguments.
+      | if $mode != "project" or
+          ."java.import.gradle.arguments" == $legacyGradleArgs
+        then del(."java.import.gradle.arguments")
+        else .
+        end
+      | (if $mode == "project" then . else
+          ."workbench.colorTheme" //= "Default Dark Modern"
+        end)
     ' "${settings_file}" > "${tmp_settings}"; then
     mv "${tmp_settings}" "${settings_file}"
   else
@@ -91,21 +113,9 @@ merge_vscode_settings() {
   fi
 }
 
-merge_vscode_settings "${USER_SETTINGS}" defaults
+merge_vscode_settings "${MACHINE_SETTINGS}" defaults
 if [[ -f "${PROJECT_SETTINGS}" ]]; then
   merge_vscode_settings "${PROJECT_SETTINGS}" project
-fi
-
-if [[ ! -s "${MACHINE_SETTINGS}" ]]; then
-  printf '{}\n' > "${MACHINE_SETTINGS}"
-fi
-
-tmp_settings="$(mktemp)"
-if jq '."workbench.colorTheme" //= "Default Dark Modern"' "${MACHINE_SETTINGS}" > "${tmp_settings}"; then
-  mv "${tmp_settings}" "${MACHINE_SETTINGS}"
-else
-  rm -f "${tmp_settings}"
-  echo "WARNING: Could not update VS Code machine settings; leaving ${MACHINE_SETTINGS} unchanged."
 fi
 
 touch "${SIM_LOG_FILE}"
@@ -115,8 +125,15 @@ if [[ ! -d /workspace/project ]]; then
   echo "WARNING: Mounted project directory /workspace/project does not exist."
 fi
 
-# Fix ownership for /config and /workspace (linuxserver convention).
+# Fix ownership of what this script created as root. The base image's init
+# already chowns /config recursively every boot — do not reintroduce a second
+# recursive pass over ${HOME}; the Gradle cache alone is ~1 GB of traversal
+# (decision 033).
 echo "setting permissions::config"
-lsiown -R abc:abc "${HOME}"
+lsiown abc:abc \
+  "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" \
+  "${HOME}/data" "${HOME}/data/Machine" "${HOME}/data/User" \
+  "${GRADLE_PROPERTIES}" "${MACHINE_SETTINGS}" \
+  "${SIM_LOG_FILE}"
 echo "setting permissions::workspace"
 lsiown -R abc:abc /workspace/project

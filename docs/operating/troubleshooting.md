@@ -33,7 +33,7 @@ In **port mode** (the host dev loop, or a `docker compose` deployment with
 `FRC_CONTAINER_NETWORK` explicitly unset), check for port conflicts: if all
 ports in `SIM_PORT_RANGE` or `VSCODE_PORT_RANGE` are in use, container startup
 fails. Verify the ranges are not overlapping with other services on the host.
-Defaults are `25810–25899` (sim NT4) and `33000–33099` (openvscode-server).
+Defaults are `25810–25899` (sim NT4) and `33000–33099` (codium-server).
 This does not apply to **network mode** — the default for `docker compose`
 deployments — where workspace containers publish no host ports at all; see
 [decision 031](https://github.com/mathewdunne/CodeRunner/blob/main/docs/decisions/031-containerized-control-plane.md).

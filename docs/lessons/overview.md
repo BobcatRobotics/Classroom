@@ -59,8 +59,8 @@ GitHub hiccup will not empty the menu.
 ## What happens when a student loads a lesson
 
 Loading a module **replaces everything in the workspace** with that module's
-starting project, then opens its README so the student can start reading
-immediately.
+starting project, then reloads the editor on the new folder. Students use the
+Explorer sidebar to open `README.md` and the project files they need.
 
 A few behaviors are worth understanding before you put this in front of
 students:

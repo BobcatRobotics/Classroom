@@ -55,9 +55,11 @@ const config: Config = {
           path: '../docs',
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
-          // Decision logs are maintainer/agent records, not site content.
+          // Decision logs and implementation plans are maintainer/agent
+          // records, not site content.
           exclude: [
             'decisions/**',
+            'superpowers/**',
           ],
           editUrl: 'https://github.com/mathewdunne/CodeRunner/tree/main/docs/',
         },

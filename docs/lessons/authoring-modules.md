@@ -31,7 +31,7 @@ A lessons repository has a manifest at its root and one directory per module:
 modules.json              ← the catalog manifest (required, at repo root)
 modules/
   hello-world/             ← one directory per module
-    README.md             ← the lesson text (auto-opened for the student)
+    README.md             ← the lesson text
     .vscode/              ← editor config (run config, Java settings)
     src/...               ← the starting source files
   robot-starter/
@@ -159,15 +159,15 @@ unchanged in the editor. (This means projects that call `addGui()` /
 ## The README is the lesson text
 
 Each module's `README.md` is the lesson. When a student loads a module,
-CodeRunner configures the editor to **open that README automatically** as the
-startup editor, so the lesson instructions are the first thing the student sees.
-Write the README as the student-facing walkthrough: goal, steps, and optional
-bonus challenges.
+the README appears at the workspace root. Write it as the student-facing
+walkthrough: goal, steps, and optional bonus challenges.
 
-For example, the bundled `hello-world` README opens with the goal, lists numbered
-steps, and finishes with bonus challenges.
+Students open `README.md` from the Explorer sidebar, so use a clear filename and
+make the document useful from its first heading. For example, the bundled
+`hello-world` README begins with the goal, lists numbered steps, and finishes
+with bonus challenges.
 
-![A loaded lesson with its README auto-opened in the editor](/img/screenshots/lesson-readme-opened.png)
+![A lesson opened side by side with the README](/img/screenshots/lesson-readme-opened.png)
 
 ## The `.vscode/` folder
 

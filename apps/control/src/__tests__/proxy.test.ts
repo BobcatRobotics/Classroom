@@ -75,7 +75,7 @@ describe("editor proxy", () => {
 			return new Response(`upstream hit: ${url.pathname}`, {
 				headers: {
 					"content-type": "text/plain",
-					"x-upstream-marker": "openvscode-test",
+					"x-upstream-marker": "codium-test",
 				},
 			});
 		};
@@ -98,9 +98,7 @@ describe("editor proxy", () => {
 				expect(response.status).toBe(200);
 				const body = await response.text();
 				expect(body).toContain("upstream hit: /u/alice/vscode/");
-				expect(response.headers.get("x-upstream-marker")).toBe(
-					"openvscode-test",
-				);
+				expect(response.headers.get("x-upstream-marker")).toBe("codium-test");
 			},
 			{
 				dockerRunner: fakeDocker.runner,

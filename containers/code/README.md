@@ -1,13 +1,13 @@
 # V2 Code Container (`coderunner-workspace`)
 
-Merged per-student container for V2. Combines openvscode-server + Java IDE + WPILib support in a single image using the linuxserver.io base (Ubuntu 24.04, s6-overlay).
+Merged per-student container for V2. Combines VSCodium reh-web (`codium-server`) + Java IDE + WPILib support in a single image using the linuxserver.io base (Ubuntu 24.04, s6-overlay).
 
 ## What's Inside
 
 | Component | Version | License | Purpose |
 |---|---|---|---|
-| Base image | linuxserver/openvscode-server:1.109.5 | GPL-3.0 | Ubuntu 24.04, s6-overlay, openvscode-server, PUID/PGID |
-| openvscode-server | 1.109.5 (from base) | MIT | Browser-based VS Code editor |
+| Base image | linuxserver/vscodium-web:1.126.04524-ls35 | GPL-3.0 | Ubuntu 24.04, s6-overlay, codium-server, PUID/PGID |
+| VSCodium reh-web (`codium-server`) | 1.126.04524 (from base) | MIT | Browser-based VS Code editor |
 | JDK | Temurin 17.0.15+6 | GPL-2.0 w/ Classpath Exception | Java compilation and simulation |
 | redhat.java | 1.38.0 | EPL-2.0 | Java language support (JDT LS) |
 | vscode-wpilib | 2026.1.1 | BSD-3-Clause | WPILib project tooling |
@@ -22,7 +22,8 @@ The runtime seeds conservative memory defaults for classroom density:
 - Fresh workspaces default to the VS Code `Default Dark Modern` theme through Remote/Machine settings.
 - JDT LS defaults to `-Xmx512m` instead of the WPILib-generated `-Xmx8G`.
 - The VS Code Gradle Build Server path is disabled by default; JDT LS still imports Gradle projects through the Java extension.
-- Gradle imports and simulation runs use `--no-watch-fs`, `--max-workers=2`, and a bounded `-Xmx384m` daemon.
+- Gradle runs are bounded by `/config/.gradle/gradle.properties`: `-Xmx384m`, no daemon, no VFS watching, and two workers. Those limits are deliberately not duplicated into the editor's `java.import.gradle.*` settings, which reject them (decision 037).
+- Simulation runs pass `--no-watch-fs` and `--max-workers=2` on the `start-sim.sh` command line.
 - The robot simulation JVM is capped at `-Xmx256m` unless `ROBOT_SIM_JVMARGS` overrides it.
 
 ## Build
@@ -48,7 +49,7 @@ used directly. Override the full name with the `CODE_IMAGE` env var.
 
 | Container port | Purpose |
 |---|---|
-| 3000 | openvscode-server (HTTP + WebSocket) |
+| 3000 | codium-server (HTTP + WebSocket) — overrides the base image's 8000 |
 | 3300 | HALSim WebSocket server |
 | 5810 | NT4 (NetworkTables, for AdvantageScope) |
 
@@ -72,7 +73,6 @@ frc-sim.workspace=<workspaceId>
 | `VSCODE_BASE_PATH` | Yes behind proxy | Reverse proxy base path, e.g. `/u/<slug>/vscode/` |
 | `CODERUNNER_JDT_LS_VMARGS` | No | Overrides the seeded Java language-server VM args |
 | `CODERUNNER_GRADLE_JVMARGS` | No | Overrides the seeded Gradle daemon/import VM args |
-| `CODERUNNER_GRADLE_ARGS` | No | Overrides the seeded Gradle import arguments |
 | `GRADLE_SIM_JVMARGS` | No | Overrides the Gradle daemon VM args for `start-sim.sh` |
 | `GRADLE_MAX_WORKERS` | No | Overrides the Gradle worker cap for `start-sim.sh` |
 | `ROBOT_SIM_JVMARGS` | No | Overrides the robot JavaExec VM args applied by `sim-headless.init.gradle` |
@@ -103,11 +103,11 @@ and `VSCODE_BASE_PATH` still use the full workspace id / slug.)
 
 ## s6-overlay Services
 
-The container uses s6-overlay for process supervision. The upstream `linuxserver/openvscode-server` image provides the base services; we add FRC-specific layers:
+The container uses s6-overlay for process supervision. The upstream `linuxserver/vscodium-web` image provides the base services; we add FRC-specific layers:
 
-- **`init-openvscode-server`** (upstream): Creates `/config` dirs, fixes permissions, configures sudo.
+- **`init-vscodium-web`** (upstream): Creates `/config` dirs, fixes permissions, configures sudo.
 - **`init-frc-setup`** (ours, oneshot): Seeds Gradle cache and extensions on first run, validates project mount, fixes permissions.
-- **`svc-openvscode-server`** (upstream, run script overridden): Launches openvscode-server as `abc` user with health check, custom extensions/data dirs, and server-base-path.
+- **`svc-vscodium-web`** (upstream, run script overridden): Launches `codium-server` as `abc` user with health check, custom extensions/data dirs, port 3000, and server-base-path.
 
 ## First-Run Behavior
 
@@ -115,11 +115,18 @@ On first start with an empty `/config`, the init script:
 
 1. Copies the primed Gradle cache from `/opt/frc-gradle-cache/` into `/config/.gradle/`.
 2. Copies pre-installed VS Code extensions from `/opt/frc-extensions-cache/` into `/config/extensions/`.
-3. Seeds Gradle and Java extension settings with the bounded runtime defaults above.
-4. Seeds `/config/data/Machine/settings.json` with `workbench.colorTheme: Default Dark Modern` when no Machine theme is already set.
+3. Seeds `/config/data/Machine/settings.json` with the bounded Java/Gradle
+   defaults and dark theme. Gradle daemon memory stays in
+   `/config/.gradle/gradle.properties`; it is intentionally not duplicated in
+   `java.import.gradle.{jvmArguments,arguments}`, which the editor extensions
+   pass through Tooling API build launchers that reject these daemon options.
 
 Subsequent starts skip these copies (directories already populated from the bind mount).
-Settings migration still runs on later starts so existing imported WPILib projects with `java.jdt.ls.vmargs` set to `-Xmx8G` are lowered to the container default.
+Settings migration still runs on later starts so existing imported WPILib
+projects with `java.jdt.ls.vmargs` set to `-Xmx8G` are lowered to the container
+default. It also removes the former CodeRunner
+`java.import.gradle.{jvmArguments,arguments}` seeds from existing Machine
+settings and from projects where they still have CodeRunner-provided values.
 
 ## Sim Scripts
 
@@ -129,4 +136,6 @@ Settings migration still runs on later starts so existing imported WPILib projec
 
 ## Image Size
 
-Built image size: ~4.5 GiB (uncompressed). Includes JDK (~300 MB), openvscode-server runtime, 9 VS Code extensions (~200 MB), and the primed Gradle/WPILib dependency cache (~1 GB).
+Built image size: ~2.3 GiB (uncompressed). Includes JDK (~300 MB), the
+VSCodium reh-web runtime, 9 VS Code extensions, and the single primed
+Gradle/WPILib dependency-cache layer (~1.2 GiB).

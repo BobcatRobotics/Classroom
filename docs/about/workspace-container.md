@@ -18,14 +18,14 @@ published ports, labels, environment variables, and first-run behavior) is the
 
 The image (`ghcr.io/mathewdunne/coderunner-workspace:latest` by default,
 overridden via `CODE_IMAGE`) is
-built on [linuxserver/openvscode-server](https://github.com/linuxserver/docker-openvscode-server)
+built on [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web)
 (Ubuntu 24.04 with s6-overlay process supervision) and adds the following on
 top:
 
 | Component | Version |
 |---|---|
-| openvscode-server | 1.109.5 |
-| Adoptium Temurin JDK | 17.0.15+6 (x64) |
+| VSCodium reh-web (`codium-server`) | 1.126.04524 |
+| Adoptium Temurin JDK | 17.0.15+6 (x64/aarch64) |
 | redhat.java (JDT Language Server) | 1.38.0 |
 | vscode-wpilib (WPILib extension) | 2026.1.1 |
 | Java Extension Pack | debugger, test runner, Maven/Gradle, project manager |
@@ -34,9 +34,9 @@ top:
 | Gradle + WPILib dependency cache | pre-primed at build time |
 | Bundled lesson catalog | baked in at `/opt/frc-catalog/` |
 
-The total uncompressed image size is approximately 4.5 GiB, of which roughly
-1 GiB is the primed Gradle and WPILib dependency cache that makes first builds
-take seconds rather than minutes.
+The total uncompressed image size is approximately 2.3 GiB, of which roughly
+1.2 GiB is the single primed Gradle and WPILib dependency-cache layer that
+makes first builds take seconds rather than minutes.
 
 ## Classroom-density memory defaults
 
@@ -81,7 +81,7 @@ Three ports are used inside the container:
 
 | Container port | Purpose |
 |---|---|
-| 3000 | openvscode-server (HTTP + WebSocket) |
+| 3000 | codium-server (HTTP + WebSocket) — overrides the base image's 8000 |
 | 3300 | HALSim WebSocket server (robot enable/disable and mode) |
 | 5810 | NT4 NetworkTables server (telemetry) |
 
@@ -131,8 +131,8 @@ script runs before the editor starts:
    `/config/.gradle/`.
 2. Copies the pre-installed VS Code extensions from `/opt/frc-extensions-cache/`
    into `/config/extensions/`.
-3. Seeds bounded JVM and Gradle settings into editor configuration files.
-4. Sets the default VS Code color theme to `Default Dark Modern`.
+3. Seeds bounded Java/Gradle settings and the dark theme into the editor's
+   Remote/Machine configuration.
 
 On subsequent starts these copies are skipped because the directories already
 exist. A settings-migration step still runs to lower any legacy `-Xmx8G` JDT

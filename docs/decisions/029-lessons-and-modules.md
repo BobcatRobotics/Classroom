@@ -44,22 +44,18 @@ See `Lessons-Design.md` for the full rationale.
    `templates/wpilib-java-command/`. `templates/plain-java-hello-world` (the spike
    PoC) is also deleted — `hello-world` now lives in the catalog.
 
-4. **README auto-open is implemented via `workbench.startupEditor: "readme"`**
-   (D6), seeded into the per-workspace VS Code *User* settings by the container
-   init script, **not** via an editor open-file URL payload. VS Code opens the
-   workspace-root `README.md` in Markdown preview when a folder is opened with no
-   prior editor state. Because every module load clears the editor's
-   `workspaceStorage` (see 5), the folder looks "fresh" on the next open and the
-   README preview re-fires — giving exactly the D6 behaviour with no client-side
-   command plumbing. No-ops gracefully when a module ships no `README.md`.
+4. **The module README is ordinary workspace content.** A lesson places its
+   `README.md` at the workspace root alongside the starter project. Students
+   open it from the Explorer like any other file; CodeRunner does not prescribe
+   editor-tab state after a project load or reset.
 
 5. **`workspaceStorage` is cleared on every destructive project swap.** Module
    load, lesson reset, and team import all `rm -rf /config/data/User/workspaceStorage`
-   inside the container before/after replacing `/workspace/project`. This (a)
-   stops redhat.java reusing a stale Gradle/invisible-project model across a
-   `robot ↔ plain-java` switch on the stable `/workspace/project` URI (§4.3), and
-   (b) lets `startupEditor` re-open the new README (4). The rest of `/config`
-   (git credentials, editor prefs) is left intact (D5/§5.5).
+   inside the container before/after replacing `/workspace/project`. This stops
+   redhat.java reusing a stale Gradle/invisible-project model across a
+   `robot ↔ plain-java` switch on the stable `/workspace/project` URI (§4.3).
+   The rest of `/config` (git credentials and editor state) is left intact
+   (D5/§5.5).
 
 6. **First-login picker uses a computed `projectEmpty` flag**, not a stored
    "source" column. The session payload exposes `projectEmpty` (host-side

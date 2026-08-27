@@ -1,9 +1,44 @@
-# V2 merged code container
-# Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/openvscode-server
-# Base already provides: openvscode-server, s6-overlay, abc user, PUID/PGID support
-# See docs/decisions/017-linuxserver-base-migration.md
+ARG SPOTLESS_GRADLE_VERSION=1.2.1
+ARG SPOTLESS_GRADLE_COMMIT=c11a273a11454bfc06fc9cbb19290d5c330e884c
 
-FROM linuxserver/openvscode-server:1.109.5
+# The publisher does not attach VSIX files to GitHub releases and the extension
+# is absent from Open VSX. Build the pinned MIT-licensed source instead of
+# downloading the Marketplace artifact (which is not licensed for VSCodium).
+FROM node:16-bookworm-slim AS spotless-builder
+
+ARG SPOTLESS_GRADLE_VERSION
+ARG SPOTLESS_GRADLE_COMMIT
+
+RUN apt-get update -qq \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -q "https://github.com/badsyntax/vscode-spotless-gradle/archive/${SPOTLESS_GRADLE_COMMIT}.tar.gz" \
+       -O /tmp/vscode-spotless-gradle.tar.gz \
+    && mkdir -p /src \
+    && tar xzf /tmp/vscode-spotless-gradle.tar.gz --strip-components=1 -C /src \
+    && cd /src \
+    && npm ci --ignore-scripts \
+    && npm version "${SPOTLESS_GRADLE_VERSION}" --no-git-tag-version --allow-same-version \
+    && npx vsce package --no-dependencies --out /tmp/vscode-spotless-gradle.vsix
+
+# V2 merged code container
+# Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
+# Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
+# PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
+# docs/decisions/036-vscodium-web-migration.md
+FROM linuxserver/vscodium-web:1.126.04524-ls35
+
+# LinuxServer's VSCodium build points webviews at a stale VS Code CDN bundle.
+# Keep the isolated-origin bootstrap on the upstream commit used by VSCodium
+# 1.126.0; the stale bundle cannot load vscode-resource streams.
+ARG VSCODE_WEBVIEW_COMMIT=7e7950df89d055b5a378379db9ee14290772148a
+RUN VSCODE_PRODUCT_PATHS="/app/vscodium-web/product.json /app/vscodium-web/out" \
+    && STALE_WEBVIEW_COMMIT=ef65ac1ba57f57f2a3961bfe94aa20481caca4c6 \
+    && test "$(grep -rhoF "${STALE_WEBVIEW_COMMIT}" ${VSCODE_PRODUCT_PATHS} | wc -l)" -eq 8 \
+    && grep -rlF "${STALE_WEBVIEW_COMMIT}" ${VSCODE_PRODUCT_PATHS} \
+        | xargs sed -i "s/${STALE_WEBVIEW_COMMIT}/${VSCODE_WEBVIEW_COMMIT}/g" \
+    && test "$(grep -rhoF "${STALE_WEBVIEW_COMMIT}" ${VSCODE_PRODUCT_PATHS} | wc -l)" -eq 0 \
+    && test "$(grep -rhoF "${VSCODE_WEBVIEW_COMMIT}" ${VSCODE_PRODUCT_PATHS} | wc -l)" -eq 8
 
 # ── System dependencies ────────────────────────────────────────────────
 # Ubuntu 24.04 ships GLIBCXX_3.4.32+ natively — no PPA needed.
@@ -53,14 +88,13 @@ RUN java -version
 COPY containers/code/start-sim.sh containers/code/run-sim.sh containers/code/stop-sim.sh /usr/local/bin/
 COPY containers/code/sim-headless.init.gradle /usr/local/share/frc/sim-headless.init.gradle
 
-RUN sed -i 's/\r$//' /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/local/bin/stop-sim.sh \
-    && chmod +x /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/local/bin/stop-sim.sh
+RUN chmod +x /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/local/bin/stop-sim.sh
 
 # ── s6-overlay service definitions (additive to upstream) ─────────────
-# Adds init-frc-setup oneshot and overrides svc-openvscode-server run script.
+# Adds init-frc-setup oneshot and overrides svc-vscodium-web run script.
 COPY containers/code/root/ /
 RUN chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
-             /etc/s6-overlay/s6-rc.d/svc-openvscode-server/run
+             /etc/s6-overlay/s6-rc.d/svc-vscodium-web/run
 
 # ── Download and install VS Code extensions ────────────────────────────
 ARG REDHAT_JAVA_VERSION=1.38.0
@@ -71,9 +105,10 @@ ARG MAVEN_VERSION=0.45.3
 ARG GRADLE_VERSION=3.17.3
 ARG JAVA_DEPS_VERSION=0.27.2
 ARG JAVA_PACK_VERSION=0.30.5
-ARG SPOTLESS_GRADLE_VERSION=1.2.1
+ARG SPOTLESS_GRADLE_VERSION
 
-# Download extensions from pinned Open VSX, GitHub Release, and Marketplace artifacts.
+# Download pinned Open VSX and GitHub Release artifacts. Spotless is copied
+# from the pinned-source builder above.
 RUN mkdir -p /tmp/exts \
     && wget -q "https://open-vsx.org/api/redhat/java/${REDHAT_JAVA_VERSION}/file/redhat.java-${REDHAT_JAVA_VERSION}.vsix" \
        -O /tmp/exts/redhat.java.vsix \
@@ -90,13 +125,15 @@ RUN mkdir -p /tmp/exts \
     && wget -q "https://open-vsx.org/api/vscjava/vscode-java-dependency/${JAVA_DEPS_VERSION}/file/vscjava.vscode-java-dependency-${JAVA_DEPS_VERSION}.vsix" \
        -O /tmp/exts/vscode-java-dependency.vsix \
     && wget -q "https://open-vsx.org/api/vscjava/vscode-java-pack/${JAVA_PACK_VERSION}/file/vscjava.vscode-java-pack-${JAVA_PACK_VERSION}.vsix" \
-       -O /tmp/exts/vscode-java-pack.vsix \
-    && wget -q "https://richardwillis.gallery.vsassets.io/_apis/public/gallery/publisher/richardwillis/extension/vscode-spotless-gradle/${SPOTLESS_GRADLE_VERSION}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage" \
-       -O /tmp/exts/vscode-spotless-gradle.vsix
+       -O /tmp/exts/vscode-java-pack.vsix
 
-# Install to a baked cache directory; the init script seeds per-workspace configs.
+COPY --from=spotless-builder /tmp/vscode-spotless-gradle.vsix /tmp/exts/vscode-spotless-gradle.vsix
+
+# Do not resolve extension packs or dependencies from the gallery; every required
+# Java extension is installed explicitly below.
 RUN mkdir -p /opt/frc-extensions-cache \
-    && /app/openvscode-server/bin/openvscode-server \
+    && /app/vscodium-web/bin/codium-server \
+                     --do-not-include-pack-dependencies \
                      --install-extension /tmp/exts/redhat.java.vsix \
                      --install-extension /tmp/exts/vscode-wpilib.vsix \
                      --install-extension /tmp/exts/vscode-java-debug.vsix \
@@ -107,37 +144,43 @@ RUN mkdir -p /opt/frc-extensions-cache \
                      --install-extension /tmp/exts/vscode-java-pack.vsix \
                      --install-extension /tmp/exts/vscode-spotless-gradle.vsix \
                      --extensions-dir /opt/frc-extensions-cache \
+    && jq -e \
+       --argjson expected '["redhat.java@'"${REDHAT_JAVA_VERSION}"'","wpilibsuite.vscode-wpilib@'"${WPILIB_EXT_VERSION}"'","vscjava.vscode-java-debug@'"${JAVA_DEBUG_VERSION}"'","vscjava.vscode-java-test@'"${JAVA_TEST_VERSION}"'","vscjava.vscode-maven@'"${MAVEN_VERSION}"'","vscjava.vscode-gradle@'"${GRADLE_VERSION}"'","vscjava.vscode-java-dependency@'"${JAVA_DEPS_VERSION}"'","vscjava.vscode-java-pack@'"${JAVA_PACK_VERSION}"'","richardwillis.vscode-spotless-gradle@'"${SPOTLESS_GRADLE_VERSION}"'"]' \
+       'length == ($expected | length) and all(.[]; .metadata.source == "vsix" and .metadata.pinned == true) and ([.[] | "\(.identifier.id)@\(.version)"] | sort) == ($expected | sort)' \
+       /opt/frc-extensions-cache/extensions.json > /dev/null \
     && rm -rf /tmp/exts
 
 # ── Bundled lesson catalog ────────────────────────────────────────────
 # Baked into the image so bundled module loads copy locally (no network).
-COPY catalog/ /opt/frc-catalog/
-RUN chown -R abc:abc /opt/frc-catalog
+COPY --chown=abc:abc catalog/ /opt/frc-catalog/
 
 # ── Gradle / WPILib cache priming ─────────────────────────────────────
-# Prime the cache from the bundled robot module in a throwaway build dir.
-WORKDIR /workspace
-RUN cp -a /opt/frc-catalog/modules/robot-starter /workspace/template
-
-RUN mkdir -p /config/.gradle \
-    && chown -R abc:abc /workspace /config/.gradle
-
-USER abc
+# Prime directly into the cache path shipped in the final image. Keeping the
+# build, cleanup, and alias in one layer prevents the cache and template build
+# output from being retained in earlier layers.
 ENV GRADLE_USER_HOME=/config/.gradle
-WORKDIR /workspace/template
+RUN mkdir -p /opt/frc-gradle-cache /workspace \
+    && chown -R abc:abc /opt/frc-gradle-cache /workspace
 
-RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
-RUN ./gradlew --no-daemon --console=plain build
-RUN ./gradlew --no-daemon --stop; \
-    rm -rf /workspace/template/build /workspace/template/.gradle
+# WPILib templates use permwrapper/dists while the catalog uses wrapper/dists.
+# Gradle keys distributions by URL, so both paths can share the primed cache.
+USER abc
+WORKDIR /workspace
+RUN cp -a /opt/frc-catalog/modules/robot-starter /workspace/template \
+    && cd /workspace/template \
+    && chmod +x gradlew \
+    && GRADLE_USER_HOME=/opt/frc-gradle-cache ./gradlew --no-daemon --console=plain build \
+    && GRADLE_USER_HOME=/opt/frc-gradle-cache ./gradlew --no-daemon --stop \
+    && cd /workspace \
+    && rm -rf /workspace/template \
+    && test ! -e /opt/frc-gradle-cache/permwrapper \
+    && test ! -L /opt/frc-gradle-cache/permwrapper \
+    && ln -s wrapper /opt/frc-gradle-cache/permwrapper
 
 USER root
-RUN mkdir -p /opt/frc-gradle-cache \
-    && cp -a /config/.gradle/. /opt/frc-gradle-cache/ \
-    && rm -rf /config/.gradle /workspace/template
 
 # ── License notices ───────────────────────────────────────────────────
-# This image redistributes openvscode-server, Temurin, WPILib, and the bundled
+# This image redistributes VSCodium reh-web, Temurin, WPILib, and the bundled
 # extensions; the BSD-3-Clause components require their notice to accompany
 # the distribution. Placed after the Gradle priming so notice edits don't
 # invalidate that layer.

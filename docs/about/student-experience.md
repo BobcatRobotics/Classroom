@@ -30,7 +30,7 @@ their workspace.
 After signing in the student lands in the workspace shell, a full-page web
 application built around three panes:
 
-- **Editor** (left): openvscode-server embedded in an iframe. This is a
+- **Editor** (left): VSCodium embedded in an iframe. This is a
   real VS Code environment in the browser, complete with the
   [Red Hat Java](https://marketplace.visualstudio.com/items?itemName=redhat.java)
   language server, the WPILib extension, IntelliSense, and a terminal.
@@ -57,8 +57,9 @@ ways to fill the workspace:
 **Lesson modules** are structured exercises provided by the operator. Each
 module has a title, a short description, and a kind badge (Robot or Console).
 Clicking **Load** on a module copies the starter files into the workspace and
-opens them in the editor. The current module is shown with a **Reset** button
-that reloads the original files from the catalog, discarding any changes.
+reloads the editor on that folder. Students choose files from the Explorer
+sidebar. The current module is shown with a **Reset** button that reloads the
+original files from the catalog, discarding any changes.
 
 **Import from GitHub** lets a student paste a public `github.com` HTTPS URL.
 The control plane clones the repository into the workspace, preserving the
