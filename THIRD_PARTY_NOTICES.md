@@ -12,7 +12,7 @@ endorse or are affiliated with CodeRunner.
 | Component | Version | License | Where it ships |
 | --- | --- | --- | --- |
 | [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) (**modified**) | v26.0.2 | BSD-3-Clause | AS Lite assets compiled into the control image |
-| [VSCodium](https://github.com/VSCodium/vscodium) / Code – OSS | 1.126.04524 | MIT | `reh-web` build, base of the workspace image |
+| [VSCodium](https://github.com/VSCodium/vscodium) / Code – OSS (**modified**) | 1.126.04524 | MIT | `reh-web` build, base of the workspace image |
 | [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web) image | 1.126.04524-ls35 | GPL-3.0 | base image, unmodified |
 | [Eclipse Temurin JDK](https://adoptium.net/) | 17.0.15+6 | GPL-2.0 with Classpath Exception | installed in the workspace image |
 | [WPILib](https://github.com/wpilibsuite/allwpilib) | 2026 | BSD-3-Clause | jars primed into the workspace image's Gradle cache |
@@ -34,7 +34,18 @@ dependency license list as `ThirdPartyLicenses.txt` alongside the AS Lite bundle
 CodeRunner redistributes a **modified** build of AdvantageScope. The patch is kept at
 source level in [`patches/advantagescope/001-lite-nt4-endpoint-injection.patch`](./patches/advantagescope/)
 and injects an NT4 endpoint so AS Lite can run embedded in the CodeRunner page
-(`/scope/?frcEndpoint=postMessage`). No other bundled component is modified.
+(`/scope/?frcEndpoint=postMessage`).
+
+CodeRunner also redistributes a **modified** VSCodium `reh-web` build. The
+workspace image rewrites the stale VS Code revision in
+`webviewContentExternalBaseUrlTemplate` — in `product.json` and in the compiled
+`out/` where VSCodium inlines it — to the revision VSCodium 1.126 was actually
+built from, so extension webviews can load their local assets. The edit is a
+single revision string, applied in `containers/code/Dockerfile`; see
+[`docs/decisions/036-vscodium-web-migration.md`](./docs/decisions/036-vscodium-web-migration.md).
+The GPL-3.0 `linuxserver/vscodium-web` layer itself is unmodified.
+
+No other bundled component is modified.
 
 ---
 

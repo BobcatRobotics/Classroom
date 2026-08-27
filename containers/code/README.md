@@ -22,7 +22,8 @@ The runtime seeds conservative memory defaults for classroom density:
 - Fresh workspaces default to the VS Code `Default Dark Modern` theme through Remote/Machine settings.
 - JDT LS defaults to `-Xmx512m` instead of the WPILib-generated `-Xmx8G`.
 - The VS Code Gradle Build Server path is disabled by default; JDT LS still imports Gradle projects through the Java extension.
-- Gradle imports and simulation runs use `--no-watch-fs`, `--max-workers=2`, and a bounded `-Xmx384m` daemon.
+- Gradle runs are bounded by `/config/.gradle/gradle.properties`: `-Xmx384m`, no daemon, no VFS watching, and two workers. Those limits are deliberately not duplicated into the editor's `java.import.gradle.*` settings, which reject them (decision 037).
+- Simulation runs pass `--no-watch-fs` and `--max-workers=2` on the `start-sim.sh` command line.
 - The robot simulation JVM is capped at `-Xmx256m` unless `ROBOT_SIM_JVMARGS` overrides it.
 
 ## Build

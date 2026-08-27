@@ -1,6 +1,6 @@
 # Vendored VS Code Extensions
 
-This directory documents the VS Code extensions bundled into the V2 code container image. Extensions are **downloaded at build time** from public registries — no `.vsix` files are stored in this directory.
+This directory documents the VS Code extensions bundled into the V2 code container image. Extensions are **downloaded at build time** from public registries, except Spotless Gradle, which is **built at build time** from pinned publisher source — no `.vsix` files are stored in this directory.
 
 ## Bundled Extensions
 
@@ -26,7 +26,7 @@ This directory documents the VS Code extensions bundled into the V2 code contain
 
 | Extension | Version | Source |
 |---|---|---|
-| richardwillis.vscode-spotless-gradle (Spotless Gradle) | 1.2.1 | [VS Code Marketplace](https://richardwillis.gallery.vsassets.io/_apis/public/gallery/publisher/richardwillis/extension/vscode-spotless-gradle/1.2.1/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage) |
+| richardwillis.vscode-spotless-gradle (Spotless Gradle) | 1.2.1 | [Publisher source](https://github.com/badsyntax/vscode-spotless-gradle/tree/c11a273a11454bfc06fc9cbb19290d5c330e884c), packaged in a throwaway build stage |
 
 ## Provenance
 
@@ -36,13 +36,13 @@ This directory documents the VS Code extensions bundled into the V2 code contain
 
 - **Java Extension Pack + sub-extensions**: Published by Microsoft/vscjava on Open VSX. The pack and all required extensions are installed from pinned VSIXs for offline use. The image build disables gallery dependency resolution and verifies the resulting extension manifest, preventing the pack or `extensionDependencies` from replacing those pins.
 
-- **Spotless Gradle 1.2.1**: Published by Richard Willis on the VS Code Marketplace. The extension has not been updated in several years, so the image pins the current Marketplace package version directly instead of using the mutable `latest` asset URL.
+- **Spotless Gradle 1.2.1**: Published by Richard Willis. It is absent from Open VSX and the publisher attaches no VSIX to GitHub releases, so the image builds it from the pinned MIT-licensed source commit `c11a273` in a throwaway Node stage rather than redistributing the Visual Studio Marketplace artifact. See decisions 012 and 037.
 
 ## Version Pinning
 
-Extension versions are pinned as Docker build args in `containers/code/Dockerfile`. The image downloads versioned Open VSX, GitHub Release, and Marketplace artifacts; unpinned Marketplace "latest" URLs are intentionally avoided so builds remain reproducible. To update:
+Extension versions are pinned as Docker build args in `containers/code/Dockerfile`. The image downloads versioned Open VSX and GitHub Release artifacts and builds Spotless from a pinned source commit; no mutable "latest" URL is used, so builds remain reproducible. The build also passes `--do-not-include-pack-dependencies` and asserts the resulting extension manifest, so gallery resolution cannot replace a pin (decision 037). To update:
 
-1. Change the build arg default in the Dockerfile.
+1. Change the build arg default in the Dockerfile (for Spotless, bump `SPOTLESS_GRADLE_VERSION` and `SPOTLESS_GRADLE_COMMIT` together).
 2. Rebuild: `bun run docker:build:workspace`
 3. Test auto-import and ctrl-click in the rebuilt container.
 4. Update this README and add a decision log if the version jump is non-trivial.
