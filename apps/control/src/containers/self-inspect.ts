@@ -74,8 +74,8 @@ export type SelfInspectResult = {
 	 * The `com.docker.compose.project` label of this container, so workspace
 	 * containers can carry the same label and nest under the control plane's
 	 * compose project in tools that group by it (Portainer, `docker compose ls`).
-	 * Null on the host, and null when every field is env-overridden (we skip the
-	 * inspect entirely in that path, so the label is never read).
+	 * Null on the host, when the control plane was not started by compose, and
+	 * when the inspect that reads it fails on the fully-overridden path.
 	 */
 	composeProject: string | null;
 	/** Which fields came from inspection (vs. an explicit env override). */
@@ -110,11 +110,15 @@ export async function selfInspect(
 	const needNetwork = envContainerNetwork === null;
 	const needUser = envContainerUser === null;
 
-	// Everything explicitly configured — nothing to inspect.
+	// Everything explicitly configured — nothing to derive. The compose label is
+	// still worth reading so workspace containers keep nesting under the control
+	// plane's project no matter how the deployment is configured; it is cosmetic,
+	// so unlike the three derived fields a failed inspect here is not fatal.
 	if (!needHostDataDir && !needNetwork && !needUser) {
 		return {
 			...notDerived(envHostDataDir, envContainerNetwork, envContainerUser),
 			containerized: true,
+			composeProject: await readComposeProject(inspect, hostname()),
 		};
 	}
 
@@ -216,6 +220,24 @@ function deriveNetwork(container: DockerInspectContainer): string {
 			`one user-defined network attached to this container, found ${found}. Set ` +
 			`FRC_CONTAINER_NETWORK to the network workspace containers should join.`,
 	);
+}
+
+/**
+ * The compose project label, best-effort. Only used on the fully-overridden
+ * path, where nothing else needs the inspect: grouping in Portainer / Docker
+ * Desktop is a convenience, so it degrades to "ungrouped" (which the startup
+ * config log reports) instead of failing startup.
+ */
+async function readComposeProject(
+	inspect: (id: string) => Promise<DockerInspectContainer | null>,
+	id: string,
+): Promise<string | null> {
+	try {
+		const container = await inspect(id);
+		return container ? deriveComposeProject(container) : null;
+	} catch {
+		return null;
+	}
 }
 
 function deriveComposeProject(

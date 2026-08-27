@@ -188,7 +188,7 @@ describe("selfInspect — containerized derivation", () => {
 });
 
 describe("selfInspect — env overrides win", () => {
-	test("all three env values set → inspection is skipped entirely", async () => {
+	test("all three env values set → nothing is derived, but the label is read", async () => {
 		let inspectCalls = 0;
 		const result = await selfInspect({
 			dataDir: "/data",
@@ -196,6 +196,7 @@ describe("selfInspect — env overrides win", () => {
 			envContainerNetwork: "explicit-net",
 			envContainerUser: "500:500",
 			dockerenvExists: () => true,
+			hostname: () => "abc123",
 			inspect: async () => {
 				inspectCalls += 1;
 				return containerizedFixture();
@@ -205,20 +206,44 @@ describe("selfInspect — env overrides win", () => {
 			},
 		});
 
-		expect(inspectCalls).toBe(0);
+		expect(inspectCalls).toBe(1);
 		expect(result).toEqual({
 			containerized: true,
 			hostDataDir: "/explicit/data",
 			containerNetwork: "explicit-net",
 			containerUser: "500:500",
-			// All fields env-overridden → inspect skipped → label never read.
-			composeProject: null,
+			// Grouping must not depend on whether the other three fields happen
+			// to be env-overridden.
+			composeProject: "coderunner",
 			autoDetected: {
 				hostDataDir: false,
 				containerNetwork: false,
 				containerUser: false,
 			},
 		});
+	});
+
+	test("a failed inspect on the fully-overridden path is not fatal", async () => {
+		const result = await selfInspect({
+			dataDir: "/data",
+			envHostDataDir: "/explicit/data",
+			envContainerNetwork: "explicit-net",
+			envContainerUser: "500:500",
+			dockerenvExists: () => true,
+			hostname: () => "abc123",
+			inspect: async () => {
+				throw new Error("docker socket unavailable");
+			},
+			stat: () => {
+				throw new Error("stat should not be called when the user is explicit");
+			},
+		});
+
+		// Only the cosmetic label needed the inspect, so startup carries on with
+		// workspaces ungrouped rather than hard-failing.
+		expect(result.composeProject).toBeNull();
+		expect(result.containerized).toBe(true);
+		expect(result.hostDataDir).toBe("/explicit/data");
 	});
 
 	test("an explicit field keeps its env value while the rest are derived", async () => {
