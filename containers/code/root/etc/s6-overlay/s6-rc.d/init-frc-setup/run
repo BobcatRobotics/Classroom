@@ -9,10 +9,9 @@ PROJECT_SETTINGS="/workspace/project/.vscode/settings.json"
 SIM_LOG_FILE="${SIM_LOG_FILE:-${HOME}/sim.log}"
 DEFAULT_JDT_LS_VMARGS="-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xms64m -Xmx512m -XX:ReservedCodeCacheSize=96m -Xlog:disable"
 DEFAULT_GRADLE_JVMARGS="-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
-DEFAULT_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
+LEGACY_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
 CODERUNNER_JDT_LS_VMARGS="${CODERUNNER_JDT_LS_VMARGS:-${DEFAULT_JDT_LS_VMARGS}}"
 CODERUNNER_GRADLE_JVMARGS="${CODERUNNER_GRADLE_JVMARGS:-${DEFAULT_GRADLE_JVMARGS}}"
-CODERUNNER_GRADLE_ARGS="${CODERUNNER_GRADLE_ARGS:-${DEFAULT_GRADLE_ARGS}}"
 
 mkdir -p "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" "${HOME}/data/Machine" "${HOME}/data/User"
 
@@ -66,7 +65,8 @@ merge_vscode_settings() {
   if jq \
     --arg jdtVmargs "${CODERUNNER_JDT_LS_VMARGS}" \
     --arg gradleJvmargs "${CODERUNNER_GRADLE_JVMARGS}" \
-    --arg gradleArgs "${CODERUNNER_GRADLE_ARGS}" \
+    --arg defaultGradleJvmargs "${DEFAULT_GRADLE_JVMARGS}" \
+    --arg legacyGradleArgs "${LEGACY_GRADLE_ARGS}" \
     --arg mode "${mode}" \
     '
       def oldJdtVmargs:
@@ -86,8 +86,22 @@ merge_vscode_settings() {
       end
       | ."java.gradle.buildServer.enabled" //= "off"
       | ."gradle.autoDetect" //= "off"
-      | ."java.import.gradle.jvmArguments" //= $gradleJvmargs
-      | ."java.import.gradle.arguments" //= $gradleArgs
+      # vscode-gradle 3.17.3 passes this setting to Tooling API
+      # BuildLauncher.setJvmArguments(), which Gradle 8.11 rejects as build
+      # arguments. gradle.properties already applies the same daemon limits.
+      | if $mode != "project" or
+          ."java.import.gradle.jvmArguments" == $gradleJvmargs or
+          ."java.import.gradle.jvmArguments" == $defaultGradleJvmargs
+        then del(."java.import.gradle.jvmArguments")
+        else .
+        end
+      # These build arguments are also redundant with gradle.properties, and
+      # --no-daemon is not supported by Tooling API BuildLauncher arguments.
+      | if $mode != "project" or
+          ."java.import.gradle.arguments" == $legacyGradleArgs
+        then del(."java.import.gradle.arguments")
+        else .
+        end
       | (if $mode == "project" then . else
           ."workbench.colorTheme" //= "Default Dark Modern"
         end)

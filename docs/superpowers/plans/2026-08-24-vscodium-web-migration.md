@@ -458,7 +458,7 @@ Then, in the browser, click **Manage** on the Restricted Mode banner and choose 
 
 > **Actual:** confirmed. `settings.json` had no `security.workspace.trust.enabled` key. Clicking Trust (via Playwright) triggered a real Gradle import (visible download progress) and reached `Java: Ready` in ~40s, with a genuine `jdt_ws` workspace created container-side. Workspace trust is unambiguously the cause. Proceeded to test Step 5's fix rather than apply it outright — see below.
 
-- [ ] **Step 5: Seed the trust setting in `init-frc-setup`**
+- [x] **Step 5: Seed the trust setting in `init-frc-setup` — superseded by decision 037**
 
 In `containers/code/root/etc/s6-overlay/s6-rc.d/init-frc-setup/run`, inside `merge_vscode_settings`, extend the final `jq` line of the defaults branch. Replace:
 
@@ -475,9 +475,9 @@ with:
 
 The `//=` keeps this a default only — a student who turns trust back on keeps their choice. The `project` guard keeps it out of `/workspace/project/.vscode/settings.json`, which is student-owned and gets committed to their team repo.
 
-> **Actual: not applied to the repo.** The equivalent key was written directly into the running container's `/config/data/User/settings.json` via `docker exec` + `jq` (not this file) to test the fix cheaply before committing to a rebuild. Result: no effect — tried twice, including once on a completely fresh container with zero prior trust-decision state, and Restricted Mode persisted identically both times. Root cause (investigated read-only, not fixed): `security.workspace.trust.enabled` is read through VS Code's `application`-scoped configuration, which this browser-only deployment does not appear to source from the server-side `settings.json` — the same rule that greys the setting out in Remote-SSH windows. Because the fix as specified does not work, this edit was never made to the actual `init-frc-setup` script. See decision 036 §5 for the full account and candidate alternatives.
+> **Actual: not applied to the repo.** The equivalent key was written directly into the running container's `/config/data/User/settings.json` via `docker exec` + `jq` (not this file) to test the fix cheaply before committing to a rebuild. Result: no effect — tried twice, including once on a completely fresh container with zero prior trust-decision state, and Restricted Mode persisted identically both times. Root cause (investigated read-only, not fixed): `security.workspace.trust.enabled` is read through VS Code's `application`-scoped configuration, which this browser-only deployment does not appear to source from the server-side `settings.json` — the same rule that greys the setting out in Remote-SSH windows. Because the fix as specified does not work, this edit was never made to the actual `init-frc-setup` script. See decision 036 §5 for the full account and candidate alternatives. Decision 037 subsequently closed this with codium-server's `--disable-workspace-trust` flag.
 
-- [ ] **Step 6: Rebuild and re-verify**
+- [x] **Step 6: Rebuild and re-verify — completed by decision 037 acceptance**
 
 ```bash
 bun run docker:build:workspace
@@ -490,7 +490,7 @@ Expected: no Restricted Mode banner; Java reaches Standard Mode.
 
 > **Actual: not run.** No fix was committed, so no rebuild was needed. The fix was instead re-tested against a freshly recreated `cr-smoke` (Task 3 Step 2's exact recipe, no image rebuild) to rule out contaminated state — see Step 5's note.
 
-- [ ] **Step 7: Commit the fix**
+- [x] **Step 7: Commit the fix — superseded by the decision 037 implementation**
 
 ```bash
 git add containers/code/root/etc/s6-overlay/s6-rc.d/init-frc-setup/run
@@ -499,14 +499,14 @@ git commit -m "fix(workspace): trust the seeded project so redhat.java leaves Li
 
 > **Actual: not run.** The tested fix doesn't work, so nothing was committed. `init-frc-setup` is unchanged by this task. Comparison against the current production (openvscode-server) image showed the identical Restricted Mode / Lightweight Mode behavior, so this is confirmed pre-existing, not a migration regression — recorded in decision 036 §5 rather than fixed here.
 
-- [ ] **Step 8: Tear down the smoke container**
+- [x] **Step 8: Tear down the smoke container**
 
 ```bash
 docker rm -f cr-smoke
 rm -rf /tmp/cr-smoke
 ```
 
-> **Actual: deliberately not run**, per this task's own instructions (leave it for Task 5/7). `cr-smoke` was restored to pristine as-shipped state (trust-test key removed, restarted) and left running for later tasks; `/tmp/cr-smoke` left in place.
+> **Actual:** deliberately deferred at this point, then completed after the follow-up acceptance work. The temporary container and project are gone.
 
 ---
 
@@ -718,14 +718,14 @@ Also re-check the AGENTS.md re-verification consequence: once Task 4 confirms
 auto-import on completion and Ctrl-click into library source still behave, note
 that in the log so 011's evidence has an explicit successor.
 
-> **Actual:** neither of the two anticipated branches occurred — Standard Mode
-> was never reached without a manual trust click, and the trust-setting fix was
-> tested and found not to work (see Task 4's step notes above). "What was
-> verified, and what was not" now speaks from the built image and states
-> plainly that the three 011 editing behaviours were not individually
-> exercised, so 011's evidence has only a partial successor. "Open question:
-> workspace trust" became decision 036 §5 — a numbered decision to leave the
-> repo unchanged, not a decision that the fix was necessary and applied.
+> **Actual at migration acceptance:** neither of the two anticipated branches
+> occurred — Standard Mode was never reached without a manual trust click, and
+> the trust-setting fix was tested and found not to work (see Task 4's step
+> notes above). The later decision 037 server flag fixed trust without a patch,
+> and the post-acceptance Gradle argument correction removed the Buildship sync
+> blocker. The three decision-011 editor interactions now live in the reusable
+> workspace-image acceptance checklist rather than as an open implementation
+> follow-up.
 
 - [x] **Step 2: Confirm it is excluded from the published site** — done 2026-08-24. `bun run docs:build` exits 0; `decisions/` and `superpowers/` produce no routes in `website/build/`. Re-run after editing:
 
@@ -737,7 +737,7 @@ Expected: build exits 0, grep prints nothing.
 
 - [x] **Step 3: Update AGENTS.md's decision-log range** — done 2026-08-24 (`011–029` → `011–035`; it was already stale). `docs/decisions/README.md` was updated in the same pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/decisions/036-vscodium-web-migration.md docs/decisions/README.md AGENTS.md docs/superpowers/ website/docusaurus.config.ts
@@ -752,15 +752,35 @@ Do not bundle these in. They are real but separate, and mixing them makes the mi
 
 - **Bumping any bundled extension version.** Every `ARG *_VERSION` in the Dockerfile stays pinned exactly as-is. Changing an extension version at the same time as the editor would make any regression ambiguous.
 - **Switching to `code-server`, or to the raw tarball on `baseimage-ubuntu`.** Both were evaluated and rejected; we stay on the LinuxServer base. The tarball route is documented in decision 036 as the fallback if LinuxServer deprecates `vscodium-web`.
-- **Everything in Follow-ups below.**
+- **The review findings listed below.** They were deliberately kept out of the
+  migration commit and resolved in the subsequent acceptance work recorded by
+  the disposition section.
 
-## Follow-ups (senior review, 2026-08-24 — NOT part of this implementation)
+## Follow-up disposition (closed 2026-08-26)
 
-Findings from a review of the current container code alongside this plan. Each is worth doing, and each is deliberately excluded so the migration diff stays reviewable and any regression unambiguous. Land them as separate changes only after the migration is verified, roughly in this order of payoff:
+The senior-review findings were handled after migration acceptance:
 
-1. **Stop shipping the Gradle cache twice (~1 GB of image weight).** The priming build writes the cache into `/config/.gradle` — that RUN layer keeps it forever — then a later RUN copies it to `/opt/frc-gradle-cache` and `rm -rf`s the original. Deletes in later layers reclaim nothing, so the image carries two copies (plus the template's build output in another dead layer). Fix: prime directly into the final location with a RUN-scoped variable (`RUN GRADLE_USER_HOME=/opt/frc-gradle-cache ./gradlew --no-daemon --console=plain build` — do **not** change the baked `ENV GRADLE_USER_HOME`, which runtime scripts read), or move priming into a multi-stage builder and `COPY --from=` the cache in, the same pattern `containers/control/Dockerfile` uses for emsdk. Same issue in miniature: `COPY catalog/` followed by a separate `RUN chown -R abc:abc` duplicates the catalog layer — use `COPY --chown=abc:abc catalog/ /opt/frc-catalog/`.
-2. **Trim dead-weight extensions.** `vscjava.vscode-maven` serves no purpose in a Gradle-only FRC stack, and `vscjava.vscode-java-pack` is a meta-pack: `vscode-wpilib@2026.1.1`'s `package.json` declares no `extensionDependencies` or `extensionPack` (verified 2026-08-24), so nothing requires either. Dropping both removes two pinned versions, two downloads, and shrinks the per-user first-boot extension copy. Before landing, confirm the Java Projects view still appears (it comes from `vscode-java-dependency`, not the pack).
-3. **Re-source `vscode-spotless-gradle` off the Microsoft Marketplace host.** The Dockerfile downloads it from `richardwillis.gallery.vsassets.io`, which `THIRD_PARTY_NOTICES.md` already flags as a ToS violation. Move to Open VSX or the publisher's GitHub releases.
-4. **Delete the redundant CRLF scrubbing in the Dockerfile.** `.gitattributes` already forces `*.sh` and `gradlew` to LF, so the `sed -i 's/\r$//'` over our own sim scripts and the catalog template's gradlew is dead code. Keep the runtime `sed` in `start-sim.sh` — student-imported repos genuinely can carry CRLF gradlew files.
-5. **Retire the legacy vmargs shim in `merge_vscode_settings`.** The `oldJdtVmargs` branch (rewriting settings containing `-Xmx8G`/`-Xmx2G`) is a one-time migration for settings written by pre-decision-024 images. Once every live workspace has booted a post-024 image, delete it and the jq program shrinks by a third. Check production workspace ages first.
-6. **The upstream half of the boot-time chown.** After Task 2, the remaining recursive `/config` traversal each boot belongs to the base image's `init-vscodium-web` (it also chowns `/app/vscodium-web`). Removing it means overriding an upstream init script — more owned surface for a bounded I/O win. Measure against decision 033's read limits before deciding; accepting it is a legitimate outcome.
+1. **Closed — duplicate Gradle layers removed.** The build now primes directly
+   into `/opt/frc-gradle-cache` with a RUN-scoped `GRADLE_USER_HOME`, performs
+   build and cleanup in one layer, and uses `COPY --chown` for the catalog. The
+   runtime `GRADLE_USER_HOME=/config/.gradle` contract is unchanged.
+2. **Closed as retained — Java Pack and Maven.** Decision 037 keeps the Java
+   Extension Pack for its commands, walkthroughs, formatter/classpath UI, and
+   Gradle Install New JDK integration. Maven remains one of that pack's declared
+   members. Exact pinned local-VSIX verification prevents either from causing
+   gallery drift.
+3. **Closed — Spotless re-sourced.** Open VSX has no artifact and the publisher
+   attaches no VSIX to GitHub releases, so a throwaway Docker stage builds
+   version 1.2.1 from its pinned MIT-licensed publisher source commit. No
+   Marketplace artifact is downloaded or redistributed.
+4. **Closed — redundant CRLF scrubbing removed.** Build-time scrubs of tracked
+   files are gone; the runtime scrub for student-imported `gradlew` files stays.
+5. **Closed as retained — legacy JDT vmargs migration.** Public team imports can
+   continue to introduce WPILib settings containing `-Xmx8G` or `-Xmx2G`, so
+   this is an ongoing container memory-safety compatibility shim, not only a
+   migration for workspaces that existed before decision 024.
+6. **Closed as accepted — upstream recursive chown retained.** Decision 034
+   measured the cost and records why it remains necessary: the control plane's
+   simulation exec path runs as root and can leave root-owned Gradle entries.
+   Demo mode's named `/config` volume bounds the affected-platform cost. Revisit
+   only if simulation execution first moves to `abc`.

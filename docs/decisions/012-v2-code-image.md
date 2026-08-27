@@ -46,9 +46,16 @@ Extensions are downloaded from public registries during `docker build` instead o
 - Building the image requires internet access. This is acceptable for initial setup; the built image runs offline.
 - The design doc's "build succeeds with the host offline" DoD item is relaxed. The image itself runs offline; only the build needs internet.
 
-### Spotless Gradle extension included as a pinned Marketplace artifact
+### Spotless Gradle extension included from pinned publisher source
 
-The V2 image includes `richardwillis.vscode-spotless-gradle` for code formatting. The extension is only published on the VS Code Marketplace, not Open VSX, so the Dockerfile downloads it from the Marketplace gallery asset endpoint. To avoid unnecessary build drift, the URL pins version `1.2.1` instead of using the mutable `latest` asset URL. The extension has not been updated in several years; if it does change later, treat updates as an explicit version bump in `containers/code/Dockerfile` and `vendor/vscode-extensions/README.md`.
+The V2 image includes `richardwillis.vscode-spotless-gradle` for code
+formatting. The extension is not published on Open VSX and the publisher does
+not attach VSIX artifacts to GitHub releases. The Dockerfile originally used a
+Visual Studio Marketplace asset, but now builds version `1.2.1` from the
+publisher's pinned MIT-licensed source commit in a throwaway stage. This keeps
+the formatter without relying on Marketplace redistribution terms. Treat any
+update as an explicit version and source-commit bump in
+`containers/code/Dockerfile`.
 
 ### Direct launch base path handling
 

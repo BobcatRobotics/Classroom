@@ -72,7 +72,6 @@ frc-sim.workspace=<workspaceId>
 | `VSCODE_BASE_PATH` | Yes behind proxy | Reverse proxy base path, e.g. `/u/<slug>/vscode/` |
 | `CODERUNNER_JDT_LS_VMARGS` | No | Overrides the seeded Java language-server VM args |
 | `CODERUNNER_GRADLE_JVMARGS` | No | Overrides the seeded Gradle daemon/import VM args |
-| `CODERUNNER_GRADLE_ARGS` | No | Overrides the seeded Gradle import arguments |
 | `GRADLE_SIM_JVMARGS` | No | Overrides the Gradle daemon VM args for `start-sim.sh` |
 | `GRADLE_MAX_WORKERS` | No | Overrides the Gradle worker cap for `start-sim.sh` |
 | `ROBOT_SIM_JVMARGS` | No | Overrides the robot JavaExec VM args applied by `sim-headless.init.gradle` |
@@ -115,10 +114,18 @@ On first start with an empty `/config`, the init script:
 
 1. Copies the primed Gradle cache from `/opt/frc-gradle-cache/` into `/config/.gradle/`.
 2. Copies pre-installed VS Code extensions from `/opt/frc-extensions-cache/` into `/config/extensions/`.
-3. Seeds `/config/data/Machine/settings.json` with the bounded Java/Gradle defaults and dark theme.
+3. Seeds `/config/data/Machine/settings.json` with the bounded Java/Gradle
+   defaults and dark theme. Gradle daemon memory stays in
+   `/config/.gradle/gradle.properties`; it is intentionally not duplicated in
+   `java.import.gradle.{jvmArguments,arguments}`, which the editor extensions
+   pass through Tooling API build launchers that reject these daemon options.
 
 Subsequent starts skip these copies (directories already populated from the bind mount).
-Settings migration still runs on later starts so existing imported WPILib projects with `java.jdt.ls.vmargs` set to `-Xmx8G` are lowered to the container default.
+Settings migration still runs on later starts so existing imported WPILib
+projects with `java.jdt.ls.vmargs` set to `-Xmx8G` are lowered to the container
+default. It also removes the former CodeRunner
+`java.import.gradle.{jvmArguments,arguments}` seeds from existing Machine
+settings and from projects where they still have CodeRunner-provided values.
 
 ## Sim Scripts
 
@@ -128,4 +135,6 @@ Settings migration still runs on later starts so existing imported WPILib projec
 
 ## Image Size
 
-Built image size: ~4.5 GiB (uncompressed). Includes JDK (~300 MB), the VSCodium reh-web runtime, 9 VS Code extensions (~200 MB), and the primed Gradle/WPILib dependency cache (~1 GB).
+Built image size: ~2.3 GiB (uncompressed). Includes JDK (~300 MB), the
+VSCodium reh-web runtime, 9 VS Code extensions, and the single primed
+Gradle/WPILib dependency-cache layer (~1.2 GiB).

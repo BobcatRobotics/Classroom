@@ -147,12 +147,10 @@ components themselves and are available upstream:
 - **`redhat.java` (Language Support for Java by Red Hat)** — Eclipse Public License 2.0.
   <https://github.com/redhat-developer/vscode-java/blob/master/LICENSE>
 
-## Known sourcing issue
+## Extension artifact sourcing
 
-`containers/code/Dockerfile` currently downloads the `vscode-spotless-gradle` VSIX from
-`richardwillis.gallery.vsassets.io`, a Microsoft Visual Studio Marketplace host. The
-Marketplace terms of use restrict Marketplace-served extensions to Microsoft's own Visual
-Studio products, and VSCodium is not one of them. This is a terms-of-service
-matter rather than a license incompatibility; the extension itself is MIT licensed. The
-fix is to re-source that VSIX from Open VSX or the publisher's GitHub releases, as every
-other bundled extension already is.
+`vscode-spotless-gradle` is not published to Open VSX and its publisher does
+not attach VSIX artifacts to GitHub releases. The workspace image therefore
+builds version 1.2.1 from the publisher's pinned MIT-licensed source commit in
+a throwaway Docker stage. No Visual Studio Marketplace artifact is downloaded
+or redistributed.

@@ -34,9 +34,9 @@ top:
 | Gradle + WPILib dependency cache | pre-primed at build time |
 | Bundled lesson catalog | baked in at `/opt/frc-catalog/` |
 
-The total uncompressed image size is approximately 4.5 GiB, of which roughly
-1 GiB is the primed Gradle and WPILib dependency cache that makes first builds
-take seconds rather than minutes.
+The total uncompressed image size is approximately 2.3 GiB, of which roughly
+1.2 GiB is the single primed Gradle and WPILib dependency-cache layer that
+makes first builds take seconds rather than minutes.
 
 ## Classroom-density memory defaults
 

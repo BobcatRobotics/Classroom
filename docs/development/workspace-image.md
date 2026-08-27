@@ -19,10 +19,10 @@ development.
 
 ## Image size
 
-The built image is approximately 4.5 GiB uncompressed. That includes JDK 17
-(~300 MB), the VSCodium reh-web runtime, nine VS Code extensions (~200 MB), and the
-primed Gradle/WPILib dependency cache (~1 GB) baked in so first builds inside
-the container take seconds rather than minutes.
+The built image is approximately 2.3 GiB uncompressed. That includes JDK 17
+(~300 MB), the VSCodium reh-web runtime, nine VS Code extensions, and one
+primed Gradle/WPILib dependency-cache layer (~1.2 GiB) baked in so first builds
+inside the container take seconds rather than minutes.
 
 ## Building the image locally
 
@@ -74,6 +74,34 @@ Rebuild the image when you change any of the following:
 
 You do not need to rebuild for changes to `apps/control/`, `apps/web/`, or
 `packages/contracts/`; those run on the host, not inside the container.
+
+When bumping `linuxserver/vscodium-web`, also update the pinned
+`VSCODE_WEBVIEW_COMMIT` in the Dockerfile to the upstream VS Code revision used
+by that VSCodium release. The build deliberately asserts the old embedded
+revision count and will fail until the patch is reviewed. Smoke-test a
+script-bearing extension webview (the WPILib Vendor Dependencies activity is
+the current acceptance case), not only the editor shell.
+
+## Editor acceptance smoke
+
+After an editor/base-image or critical-extension change, test the real built
+image in a fresh workspace rather than relying only on the mocked E2E tier:
+
+1. Open the bundled `robot-starter` project and wait for `Java: Ready`. Confirm
+   no Gradle error item appears beside it and the Gradle output contains no
+   `Unknown command-line option '-X'` message.
+2. In `Robot.java`, type an unimported `Pose2d`, accept the WPILib completion,
+   and confirm it adds `edu.wpi.first.math.geometry.Pose2d`. Use F12 or
+   Ctrl-click on the type and confirm the WPILib library source opens through a
+   `jdt://` document.
+3. Open the **WPILib Vendor Dependencies** activity. Confirm the installed
+   vendordeps render (not only the static **Update All** button), then use its
+   refresh action once.
+4. Run the project through CodeRunner and confirm the normal build/simulation
+   path still starts.
+
+These are intentionally built-image acceptance checks. The mocked Playwright
+tier does not load the real editor or extension webviews.
 
 ## Refreshing running student containers
 

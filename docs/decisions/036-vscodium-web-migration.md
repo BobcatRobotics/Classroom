@@ -248,18 +248,18 @@ and 5 failed requests, including a missing
 `static/node_modules/vsda/rust/web/vsda_bg.wasm` and `vsda.js`, and an aborted
 external `vscode-cdn.net` webview fetch.
 
-**Not verified: the three Java editing behaviours decision 011 recorded as its
-evidence.** `redhat.java` never left Lightweight Mode on its own during
-verification — see decision 5, above — so WPILib type completions,
-auto-import on completion, and Ctrl-click into library source were not
-individually exercised. A manual workspace-trust click did carry the language
-server to `Java: Ready` in about 40 seconds with a real Gradle import, so the
-underlying redhat.java/Gradle/WPILib pipeline is confirmed healthy end to end —
-but that is not the same as confirming the three specific editing behaviours
-011 documented still work on this editor. Decision 011 therefore has only a
-partial successor. Closing this out needs a follow-up: open `Robot.java` in a
-pre-trusted workspace and exercise completions, auto-import, and Ctrl-click
-directly.
+**The initial migration did not verify the three Java editing behaviours that
+decision 011 recorded as evidence.** `redhat.java` never left Lightweight Mode
+on its own during that verification — see decision 5, above — so WPILib type
+completion, completion-driven auto-import, and navigation into library source
+were not individually exercised at that point. The post-acceptance work closed
+both implementation blockers: decision 037 disables workspace trust at the
+server and removes the editor Gradle arguments that prevented Buildship
+synchronization. A clean rebuilt image reaches `Java: Ready` with
+`Gradle: Configure project : succeeded` and no Gradle error status. The three
+editor interactions now live in the repeatable acceptance checklist in
+`docs/development/workspace-image.md`; they are a release smoke gate for the
+rebuilt image rather than an open migration implementation task.
 
 The regression gate confirms nothing outside the editor moved: `bun run
 typecheck` exits 0; `bun run check` exits 0 across 264 files; `bun run test` is
@@ -296,23 +296,52 @@ above carry inline corrections. The follow-up re-run and final workspace-trust
 fix are recorded in decision
 [`037`](./037-gradle-wrapper-alias-and-extension-pins.md).
 
+## Post-acceptance correction (2026-08-26): webview CDN revision
+
+The WPILib Vendor Dependencies activity opened after the migration, but showed
+only its static **Update All** button. The extension host had loaded, parsed the
+project's installed vendordeps, registered the webview provider, and enabled
+scripts. The failure was lower in the webview resource transport: every local
+script and stylesheet request rejected with `A ReadableStream could not be
+cloned because it was not transferred`.
+
+`linuxserver/vscodium-web:1.126.04524-ls35` carries the VSCodium 1.126
+workbench, whose webview protocol uses service-worker version 5 and
+transferable `ReadableStream` responses. Its product configuration nevertheless
+pointed `webviewContentExternalBaseUrlTemplate` at VS Code revision
+`ef65ac1ba57f57f2a3961bfe94aa20481caca4c6`, whose CDN bundle implements the
+older version-4, `ArrayBuffer` protocol. The workbench and externally hosted
+bootstrap therefore disagreed on the message shape, so no `vscode-resource`
+asset could load. The same defect affects any extension webview with local
+assets, not just WPILib.
+
+The image now replaces that stale revision with VS Code 1.126.0 revision
+`7e7950df89d055b5a378379db9ee14290772148a`. The CDN's `index.html` at that
+revision is byte-identical to the bootstrap bundled in VSCodium 1.126. VSCodium
+inlines product configuration into its compiled JavaScript, so the image
+replaces all eight occurrences in `product.json` and `out/`. The Dockerfile
+requires exactly eight occurrences of both the old and replacement revision,
+so a future LinuxServer/VSCodium bump fails the image build instead of silently
+retaining an obsolete patch. Each base bump must identify the new upstream VS
+Code revision and re-run a script-bearing webview smoke test.
+
 ## Consequences
 
-- **Decision 011 is no longer the live evidence record.** It documented the
+- **Decision 011 is no longer the live acceptance record.** It documented the
   openvscode-server spike — `?folder=` boot, `additionalTextEdits` on tab,
   `jdt://` navigation — for an editor we no longer ship. It stays as history;
-  this decision plus the plan's verification steps replace it.
-- **AGENTS.md's re-verification rule now fires, and is only partly closed.** It
+  the reusable workspace-image acceptance checklist replaces it.
+- **AGENTS.md's re-verification rule fired and is now an image acceptance
+  gate.** It
   says not to re-verify upstream extension-owned behaviour "unless editor or
   extension versions changed." The editor version changes from 1.109.5 to
   1.126.04524, so the Java editing behaviours 011 recorded are exactly what
-  must be re-checked once — auto-import on completion and Ctrl-click into
-  library source, not just "the extension loads." Verification attempted this
-  but was blocked by workspace trust (decision 5): only the underlying
-  Lightweight → Standard Mode transition after a manual trust click was
-  confirmed, not the three specific editing behaviours themselves. See "What
-  was verified, and what was not," above — this rule stays open until a
-  follow-up completes it.
+  must be checked on the rebuilt image — auto-import on completion and
+  navigation into library source, not just "the extension loads." The original
+  verification was blocked by workspace trust; decision 037 and the Gradle
+  argument correction remove those blockers, and the maintained checklist now
+  carries the one-time migration check forward as the editor-version smoke
+  test for every future base bump.
 - **Each base bump crosses a wider delta than before.** VSCodium releases jump
   4–5 minor versions at a time, against openvscode-server's old roughly monthly
   single-version cadence. At 2–3 bumps a year that is acceptable, but every bump
@@ -328,17 +357,18 @@ fix are recorded in decision
   historical rhythm, and commits since are dependabot bumps in an unrelated
   subdirectory. Not a red flag on its own; worth a glance before each bump, and
   a trigger to revisit decision 1 if it stretches much further.
-- **The webview CDN dependency is unchanged.** Both openvscode-server and
-  VSCodium ship a byte-identical `webviewContentExternalBaseUrlTemplate`
-  pointing at `*.vscode-cdn.net`, inherited from the same upstream. Whatever
-  that implies for offline use, it is not a regression introduced here.
-- **Unrelated issue left standing.** `containers/code/Dockerfile` still fetches
-  the `vscode-spotless-gradle` VSIX from a Microsoft Marketplace host, which
-  `THIRD_PARTY_NOTICES.md` already flags as a terms-of-use problem. It shares
-  the extension-sourcing code path and was deliberately excluded from this
-  migration so a regression in either would be unambiguous.
-- **Another pre-existing issue, found during verification and also left
-  standing.** Four bundled extensions install at versions above their
+- **The external webview origin remains, with its revision corrected.** Both
+  editors use `*.vscode-cdn.net` to isolate extension webviews from the
+  workbench origin. The selected VSCodium image shipped an incorrect upstream
+  revision in `webviewContentExternalBaseUrlTemplate`; the post-acceptance
+  correction above pins it to the VS Code revision that VSCodium actually
+  built. Webviews still require that CDN and therefore are not offline-only.
+- **The Spotless sourcing follow-up is closed.** The formatter remains bundled,
+  but its VSIX is now built from the publisher's pinned MIT-licensed source in
+  a throwaway Docker stage. The image no longer downloads or redistributes the
+  Visual Studio Marketplace artifact.
+- **The extension-version drift follow-up is closed.** Four bundled extensions
+  previously installed at versions above their
   `ARG *_VERSION` pins: `redhat.java` (pinned `1.38.0`, installs `1.55.0`),
   `vscjava.vscode-gradle` (pinned `3.17.3`, installs `3.18.0`),
   `vscjava.vscode-java-dependency` (pinned `0.27.2`, installs `0.27.6`), and
@@ -347,6 +377,7 @@ fix are recorded in decision
   fetch all six pack members from the Open VSX gallery at latest, overwriting
   the pinned installs; a pinned VSIX installed alone honours its version
   exactly. The old openvscode-server image does the same thing, so this
-  predates the migration and is not caused by it. The plan's own follow-up #2
-  (drop `vscode-java-pack`, which nothing in the image depends on) is the fix;
-  out of scope here for the same reason as the spotless-gradle issue above.
+  predates the migration and is not caused by it. Decision 037 instead keeps
+  the useful Java Extension Pack and passes
+  `--do-not-include-pack-dependencies`, with an exact manifest assertion that
+  prevents gallery resolution from replacing any pin.

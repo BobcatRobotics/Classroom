@@ -78,7 +78,7 @@ files in that student's `/config` before they click Run. The accepted tradeoff
 is a classroom flow with immediate Java support; container isolation remains the
 security boundary between students and the host.
 
-## Follow-up: browser-owned settings
+## Browser-owned settings finding
 
 The trust investigation also confirmed that browser-local User settings are not
 backed by `/config/data/User/settings.json` in a web workbench. The server does
@@ -90,3 +90,64 @@ Machine settings, so the ineffective seed was removed. A reliable README
 auto-open needs either a top-level workbench default from a server patch or an
 explicit editor URL payload. Application-scoped settings such as workspace
 trust require a server or browser-side control.
+
+The only remaining product idea from this finding is reliable README
+auto-open. It is intentionally deferred; the settings-scope investigation and
+workspace-trust action are otherwise complete.
+
+## 4. Keep Gradle daemon limits out of editor build arguments
+
+Acceptance testing also found a persistent Gradle error status beside
+`Java: Ready`, even though command-line builds and simulation runs succeeded.
+The bundled `vscjava.vscode-gradle` extension forwards
+`java.import.gradle.jvmArguments` to Tooling API
+`BuildLauncher.setJvmArguments()`. With its bundled Tooling API and the WPILib
+Gradle 8.11 wrapper, the `-Xms`, `-Xmx`, and `-XX` tokens are then rejected as
+Gradle build arguments (`Unknown command-line option '-X'`).
+
+The JVM setting was redundant: `init-frc-setup` already writes the same bounded
+daemon options to `/config/.gradle/gradle.properties` as
+`org.gradle.jvmargs`. The init script no longer seeds
+`java.import.gradle.jvmArguments`. The former
+`java.import.gradle.arguments="--no-daemon --no-watch-fs --max-workers=2"`
+seed is removed too: those limits are all present in `gradle.properties`, and
+Tooling API build launchers do not support the daemon flag. Leaving it active
+prevented JDT LS from completing the Buildship synchronization even after its
+status reached `Java: Ready`.
+
+On later starts the init script deletes both old values from CodeRunner-owned
+Machine settings and deletes only known CodeRunner values from project
+settings, preserving explicitly different project values. This removes the
+editor error and restores the full Java project model without relaxing the
+container's Gradle limits or changing command-line builds.
+
+## 5. Close the workspace-image build follow-ups
+
+The migration review found that Gradle priming retained both the 1.9 GB build
+layer and the 1.3 GB copied cache layer. The image now primes directly into
+`/opt/frc-gradle-cache` with a RUN-scoped `GRADLE_USER_HOME`, builds and removes
+the throwaway template in the same layer, and uses `COPY --chown` for the
+catalog. Runtime still exports `GRADLE_USER_HOME=/config/.gradle`; first boot
+still copies the same final cache, including `permwrapper -> wrapper`.
+
+The Spotless extension remains because the bundled robot project selects it as
+the Java formatter. It is absent from Open VSX and the publisher's GitHub
+releases have no VSIX assets, so the image builds version 1.2.1 from the pinned
+MIT-licensed publisher commit in a throwaway Node stage. The final image does
+not contain that build toolchain and no Visual Studio Marketplace artifact is
+downloaded or redistributed.
+
+Build-time CRLF scrubbing of repository-controlled scripts and `gradlew` is
+removed because `.gitattributes` already normalizes them to LF. The runtime
+scrub in `start-sim.sh` stays for public imports.
+
+Three proposed removals are rejected:
+
+- The Java Extension Pack and Maven member stay for the pack's commands,
+  walkthroughs, formatter/classpath UI, and Gradle Install New JDK integration.
+- The legacy `-Xmx8G`/`-Xmx2G` JDT settings migration stays because public
+  imports can continually reintroduce old WPILib project settings.
+- The base image's recursive `/config` ownership repair stays for the reason
+  measured in decision 034: simulation exec currently runs as root and can
+  create root-owned Gradle entries. It can be reconsidered only after that exec
+  path drops to `abc`.
