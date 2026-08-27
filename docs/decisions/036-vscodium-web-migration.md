@@ -280,8 +280,8 @@ because Gitpod patched exactly that line
 (`USER_DATA_PATH = args['user-data-dir'] || ...`). With no `--server-data-dir`
 passed, the real data root was `/config/.vscodium-server/data/` — so every
 setting `init-frc-setup` seeds (bounded `java.jdt.ls.vmargs`,
-`java.gradle.buildServer.enabled: off`, `gradle.autoDetect: off`, the Machine
-dark theme, `workbench.startupEditor`) would never have been read, and the
+`java.gradle.buildServer.enabled: off`, `gradle.autoDetect: off`, and the
+Machine dark theme) would never have been read, and the
 control plane's `imports.ts` purge of `/config/data/User/workspaceStorage` on
 lesson switch would have been a silent no-op. Gradle-side limits in
 `gradle.properties` were unaffected (read via `GRADLE_USER_HOME`, not the

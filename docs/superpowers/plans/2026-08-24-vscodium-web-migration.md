@@ -460,16 +460,10 @@ Then, in the browser, click **Manage** on the Restricted Mode banner and choose 
 
 - [x] **Step 5: Seed the trust setting in `init-frc-setup` — superseded by decision 037**
 
-In `containers/code/root/etc/s6-overlay/s6-rc.d/init-frc-setup/run`, inside `merge_vscode_settings`, extend the final `jq` line of the defaults branch. Replace:
+The proposed change was to add this line to the defaults branch in
+`merge_vscode_settings`:
 
 ```bash
-      | (if $mode == "project" then . else ."workbench.startupEditor" //= "readme" end)
-```
-
-with:
-
-```bash
-      | (if $mode == "project" then . else ."workbench.startupEditor" //= "readme" end)
       | (if $mode == "project" then . else ."security.workspace.trust.enabled" //= false end)
 ```
 

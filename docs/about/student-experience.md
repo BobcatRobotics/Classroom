@@ -57,8 +57,9 @@ ways to fill the workspace:
 **Lesson modules** are structured exercises provided by the operator. Each
 module has a title, a short description, and a kind badge (Robot or Console).
 Clicking **Load** on a module copies the starter files into the workspace and
-opens them in the editor. The current module is shown with a **Reset** button
-that reloads the original files from the catalog, discarding any changes.
+reloads the editor on that folder. Students choose files from the Explorer
+sidebar. The current module is shown with a **Reset** button that reloads the
+original files from the catalog, discarding any changes.
 
 **Import from GitHub** lets a student paste a public `github.com` HTTPS URL.
 The control plane clones the repository into the workspace, preserving the

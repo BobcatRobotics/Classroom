@@ -44,21 +44,10 @@ See `Lessons-Design.md` for the full rationale.
    `templates/wpilib-java-command/`. `templates/plain-java-hello-world` (the spike
    PoC) is also deleted — `hello-world` now lives in the catalog.
 
-4. **README auto-open is implemented via `workbench.startupEditor: "readme"`**
-   (D6), seeded into the per-workspace VS Code *User* settings by the container
-   init script, **not** via an editor open-file URL payload. VS Code opens the
-   workspace-root `README.md` in Markdown preview when a folder is opened with no
-   prior editor state. Because every module load clears the editor's
-   `workspaceStorage` (see 5), the folder looks "fresh" on the next open and the
-   README preview re-fires — giving exactly the D6 behaviour with no client-side
-   command plumbing. No-ops gracefully when a module ships no `README.md`.
-
-   **VSCodium follow-up (2026-08-26):** this mechanism does not work in the
-   browser workbench. Server-side User settings are browser-owned, and moving
-   the setting to Remote/Machine still loses to startup and walkthrough state.
-   Decision [`037`](./037-gradle-wrapper-alias-and-extension-pins.md) removes
-   the ineffective seed. Reliable auto-open needs a workbench default patch or
-   an explicit editor URL payload.
+4. **The module README is ordinary workspace content.** A lesson places its
+   `README.md` at the workspace root alongside the starter project. Students
+   open it from the Explorer like any other file; CodeRunner does not prescribe
+   editor-tab state after a project load or reset.
 
 5. **`workspaceStorage` is cleared on every destructive project swap.** Module
    load, lesson reset, and team import all `rm -rf /config/data/User/workspaceStorage`

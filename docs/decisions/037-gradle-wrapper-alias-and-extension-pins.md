@@ -84,16 +84,8 @@ The trust investigation also confirmed that browser-local User settings are not
 backed by `/config/data/User/settings.json` in a web workbench. The server does
 load `/config/data/Machine/settings.json` as Remote/Machine configuration for
 non-application scopes, including window and resource settings. The init script
-now seeds its Java/Gradle limits and theme there. `workbench.startupEditor`
-still loses to browser startup and extension walkthrough state even from
-Machine settings, so the ineffective seed was removed. A reliable README
-auto-open needs either a top-level workbench default from a server patch or an
-explicit editor URL payload. Application-scoped settings such as workspace
-trust require a server or browser-side control.
-
-The only remaining product idea from this finding is reliable README
-auto-open. It is intentionally deferred; the settings-scope investigation and
-workspace-trust action are otherwise complete.
+now seeds its Java/Gradle limits and theme there. Application-scoped settings
+such as workspace trust require a server or browser-side control.
 
 ## 4. Keep Gradle daemon limits out of editor build arguments
 

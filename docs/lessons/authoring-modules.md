@@ -162,10 +162,12 @@ Each module's `README.md` is the lesson. When a student loads a module,
 the README appears at the workspace root. Write it as the student-facing
 walkthrough: goal, steps, and optional bonus challenges.
 
-For example, the bundled `hello-world` README opens with the goal, lists numbered
-steps, and finishes with bonus challenges.
+Students open `README.md` from the Explorer sidebar, so use a clear filename and
+make the document useful from its first heading. For example, the bundled
+`hello-world` README begins with the goal, lists numbered steps, and finishes
+with bonus challenges.
 
-![A loaded lesson README in the editor](/img/screenshots/lesson-readme-opened.png)
+![A lesson opened side by side with the README](/img/screenshots/lesson-readme-opened.png)
 
 ## The `.vscode/` folder
 
