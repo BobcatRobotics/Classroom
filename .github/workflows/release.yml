@@ -21,8 +21,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WORKSPACE_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-workspace
-  CONTROL_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-control
+  WORKSPACE_IMAGE: docker.io/bobcatrobotics/coderunner-workspace
+  CONTROL_IMAGE: docker.io/bobcatrobotics/coderunner-control
 
 jobs:
   validate:
@@ -107,9 +107,9 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build and push workspace image by digest
         id: build
@@ -143,9 +143,9 @@ jobs:
   build-control-amd64:
     needs: [validate, verify]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    # permissions:
+    #   contents: read
+    #   packages: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -155,9 +155,9 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build and push control image by digest
         id: build
@@ -244,9 +244,9 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       # The ascope-dist build context substitutes the Dockerfile's ascope-dist
       # stage with the amd64 job's output, skipping the emsdk stage (which has
@@ -285,8 +285,8 @@ jobs:
   merge:
     needs: [validate, build-workspace, build-control-amd64, build-control-arm64]
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
+    # permissions:
+    #   packages: write
     env:
       TAG: ${{ needs.validate.outputs.tag }}
     steps:
@@ -306,9 +306,9 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Create multi-arch manifests
         run: |
@@ -343,8 +343,8 @@ jobs:
   release:
     needs: [validate, merge]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    # permissions:
+    #   contents: write
     env:
       TAG: ${{ needs.validate.outputs.tag }}
       TAG_SHA: ${{ needs.validate.outputs.tag_sha }}
