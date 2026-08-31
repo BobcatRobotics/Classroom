@@ -10,7 +10,7 @@ The docker build/pull steps were bolted on at different development stages and
 disagreed on what the images are called:
 
 - The workspace build script tagged only the bare name `coderunner-workspace`,
-  while docker compose referenced `ghcr.io/mathewdunne/coderunner-workspace:${CODERUNNER_TAG:-latest}`
+  while docker compose referenced `docker.io/bobcatrobotics/coderunner-workspace:${CODERUNNER_TAG:-latest}`
   — so a local rebuild was invisible to `docker compose up`.
 - The control build was an inline one-liner tagging both a bare name and the
   GHCR name; the workspace build tagged neither GHCR name.
@@ -31,8 +31,8 @@ build script, the pull script, docker compose, and the control plane's
 `CODE_IMAGE` default:
 
 ```
-${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-control:${CODERUNNER_TAG:-latest}
-${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}
+${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-control:${CODERUNNER_TAG:-latest}
+${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-workspace:${CODERUNNER_TAG:-latest}
 ```
 
 - **Local builds claim the canonical `:latest` name directly.** Rebuild +
@@ -43,7 +43,7 @@ ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TA
 - **`CODERUNNER_IMAGE_NS` (registry + owner) is the fork knob.** One `.env`
   line covers compose interpolation, `scripts/image.ts`, and the control
   plane's default. CI already derives the owner
-  (`ghcr.io/${{ github.repository_owner }}`), so the release workflow needed
+  (`docker.io/${{ github.repository_owner }}`), so the release workflow needed
   no change. `CODE_IMAGE` still overrides the workspace name outright.
 - **Bare names are gone.** They were shorthand for `docker.io/library/...`
   (the wrong registry), broke `docker compose pull`, and hid image provenance.

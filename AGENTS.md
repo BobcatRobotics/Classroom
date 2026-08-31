@@ -63,7 +63,7 @@ imports keep `.git` for push. The per-import backup/restore flow was removed
 and `docs/decisions/029-lessons-and-modules.md`.
 
 **Containerized control plane (post-V2):** the control plane ships as a Docker
-image (`containers/control/Dockerfile` → `ghcr.io/mathewdunne/coderunner-control`)
+image (`containers/control/Dockerfile` → `docker.io/bobcatrobotics/coderunner-control`)
 and is deployed with docker compose (`docker-compose.yml` base +
 `docker-compose.prod.yml` for Caddy/Alloy; demo mode is `CODERUNNER_DEMO_MODE=1
 docker compose up`, an env passthrough rather than an override file). It runs

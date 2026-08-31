@@ -59,6 +59,6 @@ The reference deployment uses a `c4-standard-4` VM (4 vCPU, 15 GB RAM) on Google
 
 Two separate warm-up steps happen on first use:
 
-1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles a full JDK, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
+1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `docker.io/bobcatrobotics/coderunner-workspace:latest`, which is several gigabytes (it bundles a full JDK, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
 
 2. **Gradle cache warm-up.** The workspace image primes the Gradle and WPILib dependency cache during its build by running a full `./gradlew build` against the bundled `robot-starter` module. This cache is stored at `/opt/frc-gradle-cache` inside the image and copied into each student's container on first start. Despite this priming, the very first build in a fresh container still runs the Java language server index and compiles the project from scratch. After that first run, incremental builds are much faster.

@@ -88,7 +88,7 @@ prospect of a release.
 ### 2. Stay on the LinuxServer base image
 
 `linuxserver/vscodium-web:1.126.04524-ls35` is built `FROM
-ghcr.io/linuxserver/baseimage-ubuntu:noble` — the same base OS we run today —
+docker.io/linuxserver/baseimage-ubuntu:noble` — the same base OS we run today —
 and preserves everything 017 adopted the LinuxServer image for: s6-overlay
 supervision, the `abc` user, runtime `PUID`/`PGID`, `lsiown`, and `/config` as
 `HOME`. The Dockerfile diff is a base image, a service-directory rename, and a
@@ -177,7 +177,7 @@ server.
 > codium-server's `--disable-workspace-trust` flag.
 
 **It is not a regression.** The currently published production image
-(`ghcr.io/mathewdunne/coderunner-workspace:latest`, openvscode-server-based,
+(`docker.io/bobcatrobotics/coderunner-workspace:latest`, openvscode-server-based,
 revision `ffa7b47`, built 2026-08-13) was run through the identical
 observation and behaved identically: Restricted Mode, Lightweight Mode, only
 `ss_ws`, no `jdt_ws`. Neither editor's `product.json` disables workspace trust,

@@ -49,7 +49,7 @@ nor operators ever install it. The development loop (`bun run dev:control` +
   bind-mounted socket. Entrypoint is migrate-then-serve.
 
 The CI publish job (`.github/workflows/deploy.yml`) builds and pushes
-`ghcr.io/<owner>/coderunner-control` alongside the workspace image (distinct GHA
+`docker.io/<owner>/coderunner-control` alongside the workspace image (distinct GHA
 cache scopes), and **extracts the release tarballs from the built control image**
 (`docker create` + `docker cp` of `/app/apps/web/dist` and
 `/app/dist/advantagescope`). The tarballs survive for the `deploy-cloudflare`
