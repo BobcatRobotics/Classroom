@@ -8,19 +8,19 @@ This directory documents the VS Code extensions bundled into the V2 code contain
 
 | Extension | Version | Source |
 |---|---|---|
-| redhat.java (Language Support for Java) | 1.38.0 | [Open VSX](https://open-vsx.org/api/redhat/java/1.38.0/file/redhat.java-1.38.0.vsix) |
+| redhat.java (Language Support for Java) | 1.55.0 | [Open VSX](https://open-vsx.org/api/redhat/java/1.55.0/file/redhat.java-1.55.0.vsix) |
 | wpilibsuite.vscode-wpilib (WPILib) | 2026.1.1 | [GitHub Releases](https://github.com/wpilibsuite/vscode-wpilib/releases/download/v2026.1.1/vscode-wpilib-2026.1.1.vsix) |
 
 ### Java Extension Pack (meta-pack + individual extensions)
 
 | Extension | Version | Source |
 |---|---|---|
-| vscjava.vscode-java-pack (Extension Pack for Java) | 0.30.5 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-pack/0.30.5) |
+| vscjava.vscode-java-pack (Extension Pack for Java) | 0.31.1 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-pack/0.31.1) |
 | vscjava.vscode-java-debug (Debugger for Java) | 0.59.0 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-debug/0.59.0) |
-| vscjava.vscode-java-test (Test Runner for Java) | 0.45.0 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-test/0.45.0) |
+| vscjava.vscode-java-test (Test Runner for Java) | 0.46.0 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-test/0.46.0) |
 | vscjava.vscode-maven (Maven for Java) | 0.45.3 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-maven/0.45.3) |
-| vscjava.vscode-gradle (Gradle for Java) | 3.17.3 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-gradle/3.17.3) |
-| vscjava.vscode-java-dependency (Project Manager for Java) | 0.27.2 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-dependency/0.27.2) |
+| vscjava.vscode-gradle (Gradle for Java) | 3.18.0 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-gradle/3.18.0) |
+| vscjava.vscode-java-dependency (Project Manager for Java) | 0.27.6 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-dependency/0.27.6) |
 
 ### Formatting
 
@@ -30,7 +30,7 @@ This directory documents the VS Code extensions bundled into the V2 code contain
 
 ## Provenance
 
-- **redhat.java 1.38.0**: Published by Red Hat on Open VSX. Same upstream version bundled by WPILib 2026. Verified in Stage 0 spike (Decision 011).
+- **redhat.java 1.55.0**: Published by Red Hat on Open VSX. It and the current Java Debug bundles require JDT LS to run on Java 21; CodeRunner retains Java 17 separately for WPILib projects and simulation (Decision 038).
 
 - **vscode-wpilib 2026.1.1**: Published by wpilibsuite on GitHub Releases. WPILib Kickoff release for the 2026 season. Pure JS/TS extension. Verified in Stage 0 spike (Decision 011).
 

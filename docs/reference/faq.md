@@ -31,7 +31,10 @@ Yes, if they are working on a team-imported project. When a student uses the **S
 
 ### What WPILib and Java version does CodeRunner use?
 
-The workspace image bundles **GradleRIO 2026.1.1** (the 2026 FRC season), Java **17** (Adoptium Temurin 17.0.15), and the **wpilibsuite.vscode-wpilib 2026.1.1** VS Code extension. The source of truth for all pinned versions is `containers/code/Dockerfile`.
+The workspace image bundles the 2026 FRC stack, Temurin **17.0.15** for Gradle,
+project compilation, and simulation, Temurin **21.0.12.1** for JDT LS, and the
+**wpilibsuite.vscode-wpilib 2026.1.1** VS Code extension. The source of truth
+for all pinned versions is `containers/code/Dockerfile`.
 
 ### Do students need accounts? What if I just want to try it?
 
