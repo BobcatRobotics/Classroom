@@ -50,7 +50,7 @@ export function ServiceOfflinePage({
 							</p>
 
 							<p className="text-[22px] font-semibold text-foreground">
-								CodeRunner is Offline
+								Classroom is Offline
 							</p>
 							<p className="mt-2 text-[12px] text-muted-foreground">
 								This service is currently unavailable. Check back soon or

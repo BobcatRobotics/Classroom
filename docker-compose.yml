@@ -27,7 +27,7 @@ services:
     # $HOSTNAME) is unaffected; the service name still resolves on the network
     # for Caddy.
     container_name: coderunner-control
-    image: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-control:${CODERUNNER_TAG:-latest}
+    image: ${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-control:${CODERUNNER_TAG:-latest}
     restart: unless-stopped
     # Run as the host owner of the data dir (keeps ./data host-owned, drops
     # root). group_add grants the non-root process access to the bind-mounted
@@ -56,7 +56,7 @@ services:
       # CODERUNNER_HOST_DATA_DIR to relocate the data dir (e.g. a mounted disk).
       - ${CODERUNNER_HOST_DATA_DIR:-./data}:/data
     environment:
-      CODE_IMAGE: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}
+      CODE_IMAGE: ${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-workspace:${CODERUNNER_TAG:-latest}
       # Demo mode: auth bypassed, everyone shares one admin workspace. Unset
       # (or any falsy value) keeps normal auth. Never expose a demo instance
       # publicly.
@@ -80,7 +80,7 @@ services:
   # not a running service.
   workspace-template:
     container_name: coderunner-workspace-template
-    image: ${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}
+    image: ${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-workspace:${CODERUNNER_TAG:-latest}
     entrypoint: ["/bin/true"]
     restart: "no"
     network_mode: "none"

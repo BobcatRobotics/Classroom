@@ -5,7 +5,7 @@ title: Workspace Image
 
 # Workspace Image
 
-The workspace image (`ghcr.io/mathewdunne/coderunner-workspace`) is the
+The workspace image (`docker.io/bobcatrobotics/coderunner-workspace`) is the
 per-student container that runs
 VSCodium reh-web (`codium-server`), Java 17, and the WPILib simulation stack in a single
 Docker image. The [workspace container overview](../about/workspace-container.md)
@@ -33,11 +33,11 @@ bun run docker:build:workspace
 This runs `scripts/image.ts`, which calls:
 
 ```
-docker build -f containers/code/Dockerfile -t ghcr.io/mathewdunne/coderunner-workspace:latest .
+docker build -f containers/code/Dockerfile -t docker.io/bobcatrobotics/coderunner-workspace:latest .
 ```
 
 The build context is the repo root. The image is tagged with its canonical
-name — `${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-workspace:${CODERUNNER_TAG:-latest}` —
+name — `${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-workspace:${CODERUNNER_TAG:-latest}` —
 the same name docker compose and the control plane's `CODE_IMAGE` default
 resolve to, so a local build is picked up directly by `docker compose up` or
 `bun run dev:control` with no re-tagging. Forks set `CODERUNNER_IMAGE_NS` (in

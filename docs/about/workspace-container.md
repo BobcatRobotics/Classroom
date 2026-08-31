@@ -16,7 +16,7 @@ published ports, labels, environment variables, and first-run behavior) is the
 
 ## What is inside the image
 
-The image (`ghcr.io/mathewdunne/coderunner-workspace:latest` by default,
+The image (`docker.io/bobcatrobotics/coderunner-workspace:latest` by default,
 overridden via `CODE_IMAGE`) is
 built on [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web)
 (Ubuntu 24.04 with s6-overlay process supervision) and adds the following on

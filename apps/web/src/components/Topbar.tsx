@@ -23,7 +23,7 @@ export function Topbar({
 			<div className="flex items-center gap-2.5">
 				<img src={coderunnerHeaderImg} alt="" className="h-6 w-auto" />
 				<strong className="whitespace-nowrap text-[13.5px] font-semibold tracking-tight">
-					CodeRunner
+					Bobcat Robotics Classroom
 				</strong>
 			</div>
 			<div className="ml-auto flex items-center gap-5">

@@ -337,12 +337,12 @@ git commit -m "perf(workspace): scope init-frc-setup ownership fix to files it c
 
 Run: `bun run docker:build:workspace`
 
-Expected: build succeeds. It is slow — the Gradle/WPILib cache priming runs a full `./gradlew build`. Note the tag it prints; the default is `ghcr.io/mathewdunne/coderunner-workspace:latest` unless `CODE_IMAGE` or `CODERUNNER_TAG` is set. Use that tag as `$IMAGE` below.
+Expected: build succeeds. It is slow — the Gradle/WPILib cache priming runs a full `./gradlew build`. Note the tag it prints; the default is `docker.io/bobcatrobotics/coderunner-workspace:latest` unless `CODE_IMAGE` or `CODERUNNER_TAG` is set. Use that tag as `$IMAGE` below.
 
 - [x] **Step 2: Start a throwaway container against a scratch project**
 
 ```bash
-IMAGE=ghcr.io/mathewdunne/coderunner-workspace:latest
+IMAGE=docker.io/bobcatrobotics/coderunner-workspace:latest
 rm -rf /tmp/cr-smoke
 cp -a catalog/modules/robot-starter /tmp/cr-smoke
 rm -rf /tmp/cr-smoke/build /tmp/cr-smoke/.gradle

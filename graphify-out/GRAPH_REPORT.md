@@ -2745,7 +2745,7 @@ Nodes (14): 031 — Containerized Control Plane, Addendum — non-root control c
 
 ### Community 464 - "Community 464"
 Cohesion: 0.14
-Nodes (14): Building the image locally, code:bash (bun run docker:build:workspace), code:block2 (docker build -f containers/code/Dockerfile -t ghcr.io/mathew), code:bash (bun run docker:pull:workspace), code:bash (bun run docker:rebuild-workspaces), code:bash (bun run docker:rebuild-workspaces -- --dry-run), code:bash (bun run docker:rebuild-workspaces -- --dry-run), Editor acceptance smoke (+6 more)
+Nodes (14): Building the image locally, code:bash (bun run docker:build:workspace), code:block2 (docker build -f containers/code/Dockerfile -t docker.io/mathew), code:bash (bun run docker:pull:workspace), code:bash (bun run docker:rebuild-workspaces), code:bash (bun run docker:rebuild-workspaces -- --dry-run), code:bash (bun run docker:rebuild-workspaces -- --dry-run), Editor acceptance smoke (+6 more)
 
 ### Community 465 - "Community 465"
 Cohesion: 0.13
@@ -3257,7 +3257,7 @@ Nodes (6): CodeRunner, Lessons and team projects, Next steps, Self-hosted and mo
 
 ### Community 670 - "Community 670"
 Cohesion: 0.29
-Nodes (7): code:bash (IMAGE=ghcr.io/mathewdunne/coderunner-workspace:latest), code:bash (curl -s http://127.0.0.1:33999/u/smoke/vscode/ | grep -oE '/), code:bash (curl -s -i --max-time 5 \), code:bash (docker exec cr-smoke ls /config/extensions), code:bash (docker exec cr-smoke stat -c '%U:%G %n' /config/.gradle /con), code:bash (docker exec cr-smoke java -version), Task 3: Build the image and verify the editor serves under the base path
+Nodes (7): code:bash (IMAGE=docker.io/bobcatrobotics/coderunner-workspace:latest), code:bash (curl -s http://127.0.0.1:33999/u/smoke/vscode/ | grep -oE '/), code:bash (curl -s -i --max-time 5 \), code:bash (docker exec cr-smoke ls /config/extensions), code:bash (docker exec cr-smoke stat -c '%U:%G %n' /config/.gradle /con), code:bash (docker exec cr-smoke java -version), Task 3: Build the image and verify the editor serves under the base path
 
 ### Community 671 - "Community 671"
 Cohesion: 0.29
@@ -3285,7 +3285,7 @@ Nodes (6): code:json ({), Consequences, Context, Decision, Decision 026: Editor 
 
 ### Community 677 - "Community 677"
 Cohesion: 0.29
-Nodes (6): 032 — Canonical Image Naming, code:block1 (${CODERUNNER_IMAGE_NS:-ghcr.io/mathewdunne}/coderunner-contr), Consequences, Context, Decision, Status
+Nodes (6): 032 — Canonical Image Naming, code:block1 (${CODERUNNER_IMAGE_NS:-docker.io/bobcatrobotics}/coderunner-contr), Consequences, Context, Decision, Status
 
 ### Community 678 - "Community 678"
 Cohesion: 0.29

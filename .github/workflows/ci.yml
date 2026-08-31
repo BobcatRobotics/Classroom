@@ -2,7 +2,7 @@ name: CI Verify
 
 on:
   push:
-    branches: [main]
+    branches: [release/2026]
   pull_request:
 
 concurrency:

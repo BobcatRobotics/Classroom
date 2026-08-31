@@ -268,8 +268,8 @@ The **Release** workflow (`.github/workflows/release.yml`) runs automatically:
 
 1. Validates the tag format and that it is reachable from `main`
 2. Runs `bun run verify` (Biome, typecheck, unit tests, E2E)
-3. Builds and pushes `ghcr.io/<owner>/coderunner-workspace:<tag>` and
-   `ghcr.io/<owner>/coderunner-control:<tag>` (both `:latest` too) to GHCR as
+3. Builds and pushes `docker.io/<owner>/coderunner-workspace:<tag>` and
+   `docker.io/<owner>/coderunner-control:<tag>` (both `:latest` too) to GHCR as
    **multi-arch images** (`linux/amd64` + `linux/arm64`), built on native
    runners per architecture and merged into one manifest per tag. The control
    image builds the web shell and AdvantageScope Lite (emsdk runs inside a
