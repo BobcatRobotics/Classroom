@@ -104,7 +104,9 @@ merge_vscode_settings() {
         end
       | (if $mode == "project" then . else
           ."workbench.colorTheme" //= "Default Dark Modern"
-          | ."chat.disableAIFeatures" = true
+        end)
+      | (if $mode == "project" then . else
+          ."chat.disableAIFeatures" = true
         end)
     ' "${settings_file}" > "${tmp_settings}"; then
     mv "${tmp_settings}" "${settings_file}"
