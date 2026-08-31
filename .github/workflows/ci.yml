@@ -2,7 +2,7 @@ name: CI Verify
 
 on:
   push:
-    branches: [main, release/2026, feature/docker-updates]
+    branches: [release/2026]
   pull_request:
 
 concurrency:

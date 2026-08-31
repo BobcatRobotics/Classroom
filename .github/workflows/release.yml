@@ -23,7 +23,7 @@ concurrency:
 env:
   WORKSPACE_IMAGE: docker.io/bobcatrobotics/coderunner-workspace
   CONTROL_IMAGE: docker.io/bobcatrobotics/coderunner-control
-  RELEASE_BRANCH: feature/docker-updates
+  RELEASE_BRANCH: release/2026
 
 jobs:
   validate:
