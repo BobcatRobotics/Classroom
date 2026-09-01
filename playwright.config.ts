@@ -30,7 +30,9 @@ export default defineConfig({
 			name: "docker-smoke",
 			testMatch: /smoke-docker/,
 			use: devices["Desktop Chrome"],
-			timeout: 180_000,
+			fullyParallel: false,
+			workers: 1,
+			timeout: 600_000,
 		},
 	],
 });

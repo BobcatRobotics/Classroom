@@ -5,9 +5,11 @@ title: Testing
 
 # Testing
 
-This page covers the test suite you'll run while working on CodeRunner. All
-tiers are runnable without Docker and without any external services. For the
-CI gate that runs all tiers in sequence, see [Development Servers](./dev-servers.md).
+This page covers the test suite you'll run while working on CodeRunner. The
+default verification tiers are runnable without Docker and without external
+services; the targeted Java workspace smoke requires Docker and a locally
+built image. For the CI gate that runs the default tiers in sequence, see
+[Development Servers](./dev-servers.md).
 For the full script list, see the [CLI reference](../reference/cli-reference.md).
 
 ## First-time setup
@@ -79,10 +81,28 @@ added to components are marked `test.fixme`; they appear in Playwright
 reports as expected-not-implemented markers and do not fail the suite.
 Their HTTP-layer counterparts run as normal tests.
 
-Real-container (Docker smoke) tests are intentionally not implemented.
-The unit and mocked E2E tiers already cover the logic paths; container
-behaviour (JNI loading, Gradle lock isolation, headless GUI removal) is
-upstream-owned and manually validated during image updates.
+### `bun run e2e:workspace-java`: real Java workspace smoke
+
+```bash
+bun run docker:build:workspace
+bun run e2e:workspace-java
+```
+
+Runs a targeted Playwright test against fresh containers from the real
+workspace image. It opens `hello-world` in real VSCodium, verifies that JDT LS
+uses Java 21, waits for `Java: Ready`, launches **Run Main** with F5, verifies
+`Hello, World!`, and
+asserts that JDT logs enumerate `vscode.java.resolveMainMethod` without any
+`No delegateCommandHandler` error. It then opens `robot-starter`, waits for
+the real Gradle import, invokes **WPILib: Build Robot Code**, verifies that
+WPILib generated a Java 17 command and launched its Gradle daemon on Java 17,
+rejects Spotless/JDK failures, checks Java 17 classfiles, and starts/stops the
+supported `start-sim.sh` → `run-sim.sh` path.
+
+This focused tier is intentionally outside `bun run verify`: it requires a
+Docker daemon, a prebuilt multi-gigabyte image, and several minutes. Run it
+whenever the JDK, VSCodium base, Java/WPILib extensions, or workspace startup
+logic changes.
 
 ### `bun run e2e:security`: security E2E tests
 
@@ -177,4 +197,4 @@ The `playwright.config.ts` defines three projects:
 |---|---|---|
 | `mocked` | `bun run e2e` | All specs except `smoke-docker/` and `security/` |
 | `security` | `bun run e2e:security` | Specs under `e2e/specs/security/` |
-| `docker-smoke` | _(not wired to a top-level script)_ | Specs under `e2e/specs/smoke-docker/`; requires Docker daemon |
+| `docker-smoke` | `bun run e2e:workspace-java` | Real VSCodium/JDT/Java/WPILib smoke under `e2e/specs/smoke-docker/`; requires Docker and a built workspace image |

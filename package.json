@@ -54,6 +54,7 @@
 		"e2e:ui": "E2E_TEST=1 bun --bun playwright test --project=mocked --ui",
 		"e2e:debug": "E2E_TEST=1 PWDEBUG=1 playwright test --project=mocked",
 		"e2e:security": "E2E_TEST=1 bun --bun playwright test --project=security",
+		"e2e:workspace-java": "E2E_TEST=1 PLAYWRIGHT_SKIP_WEB_BUILD=1 bun --bun playwright test --project=docker-smoke",
 		"e2e:report": "playwright show-report"
 	},
 	"devDependencies": {

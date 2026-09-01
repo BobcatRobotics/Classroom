@@ -143,10 +143,10 @@ Point `mainClass` at the class with your `main` method.
 
 A full WPILib/Gradle robot project, the same structure WPILib's project
 generator produces (`build.gradle`, `gradlew`, `vendordeps/`, `.wpilib/`,
-`src/main/java/frc/robot/...`). The student runs it **from the Driver Station**,
-which builds the project and starts it in simulation; telemetry flows to
-AdvantageScope and the Driver Station panel. Use this for actual robot
-programming.
+`src/main/java/frc/robot/...`). The student clicks **Start** in the Driver
+Station, which builds the project and starts it in simulation. Once it is
+ready, they choose a mode and click **Enable**. Telemetry flows to AdvantageScope
+and the Driver Station panel. Use this for actual robot programming.
 
 You do not need to do anything special to make a robot project run headless in
 the container. CodeRunner applies a non-destructive Gradle override at run time

@@ -171,7 +171,13 @@ Key E2E fixtures:
 - `e2e/fixtures/gamepad-shim.ts` — Playwright addInitScript gamepad override
 - `e2e/fixtures/runtime.ts` — Runtime seeding helpers
 
-The Docker smoke tier (`e2e:docker`) was intentionally not implemented — see `docs/decisions/022-skip-docker-smoke-and-import-tests.md`. The old per-import backup/restore flow is gone; import coverage now lives in control-plane tests plus the mocked E2E URL-validation spec.
+The broad Docker smoke tier remains intentionally unimplemented — see
+`docs/decisions/022-skip-docker-smoke-and-import-tests.md`. A targeted real-image
+Java workspace smoke is available as `bun run e2e:workspace-java` and is
+required when the workspace JDK, editor base, Java/WPILib extensions, or init
+logic changes (decision 038). The old per-import backup/restore flow is gone;
+import coverage lives in control-plane tests plus the mocked E2E URL-validation
+spec.
 
 See [`docs/development/testing.md`](./docs/development/testing.md) for the full test architecture and catalog.
 

@@ -61,6 +61,29 @@ describe("Code container VS Code defaults", () => {
 		expect(contents).toContain('contains("-Xmx2G")');
 	});
 
+	test("runs JDT LS on Java 21 while keeping projects and Gradle on Java 17", async () => {
+		const contents = await readFile(initScript, "utf8");
+		const dockerfileContents = await readFile(dockerfile, "utf8");
+
+		expect(dockerfileContents).toContain("ENV JDK_HOME=/usr/lib/jvm/jdk-21");
+		expect(dockerfileContents).not.toContain("ENV JDTLS_JAVA_HOME=");
+		expect(contents).toContain(
+			'TOOLING_JAVA_HOME="$' + '{JDK_HOME:-/usr/lib/jvm/jdk-21}"',
+		);
+		expect(contents).toContain(
+			'PROJECT_JAVA_HOME="$' + '{PROJECT_JAVA_HOME:-/usr/lib/jvm/jdk-17}"',
+		);
+		expect(contents).toContain(
+			'if ."java.jdt.ls.java.home" == $legacyJdtJavaHome',
+		);
+		expect(contents).toContain('then del(."java.jdt.ls.java.home")');
+		expect(contents).toContain(
+			'."java.import.gradle.java.home" //= $projectJavaHome',
+		);
+		expect(contents).toContain('"name": "JavaSE-17"');
+		expect(contents).toContain('"default": true');
+	});
+
 	test("ships one directly primed Gradle cache layer", async () => {
 		const contents = await readFile(dockerfile, "utf8");
 

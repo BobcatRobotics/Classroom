@@ -8,7 +8,7 @@ title: Development Servers
 This page covers the day-to-day inner loop for working on CodeRunner: getting the
 repo running locally, the two dev servers, and the gates to run before you call a
 change done. If you just want to stand up the whole app, start with the
-[Quick Start](../quick-start.md). For the big picture of how the pieces fit, see
+[Quick Start (Installation)](../quick-start.md). For the big picture of how the pieces fit, see
 the [architecture overview](../about/architecture.md).
 
 ## First-time setup

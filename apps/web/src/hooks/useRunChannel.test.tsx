@@ -18,6 +18,7 @@ class FakeSocket {
 	readyState = 0;
 	url: string;
 	sent: string[] = [];
+	deferCloseEvent = false;
 	private listeners: Record<string, Listener[]> = {};
 
 	constructor(url: string) {
@@ -39,7 +40,7 @@ class FakeSocket {
 	}
 	close() {
 		this.readyState = FakeSocket.CLOSED;
-		this.fire("close");
+		if (!this.deferCloseEvent) this.fire("close");
 	}
 	fire(event: string, payload?: unknown) {
 		for (const l of this.listeners[event] ?? []) l(payload);
@@ -157,6 +158,23 @@ describe("useRunChannel", () => {
 			vi.advanceTimersByTime(60_000);
 		});
 		expect(FakeSocket.instances.length).toBe(1);
+	});
+
+	test("a stale close after a channel transition cannot create a zombie socket", () => {
+		const { rerender } = renderHook(
+			({ slug }: { slug: string | null }) => useRunChannel(slug),
+			{ initialProps: { slug: "alice" } },
+		);
+		const staleSocket = FakeSocket.instances[0]!;
+		staleSocket.deferCloseEvent = true;
+
+		rerender({ slug: null });
+		rerender({ slug: "alice" });
+		expect(FakeSocket.instances).toHaveLength(2);
+
+		act(() => staleSocket.fire("close"));
+		act(() => vi.advanceTimersByTime(60_000));
+		expect(FakeSocket.instances).toHaveLength(2);
 	});
 
 	test("idle ping is sent every 30s and does not change runStatus", () => {

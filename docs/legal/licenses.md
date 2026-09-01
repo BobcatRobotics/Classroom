@@ -31,7 +31,7 @@ copyright notice and permission notice are included. It comes with no warranty.
 | [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) (**modified**) | BSD-3-Clause | Telemetry view, compiled into the control image |
 | [VSCodium](https://github.com/VSCodium/vscodium) / Code – OSS (**modified**) | MIT | The editor (`reh-web` build), base of the workspace image |
 | [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web) image | GPL-3.0 | Workspace base image, unmodified |
-| [Eclipse Temurin JDK 17](https://adoptium.net/) | GPL-2.0 with Classpath Exception | Java toolchain in the workspace image |
+| [Eclipse Temurin JDK 17 and 21](https://adoptium.net/) | GPL-2.0 with Classpath Exception | Project/simulation and JDT LS runtimes in the workspace image |
 | [WPILib](https://github.com/wpilibsuite/allwpilib) | BSD-3-Clause | Robot libraries and simulator |
 | [vscode-wpilib](https://github.com/wpilibsuite/vscode-wpilib) | BSD-3-Clause | WPILib editor tooling |
 | [AdvantageKit](https://github.com/Mechanical-Advantage/AdvantageKit) | BSD-3-Clause | Referenced by the bundled starter lesson |

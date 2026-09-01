@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 title: Cloudflare Offline Page
+sidebar_label: Cloudflare Offline Page (Advanced)
 ---
 
 # Cloudflare Offline Page
