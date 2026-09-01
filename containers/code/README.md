@@ -8,10 +8,11 @@ Merged per-student container for V2. Combines VSCodium reh-web (`codium-server`)
 |---|---|---|---|
 | Base image | linuxserver/vscodium-web:1.126.04524-ls35 | GPL-3.0 | Ubuntu 24.04, s6-overlay, codium-server, PUID/PGID |
 | VSCodium reh-web (`codium-server`) | 1.126.04524 (from base) | MIT | Browser-based VS Code editor |
-| JDK | Temurin 17.0.15+6 | GPL-2.0 w/ Classpath Exception | Java compilation and simulation |
-| redhat.java | 1.38.0 | EPL-2.0 | Java language support (JDT LS) |
+| Project JDK | Temurin 17.0.15+6 | GPL-2.0 w/ Classpath Exception | Gradle, Java compilation, and robot simulation |
+| Tooling JDK | Temurin 21.0.12.1+1 | GPL-2.0 w/ Classpath Exception | Java language server runtime |
+| redhat.java | 1.55.0 | EPL-2.0 | Java language support (JDT LS) |
 | vscode-wpilib | 2026.1.1 | BSD-3-Clause | WPILib project tooling |
-| Java Extension Pack | 0.30.5 | MIT | Debugger, test runner, Maven/Gradle, project manager |
+| Java Extension Pack | 0.31.1 | MIT | Debugger, test runner, Maven/Gradle, project manager |
 | Spotless Gradle | 1.2.1 | MIT | Code formatting via Spotless |
 | Gradle cache | Primed from template | BSD-3-Clause (WPILib) | Fast first builds (~seconds vs ~minutes) |
 
@@ -20,6 +21,12 @@ Required notices for all of the above are in [`THIRD_PARTY_NOTICES.md`](../../TH
 The runtime seeds conservative memory defaults for classroom density:
 
 - Fresh workspaces default to the VS Code `Default Dark Modern` theme through Remote/Machine settings.
+- JDT LS runs on the dedicated Java 21 installation required by current Java
+  Debug/JDT bundles, discovered through `JDK_HOME`. The
+  `java.jdt.ls.java.home` setting is deliberately unset because WPILib treats
+  it as the project JDK. `JAVA_HOME`, WPILib builds, Gradle import, project
+  compilation, and robot simulation remain on Java 17; projects declare Java
+  17 source/target.
 - JDT LS defaults to `-Xmx512m` instead of the WPILib-generated `-Xmx8G`.
 - The VS Code Gradle Build Server path is disabled by default; JDT LS still imports Gradle projects through the Java extension.
 - Gradle runs are bounded by `/config/.gradle/gradle.properties`: `-Xmx384m`, no daemon, no VFS watching, and two workers. Those limits are deliberately not duplicated into the editor's `java.import.gradle.*` settings, which reject them (decision 037).
@@ -106,7 +113,7 @@ and `VSCODE_BASE_PATH` still use the full workspace id / slug.)
 The container uses s6-overlay for process supervision. The upstream `linuxserver/vscodium-web` image provides the base services; we add FRC-specific layers:
 
 - **`init-vscodium-web`** (upstream): Creates `/config` dirs, fixes permissions, configures sudo.
-- **`init-frc-setup`** (ours, oneshot): Seeds Gradle cache and extensions on first run, validates project mount, fixes permissions.
+- **`init-frc-setup`** (ours, oneshot): Seeds the Gradle cache, reconciles CodeRunner-managed extensions, validates the project mount, and fixes permissions.
 - **`svc-vscodium-web`** (upstream, run script overridden): Launches `codium-server` as `abc` user with health check, custom extensions/data dirs, port 3000, and server-base-path.
 
 ## First-Run Behavior
@@ -114,15 +121,18 @@ The container uses s6-overlay for process supervision. The upstream `linuxserver
 On first start with an empty `/config`, the init script:
 
 1. Copies the primed Gradle cache from `/opt/frc-gradle-cache/` into `/config/.gradle/`.
-2. Copies pre-installed VS Code extensions from `/opt/frc-extensions-cache/` into `/config/extensions/`.
+2. Installs the CodeRunner-managed VS Code extensions from
+   `/opt/frc-extensions-cache/` into `/config/extensions/`.
 3. Seeds `/config/data/Machine/settings.json` with the bounded Java/Gradle
    defaults and dark theme. Gradle daemon memory stays in
    `/config/.gradle/gradle.properties`; it is intentionally not duplicated in
    `java.import.gradle.{jvmArguments,arguments}`, which the editor extensions
    pass through Tooling API build launchers that reject these daemon options.
 
-Subsequent starts skip these copies (directories already populated from the bind mount).
-Settings migration still runs on later starts so existing imported WPILib
+Subsequent starts skip the Gradle copy, but reconcile the nine CodeRunner-managed
+extension IDs to the versions baked into the current image. Superseded managed
+directories and manifest entries are replaced; unrelated student-installed
+extensions are preserved. Settings migration also runs on later starts so existing imported WPILib
 projects with `java.jdt.ls.vmargs` set to `-Xmx8G` are lowered to the container
 default. It also removes the former CodeRunner
 `java.import.gradle.{jvmArguments,arguments}` seeds from existing Machine
@@ -136,6 +146,6 @@ settings and from projects where they still have CodeRunner-provided values.
 
 ## Image Size
 
-Built image size: ~2.3 GiB (uncompressed). Includes JDK (~300 MB), the
+Built image size: ~2.65 GiB (uncompressed). Includes both JDKs (~600 MB), the
 VSCodium reh-web runtime, 9 VS Code extensions, and the single primed
 Gradle/WPILib dependency-cache layer (~1.2 GiB).

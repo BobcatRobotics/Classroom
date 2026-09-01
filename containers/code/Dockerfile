@@ -22,7 +22,7 @@ RUN apt-get update -qq \
     && npx vsce package --no-dependencies --out /tmp/vscode-spotless-gradle.vsix
 
 # V2 merged code container
-# Layers JDK 17 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
+# Layers JDK 17/21 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
 # Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
 # PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
 # docs/decisions/036-vscodium-web-migration.md
@@ -61,34 +61,44 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# ── JDK 17 (Adoptium Temurin) ─────────────────────────────────────────
+# ── JDKs (Adoptium Temurin) ───────────────────────────────────────────
 # TARGETARCH (amd64/arm64, set by buildx) picks the Temurin arch classifier.
 ARG TARGETARCH
-ARG JDK_VERSION=17.0.15+6
+ARG JDK17_VERSION=17.0.15+6
+ARG JDK21_VERSION=21.0.12.1+1
 
 RUN case "${TARGETARCH}" in \
         amd64) JDK_ARCH=x64 ;; \
         arm64) JDK_ARCH=aarch64 ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
-    && JDK_TAG="jdk-$(echo "${JDK_VERSION}" | sed 's/+/%2B/')" \
-    && JDK_FILE="OpenJDK17U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK_VERSION}" | tr + _).tar.gz" \
     && mkdir -p /usr/lib/jvm \
-    && wget -q "https://github.com/adoptium/temurin17-binaries/releases/download/${JDK_TAG}/${JDK_FILE}" -O /tmp/jdk.tar.gz \
-    && tar xzf /tmp/jdk.tar.gz -C /usr/lib/jvm \
-    && rm /tmp/jdk.tar.gz \
-    && ln -s /usr/lib/jvm/jdk-* /usr/lib/jvm/jdk-17
+    && JDK17_TAG="jdk-$(echo "${JDK17_VERSION}" | sed 's/+/%2B/')" \
+    && JDK17_FILE="OpenJDK17U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK17_VERSION}" | tr + _).tar.gz" \
+    && wget -q "https://github.com/adoptium/temurin17-binaries/releases/download/${JDK17_TAG}/${JDK17_FILE}" -O /tmp/jdk17.tar.gz \
+    && tar xzf /tmp/jdk17.tar.gz -C /usr/lib/jvm \
+    && rm /tmp/jdk17.tar.gz \
+    && ln -s "/usr/lib/jvm/jdk-${JDK17_VERSION}" /usr/lib/jvm/jdk-17 \
+    && JDK21_TAG="jdk-$(echo "${JDK21_VERSION}" | sed 's/+/%2B/')" \
+    && JDK21_FILE="OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK21_VERSION}" | tr + _).tar.gz" \
+    && wget -q "https://github.com/adoptium/temurin21-binaries/releases/download/${JDK21_TAG}/${JDK21_FILE}" -O /tmp/jdk21.tar.gz \
+    && tar xzf /tmp/jdk21.tar.gz -C /usr/lib/jvm \
+    && rm /tmp/jdk21.tar.gz \
+    && ln -s "/usr/lib/jvm/jdk-${JDK21_VERSION}" /usr/lib/jvm/jdk-21
 
 ENV JAVA_HOME=/usr/lib/jvm/jdk-17
+ENV JDK_HOME=/usr/lib/jvm/jdk-21
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-RUN java -version
+RUN java -version && "${JDK_HOME}/bin/java" -version
 
 # ── Scripts ────────────────────────────────────────────────────────────
 COPY containers/code/start-sim.sh containers/code/run-sim.sh containers/code/stop-sim.sh /usr/local/bin/
+COPY containers/code/reconcile-extensions.sh /usr/local/bin/reconcile-frc-extensions
 COPY containers/code/sim-headless.init.gradle /usr/local/share/frc/sim-headless.init.gradle
 
-RUN chmod +x /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/local/bin/stop-sim.sh
+RUN chmod +x /usr/local/bin/start-sim.sh /usr/local/bin/run-sim.sh /usr/local/bin/stop-sim.sh \
+             /usr/local/bin/reconcile-frc-extensions
 
 # ── s6-overlay service definitions (additive to upstream) ─────────────
 # Adds init-frc-setup oneshot and overrides svc-vscodium-web run script.
@@ -97,14 +107,14 @@ RUN chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
              /etc/s6-overlay/s6-rc.d/svc-vscodium-web/run
 
 # ── Download and install VS Code extensions ────────────────────────────
-ARG REDHAT_JAVA_VERSION=1.38.0
+ARG REDHAT_JAVA_VERSION=1.55.0
 ARG WPILIB_EXT_VERSION=2026.1.1
 ARG JAVA_DEBUG_VERSION=0.59.0
-ARG JAVA_TEST_VERSION=0.45.0
+ARG JAVA_TEST_VERSION=0.46.0
 ARG MAVEN_VERSION=0.45.3
-ARG GRADLE_VERSION=3.17.3
-ARG JAVA_DEPS_VERSION=0.27.2
-ARG JAVA_PACK_VERSION=0.30.5
+ARG GRADLE_VERSION=3.18.0
+ARG JAVA_DEPS_VERSION=0.27.6
+ARG JAVA_PACK_VERSION=0.31.1
 ARG SPOTLESS_GRADLE_VERSION
 
 # Download pinned Open VSX and GitHub Release artifacts. Spotless is copied

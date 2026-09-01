@@ -1,24 +1,29 @@
 ---
-sidebar_position: 2
-title: Quick Start
+sidebar_position: 3
+title: Quick Start (Installation)
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Quick Start
+# Quick Start (Installation)
 
-This is the fastest way to see CodeRunner running on your own machine. It uses **demo mode**, which skips all of the login and account setup so you can land directly in the editor and try things out. Demo mode is for evaluation only. See the caveats at the end before you put an instance in front of students.
+Run CodeRunner locally in demo mode to try the editor without setting up user accounts or OAuth.
+
+:::danger[Do not expose demo mode to the internet]
+
+Demo mode bypasses authentication. Every visitor shares the same admin account, workspace, and files. Use it only on your computer or a trusted local network.
+
+:::
 
 ![Landing in the editor in demo mode, ready to pick a lesson](/img/screenshots/demo-mode-landing.png)
 
 ## Prerequisites
 
-- **Docker**, up and running, with the **Compose plugin** (`docker compose version`). The control plane, each workspace, and the robot simulation all run inside containers, so Docker is the only hard requirement for the demo.
-- **Git.** Clone the repository (a plain ZIP download is fine too — the demo pulls prebuilt images and does not need submodules or Bun).
-- **No configuration on macOS or native Windows** — Docker Desktop's socket is root-owned there, which is what the compose file assumes by default. On **Linux and WSL2** the socket belongs to the `docker` group instead, so the control plane needs that group's gid; the Linux / WSL2 command below passes it in for you. WSL2 is *not* a Docker Desktop free ride — it behaves exactly like a native Linux host here, whether you run Docker Engine inside the distro or use Docker Desktop's WSL2 integration. A Unix-like environment still matters for everything past the demo — see [Platform support](#platform-support) below.
+- [Docker](https://docs.docker.com/get-docker/), running with the Compose plugin (`docker compose version`)
+- [Git](https://git-scm.com/downloads)
 
-## Steps
+## Start CodeRunner
 
 Clone the repository:
 
@@ -27,7 +32,7 @@ git clone https://github.com/mathewdunne/CodeRunner coderunner
 cd coderunner
 ```
 
-Start CodeRunner in demo mode:
+Then start the demo for your platform:
 
 <Tabs groupId="shell">
 <TabItem value="linux" label="Linux / WSL2" default>
@@ -35,6 +40,8 @@ Start CodeRunner in demo mode:
 ```bash
 CODERUNNER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) CODERUNNER_DEMO_MODE=1 docker compose up
 ```
+
+`CODERUNNER_DOCKER_GID` is required on Linux and WSL2 so the control plane can access the Docker socket.
 
 </TabItem>
 <TabItem value="macos" label="macOS">
@@ -60,60 +67,24 @@ set "CODERUNNER_DEMO_MODE=1" && docker compose up
 </TabItem>
 </Tabs>
 
-(`bun run demo:docker` is the same command — Bun runs package scripts through its own POSIX-style shell, so it works on all four. It does not look up the socket gid, though, so on Linux / WSL2 put `CODERUNNER_DOCKER_GID` in `.env` first.) Then open [http://localhost:4000](http://localhost:4000) in your browser. You will land straight in the IDE, ready to pick a lesson and click Run. Stop it with `Ctrl-C`, or run with `-d` to detach.
+The first start may take a while while Docker downloads the workspace image. When the services are ready, open [http://localhost:4000](http://localhost:4000), then follow [Using CodeRunner](./using-coderunner.md): load a project, edit the code, click **Start** in the Driver Station, and click **Enable** when the robot is ready.
 
-## What that command does
+:::note[Why `workspace-template` exits]
 
-`docker compose ... up` pulls two images from the GitHub Container Registry and starts the stack:
-
-1. **`coderunner-control`** — the control plane. It already contains the web shell and the prebuilt AdvantageScope Lite assets, so there is nothing to compile and no emscripten or AdvantageScope submodule needed. On start it migrates its SQLite database (under `./data`) and serves on port 4000.
-2. **`coderunner-workspace`** — the per-student image with the full Java/WPILib toolchain and the VS Code editor. It is several gigabytes, so the **first** pull takes a while; later runs reuse the cached image.
-
-Student data (the SQLite DB and per-workspace projects) lives in `./data` in the checkout. Delete its **contents** (`rm -rf data/*`) to reset the demo — keep the directory itself, since the control plane reads its ownership to decide which user workspace containers run as. (Don't delete the directory: if Docker recreates it, it ends up root-owned, and because the control container now runs as your non-root user it can't write a root-owned `./data` — `chown` it back to yourself to recover.)
-
-Demo mode also keeps the workspace's editor and build caches in a Docker volume. They regenerate on their own, but to clear them too:
-
-```bash
-docker compose down --remove-orphans
-docker volume prune -a --force --filter label=frc-sim.managed=true
-```
-
-`--remove-orphans` is what actually reaps the workspace containers — they are labelled into the compose project but are not compose services, and a volume still attached to a *stopped* container is skipped by the prune. `prune -a` needs Docker 23 or newer.
-
-:::note[Running from source instead]
-
-If you are developing CodeRunner (not just evaluating it), you can run the control plane directly on the host with `bun run dev:control` / `bun run dev:web`, or build a production bundle with `bun run build`. The host path needs Bun and — for a from-source AdvantageScope build — the submodule (`git submodule update --init --recursive`) and emscripten; `bun run setup:demo` downloads prebuilt assets to skip emscripten. See [Local Deployment](./deploying/local.md) and [Development Servers](./development/dev-servers.md).
+Docker Compose may report that `workspace-template` exited with code 0. This is
+expected: it is a short-lived helper that pulls the multi-gigabyte
+workspace image during startup, so the first student does not have to wait for
+it to download when they log in. The control plane starts a separate workspace
+container from that image when needed.
 
 :::
 
-## Platform support
+To stop CodeRunner, press `Ctrl-C`, then run:
 
-CodeRunner runs on Linux, macOS, and Windows, but they are not equal:
+```bash
+docker compose down --remove-orphans
+```
 
-- **Linux and macOS** are first-class. The build and dev loop run at full speed with no extra setup.
-- **Native Windows** is fine for the demo, which uses prebuilt assets. For full development (building from source, the dev loop), performance is noticeably worse — file-heavy steps like the AdvantageScope build and the Node/Bun tooling are much slower, largely due to antivirus scanning and slower filesystem access.
+## Deploy for a team
 
-If you are developing on Windows, running CodeRunner inside [WSL](https://learn.microsoft.com/windows/wsl/) (a Linux distribution under Windows) is **recommended**. Clone the repository into the WSL filesystem (not a `/mnt/c/...` path) and run all commands from there to get Linux-level performance.
-
-The same goes for **running a real instance for students**, and more strongly — outside demo mode the workspace caches sit on a host bind mount, which is fast on Linux and slow on Docker Desktop. Native Windows is for trying CodeRunner out; host it on Linux or WSL2, which is what the deployment docs assume.
-
-## About demo mode
-
-Demo mode is enabled with the `--demo` flag (or by setting the environment variable `CODERUNNER_DEMO_MODE=1`). It exists so you can evaluate CodeRunner without registering OAuth applications, wiring in client secrets, or adding anyone to an allowlist.
-
-When demo mode is on:
-
-- Authentication is bypassed entirely, so there is no login screen.
-- Every visitor resolves to the **same** seeded admin user and shares **one** workspace.
-- The server prints a warning banner on startup, and the web UI shows a banner reminding you that you are in demo mode.
-
-Because of that shared identity, demo mode has no privacy boundary between visitors:
-
-> **Never expose a demo instance to the public internet.** Anyone who can reach it is logged in as the same admin and sees the same files. Use demo mode only on your own machine or a trusted local network.
-
-## Where to go next
-
-Demo mode is a tour, not a deployment. To run CodeRunner for a real team, with individual student logins and isolated workspaces, you will set up an OAuth provider and configure who is allowed in:
-
-- [Deploying overview](./deploying/overview.md): the full path to a multi-user instance.
-- [OAuth credentials](./deploying/oauth-credentials.md): registering GitHub and/or Google sign-in.
+Demo mode is only for evaluation. For individual logins and isolated student workspaces, continue to [Local Deployment](./deploying/local.md).

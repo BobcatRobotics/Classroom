@@ -93,9 +93,9 @@ The server does not store, inject, or manage any Git credentials.
 ## Running an imported project
 
 Imported projects run through the same Driver Station flow as `robot` lessons:
-click **Enable** in the Driver Station panel, Gradle builds and starts the
-simulation, and telemetry flows to AdvantageScope and the Driver Station
-panel.
+click **Start** to build and start the simulation. When robot code and
+communications are ready, choose a mode and click **Enable**. Telemetry then
+flows to AdvantageScope and the Driver Station panel.
 
 No changes to `build.gradle` are required, even if the project calls
 `wpi.sim.addGui()` or `wpi.sim.addDriverstation()`. At run time, a Gradle

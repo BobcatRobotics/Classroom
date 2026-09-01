@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 title: Google Cloud Deployment
+sidebar_label: Google Cloud Deployment (Advanced)
 ---
 
 # Google Cloud Deployment

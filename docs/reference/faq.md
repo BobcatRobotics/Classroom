@@ -31,13 +31,24 @@ Yes, if they are working on a team-imported project. When a student uses the **S
 
 ### What WPILib and Java version does CodeRunner use?
 
-The workspace image bundles **GradleRIO 2026.1.1** (the 2026 FRC season), Java **17** (Adoptium Temurin 17.0.15), and the **wpilibsuite.vscode-wpilib 2026.1.1** VS Code extension. The source of truth for all pinned versions is `containers/code/Dockerfile`.
+The bundled robot starter uses **GradleRIO 2026.2.1** and Temurin **17.0.15**
+for Gradle, project compilation, and simulation. The editor includes the
+**wpilibsuite.vscode-wpilib 2026.1.1** extension. Students do not need Java or
+VS Code installed on their own devices.
+
+### Can I build or start simulation from the WPILib extension?
+
+You can use the extension's build commands. Its simulation command should also
+work technically, but you should not use it in CodeRunner. Start simulations
+with **Start** in the Driver Station so CodeRunner uses its supported headless
+simulation path and connects the controls and telemetry. When robot code and
+communications are ready, choose a mode and click **Enable**.
 
 ### Do students need accounts? What if I just want to try it?
 
 For a real team deployment, students sign in with GitHub or Google, whichever OAuth provider you configure. You control who is allowed in via an email/domain allowlist. No accounts are created in advance; students sign in with their existing provider accounts, and their workspace is created automatically on first login.
 
-For a solo evaluation or demo, start the demo stack (`CODERUNNER_DEMO_MODE=1 docker compose up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
+For a solo evaluation or demo, start the demo stack (`CODERUNNER_DEMO_MODE=1 docker compose up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick Start (Installation)](../quick-start.md).
 
 ### What happens to a student's work when they switch lessons?
 
@@ -59,6 +70,6 @@ The reference deployment uses a `c4-standard-4` VM (4 vCPU, 15 GB RAM) on Google
 
 Two separate warm-up steps happen on first use:
 
-1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles a full JDK, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
+1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles Java runtimes, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
 
 2. **Gradle cache warm-up.** The workspace image primes the Gradle and WPILib dependency cache during its build by running a full `./gradlew build` against the bundled `robot-starter` module. This cache is stored at `/opt/frc-gradle-cache` inside the image and copied into each student's container on first start. Despite this priming, the very first build in a fresh container still runs the Java language server index and compiles the project from scratch. After that first run, incremental builds are much faster.

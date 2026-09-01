@@ -1,7 +1,7 @@
 # Decision 021: Testing suite implementation — deviations from TESTING-PLAN.md
 
 **Date:** 2026-05-15
-**Status:** Accepted
+**Status:** Accepted; Docker-smoke scope superseded by decisions 022 and 038
 **Context:** `TESTING-PLAN.md` proposed a three-phase test suite (property + security unit tests, E2E mocked + frontend unit tests, Docker smoke + security browser tests). The plan was AI-drafted and reviewed; while implementing it, a handful of details warranted deviation. This log captures those decisions so future work doesn't reintroduce them by reading the plan and assuming it was followed verbatim.
 
 ## Summary
@@ -60,7 +60,9 @@ Reserved for browser-driven specs: anything where the regression is in the React
 - **`fast-check` for property tests.** Adopted as planned. Property tests live in `apps/control/src/__tests__/property/`, `apps/web/src/lib/*.property.test.ts`, and `packages/contracts/src/__tests__/property/`. Tunable run count via `FAST_CHECK_NUM_RUNS`.
 - **Vitest for frontend unit tests, alongside Bun for the `keyboard-mapping.test.ts` file.** That one test was written before this work in `bun:test`-style and runs under `bun test`; the Vitest config excludes it to avoid double-runs. New frontend tests go in Vitest.
 - **No tsconfig coverage of `e2e/`.** `scripts/typecheck.ts` enumerates tsconfig projects and `e2e/` is not one. Adding it would require a fourth tsconfig and is unnecessary for a test directory that Playwright transforms with its own pipeline. If a future tsconfig project is added for `e2e/`, the contracts/control-plane imports in fixtures will already resolve via the workspace's package layout.
-- **Docker smoke tests skip cleanly when `DOCKER_E2E` is unset.** The spec body is a `test.skip(...)` guard. This keeps the `e2e:docker` lane opt-in and avoids accidental Docker daemon traffic during regular dev work.
+- **The original Docker smoke scaffold skipped cleanly when `DOCKER_E2E` was
+  unset.** Decision 022 removed that broad lane; decision 038 later added the
+  narrower `e2e:workspace-java` command for real Java tooling acceptance.
 - **Property-test count default = 200.** Plan suggested 100. 200 is still under a second per property; the cost is negligible, the bug-surfacing benefit is real. Override via `FAST_CHECK_NUM_RUNS` for CI-time tradeoffs.
 
 ## Files Touched
