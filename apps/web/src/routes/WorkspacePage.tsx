@@ -220,6 +220,17 @@ export function WorkspacePage() {
 						errorDetail={editorErrorDetail}
 					/>
 				}
+				// TODO(pathplanner): once the PathPlanner integration ships
+				// end-to-end (pathplanner-web build published + verified against the
+				// deploy-files API), swap this pane for the tabbed switcher:
+				//   scope={
+				//     <SimPaneSwitcher
+				//       scope={<ScopePane ref={scopeFrameRef} />}
+				//       pathplanner={<PathPlannerPane workspaceSlug={simSlug} />}
+				//     />
+				//   }
+				// Components + tests already exist: SimPaneSwitcher.tsx,
+				// PathPlannerPane.tsx.
 				scope={<ScopePane ref={scopeFrameRef} />}
 				driverStation={
 					<DriverStation
