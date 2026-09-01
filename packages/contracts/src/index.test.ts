@@ -344,6 +344,19 @@ describe("deployFilePathSchema", () => {
 		}
 	});
 
+	test("accepts ordinary student-chosen filenames with punctuation and non-ASCII letters", () => {
+		for (const path of [
+			"src/main/deploy/pathplanner/autos/Two Piece (Left).path",
+			"src/main/deploy/pathplanner/autos/Bob's Auto.auto",
+			"src/main/deploy/pathplanner/autos/Score #1.path",
+			"src/main/deploy/pathplanner/autos/A+B.path",
+			"src/main/deploy/pathplanner/autos/Left, Right.path",
+			"src/main/deploy/pathplanner/autos/Ünïcode.path",
+		]) {
+			expect(deployFilePathSchema.safeParse(path).success).toBe(true);
+		}
+	});
+
 	test("rejects traversal, absolute, hidden, and malformed paths", () => {
 		for (const path of [
 			"",
@@ -353,6 +366,15 @@ describe("deployFilePathSchema", () => {
 			"src\\main\\deploy\\pathplanner\\x.path",
 			"src/main/deploy/pathplanner//double.path",
 			`src/${"a".repeat(600)}.path`,
+		]) {
+			expect(deployFilePathSchema.safeParse(path).success).toBe(false);
+		}
+	});
+
+	test("rejects segments with control characters or reserved filesystem characters", () => {
+		for (const path of [
+			`src/main/deploy/pathplanner/${String.fromCharCode(1)}bad.path`,
+			"src/main/deploy/pathplanner/autos/star*.path",
 		]) {
 			expect(deployFilePathSchema.safeParse(path).success).toBe(false);
 		}

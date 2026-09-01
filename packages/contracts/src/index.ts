@@ -435,16 +435,49 @@ export const DEPLOY_FILES_READ_ROOTS = [
 	"src/main/deploy/choreo",
 ] as const;
 
-// Segments start with an alphanumeric (blocks "..", ".hidden") and allow the
-// characters PathPlanner puts in user-named path/auto files (spaces, parens).
+// Deny-list rather than allow-list: PathPlanner lets students name paths and
+// autos freely (apostrophes, "#", "+", non-ASCII letters, ...), so the
+// character class only needs to block what's actually unsafe. Split on "/":
+// every segment must be non-empty (blocks "//" and a leading "/") and must
+// not start with "." (blocks "..", ".", and dotfiles — this is the
+// traversal guard, keep it). Within a segment, only reserved filesystem
+// characters and control characters are forbidden.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional — rejects control chars in deploy file paths
+const DEPLOY_FILE_FORBIDDEN_CHARS = /[\\/:*?"<>|\u0000-\u001f\u007f]/;
+
 export const deployFilePathSchema = z
 	.string()
 	.min(1)
 	.max(512)
-	.regex(
-		/^[A-Za-z0-9][A-Za-z0-9 ._()-]*(?:\/[A-Za-z0-9][A-Za-z0-9 ._()-]*)*$/,
-		"Path must be a relative path made of safe segments.",
-	);
+	.superRefine((value, ctx) => {
+		const segments = value.split("/");
+		for (const segment of segments) {
+			if (segment.length === 0) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "Path must not contain empty segments.",
+				});
+				return;
+			}
+			if (segment.startsWith(".")) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: 'Path segments must not start with ".".',
+				});
+				return;
+			}
+			// The forbidden-character class includes "/" and "\\", which is
+			// redundant with the split above for "/" but keeps the class
+			// self-contained if this is ever reused on an unsplit string.
+			if (DEPLOY_FILE_FORBIDDEN_CHARS.test(segment)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "Path segments must not contain reserved characters.",
+				});
+				return;
+			}
+		}
+	});
 
 export const deployFileSchema = z.object({
 	path: deployFilePathSchema,
