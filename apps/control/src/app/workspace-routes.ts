@@ -512,7 +512,7 @@ export async function handleWorkspaceRoute(
 		if (request.method === "DELETE") {
 			return deployFileDeleteResponse(auth.workspace, filePath);
 		}
-		return new Response("Method not allowed.", { status: 405 });
+		return jsonResponse({ error: "Method not allowed." }, { status: 405 });
 	}
 
 	// --- Import endpoints ---

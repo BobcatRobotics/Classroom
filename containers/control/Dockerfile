@@ -78,13 +78,30 @@ COPY --from=ascope-build /repo/dist/advantagescope /
 # download is best-effort until that fork publishes its first release:
 # on failure the dist stays empty and /pathplanner/ serves a 503 telling
 # the operator to rebuild once the release exists.
+#
+# Cache hazard: this RUN layer is keyed on its inputs, which include the
+# resolved URL below. Before that fork's first release exists, the curl
+# fails and Docker still caches the resulting "WARNING: ... will 503"
+# layer. Every later build with the same inputs reuses that cached layer
+# and silently ships an empty dist forever, even after the release lands —
+# including PathPlanner's debut release, unless something in the RUN
+# command's text changes. PATHPLANNER_DIST_TAG defaults to "latest" (today's
+# `/releases/latest/download/...` indirection); pinning it to a real tag
+# once one exists both fixes the release fetched and changes the composed
+# URL text below, which busts the cache and forces a fresh download attempt.
+ARG PATHPLANNER_DIST_TAG=latest
 FROM debian:bookworm-slim AS pathplanner-dist
-ARG PATHPLANNER_DIST_URL=https://github.com/mathewdunne/pathplanner-web/releases/latest/download/pathplanner-dist.tar.gz
+ARG PATHPLANNER_DIST_TAG
 RUN apt-get update -qq \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /pathplanner-dist \
-    && { curl -fsSL "$PATHPLANNER_DIST_URL" -o /tmp/pathplanner-dist.tar.gz \
+    && if [ "$PATHPLANNER_DIST_TAG" = "latest" ]; then \
+         url="https://github.com/mathewdunne/pathplanner-web/releases/latest/download/pathplanner-dist.tar.gz"; \
+       else \
+         url="https://github.com/mathewdunne/pathplanner-web/releases/download/${PATHPLANNER_DIST_TAG}/pathplanner-dist.tar.gz"; \
+       fi \
+    && { curl -fsSL "$url" -o /tmp/pathplanner-dist.tar.gz \
          && tar -xzf /tmp/pathplanner-dist.tar.gz -C /pathplanner-dist \
          || echo "WARNING: PathPlanner dist unavailable; /pathplanner will 503"; }
 

@@ -292,7 +292,7 @@ export async function pathplannerResponse(
 	);
 	if (response.status === 404 && safePath === "index.html") {
 		return htmlResponse(
-			"PathPlanner has not been fetched yet. Run `bun scripts/fetch-dist.ts` (or rebuild the control image) to install the PathPlanner web dist.",
+			"PathPlanner has not been fetched yet. Run `bun run fetch:dist` (or rebuild the control image) to install the PathPlanner web dist.",
 			{ status: 503 },
 		);
 	}
