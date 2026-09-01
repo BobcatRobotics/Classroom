@@ -35,7 +35,8 @@ The lessons/project-switch rework landed in decision 029. The old per-import
 backup/restore flow no longer exists, so that deferred E2E scope is obsolete.
 Import and catalog-load coverage now lives in Bun control-plane tests, shared
 contract/property tests, Vitest hook/component tests, and the mocked E2E
-URL-validation spec. The Docker smoke tier remains intentionally skipped.
+URL-validation spec. The broad Docker smoke tier remains intentionally skipped;
+decision 038's targeted Java workspace smoke is the only exception.
 
 ## Consequences
 

@@ -29,15 +29,16 @@ top:
 | Adoptium Temurin JDT LS JDK | 21.0.12.1+1 (x64/aarch64) |
 | redhat.java (JDT Language Server) | 1.55.0 |
 | vscode-wpilib (WPILib extension) | 2026.1.1 |
-| Java Extension Pack | debugger, test runner, Maven/Gradle, project manager |
+| Java Extension Pack | 0.31.1 (members pinned individually) |
 | Spotless Gradle | 1.2.1 |
 | GitHub CLI (`gh`) | latest stable at image build time |
 | Gradle + WPILib dependency cache | pre-primed at build time |
 | Bundled lesson catalog | baked in at `/opt/frc-catalog/` |
 
-The total uncompressed image size is approximately 2.3 GiB, of which roughly
-1.2 GiB is the single primed Gradle and WPILib dependency-cache layer that
-makes first builds take seconds rather than minutes.
+The total uncompressed image size is approximately 2.65 GiB, including both
+JDKs and roughly 1.2 GiB for the single primed Gradle and WPILib
+dependency-cache layer that makes first builds take seconds rather than
+minutes.
 
 ## Classroom-density memory defaults
 

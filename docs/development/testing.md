@@ -8,8 +8,8 @@ title: Testing
 This page covers the test suite you'll run while working on CodeRunner. The
 default verification tiers are runnable without Docker and without external
 services; the targeted Java workspace smoke requires Docker and a locally
-built image. For the
-CI gate that runs all tiers in sequence, see [Development Servers](./dev-servers.md).
+built image. For the CI gate that runs the default tiers in sequence, see
+[Development Servers](./dev-servers.md).
 For the full script list, see the [CLI reference](../reference/cli-reference.md).
 
 ## First-time setup
@@ -90,17 +90,17 @@ bun run e2e:workspace-java
 
 Runs a targeted Playwright test against fresh containers from the real
 workspace image. It opens `hello-world` in real VSCodium, verifies that JDT LS
-uses Java 21, waits for
-`Java: Ready`, launches **Run Main** with F5, verifies `Hello, World!`, and
+uses Java 21, waits for `Java: Ready`, launches **Run Main** with F5, verifies
+`Hello, World!`, and
 asserts that JDT logs enumerate `vscode.java.resolveMainMethod` without any
 `No delegateCommandHandler` error. It then opens `robot-starter`, waits for
 the real Gradle import, invokes **WPILib: Build Robot Code**, verifies that
 WPILib generated a Java 17 command and launched its Gradle daemon on Java 17,
-rejects Spotless/JDK failures, checks Java 17 classfiles, and starts/stops the supported
-`start-sim.sh` → `run-sim.sh` path.
+rejects Spotless/JDK failures, checks Java 17 classfiles, and starts/stops the
+supported `start-sim.sh` → `run-sim.sh` path.
 
 This focused tier is intentionally outside `bun run verify`: it requires a
-Docker daemon, a prebuilt multi-gigabyte image, and about two minutes. Run it
+Docker daemon, a prebuilt multi-gigabyte image, and several minutes. Run it
 whenever the JDK, VSCodium base, Java/WPILib extensions, or workspace startup
 logic changes.
 

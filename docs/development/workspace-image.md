@@ -98,8 +98,8 @@ for JDT LS and Gradle import, launches **Run Main** through F5, verifies termina
 output and the registered Java Debug command list, invokes **WPILib: Build
 Robot Code**, asserts that WPILib selected Java 17 for both the generated
 command and Gradle daemon, checks Java 17 classfile output, and starts/stops the
-supported `start-sim.sh` → `run-sim.sh` headless simulation path. It rejects Spotless/JDK failures and every
-`No delegateCommandHandler` occurrence.
+supported `start-sim.sh` → `run-sim.sh` headless simulation path. It rejects
+Spotless/JDK failures and every `No delegateCommandHandler` occurrence.
 
 For broader editor acceptance, also check:
 

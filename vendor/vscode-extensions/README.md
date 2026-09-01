@@ -15,7 +15,7 @@ This directory documents the VS Code extensions bundled into the V2 code contain
 
 | Extension | Version | Source |
 |---|---|---|
-| vscjava.vscode-java-pack (Extension Pack for Java) | 0.31.1 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-pack/0.31.1) |
+| vscjava.vscode-java-pack (Extension Pack for Java) | 0.31.1 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-pack/0.31.1/file/vscjava.vscode-java-pack-0.31.1.vsix) |
 | vscjava.vscode-java-debug (Debugger for Java) | 0.59.0 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-debug/0.59.0) |
 | vscjava.vscode-java-test (Test Runner for Java) | 0.46.0 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-java-test/0.46.0) |
 | vscjava.vscode-maven (Maven for Java) | 0.45.3 | [Open VSX](https://open-vsx.org/api/vscjava/vscode-maven/0.45.3) |

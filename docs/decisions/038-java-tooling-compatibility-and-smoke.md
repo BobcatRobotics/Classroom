@@ -40,10 +40,11 @@ requirement.
 
 The initial implementation selected the tooling JDK through
 `java.jdt.ls.java.home`. Runtime testing of a freshly imported robot exposed
-that WPILib 2026.1.1 reads that setting first, then passes it to every editor
-Gradle task as both `JAVA_HOME` and `-Dorg.gradle.java.home`. That forced the
-robot build onto Java 21 and broke the project's Spotless 6.12/google-java-format
-step. Red Hat Java also supports discovering its tooling runtime from
+that the WPILib VS Code extension 2026.1.1 reads that setting first, then passes
+it to every editor Gradle task as both `JAVA_HOME` and
+`-Dorg.gradle.java.home`. That forced the robot build onto Java 21 and broke the
+project's Spotless 6.12/google-java-format step. Red Hat Java also supports
+discovering its tooling runtime from
 `JDK_HOME`, whereas WPILib falls through to `JAVA_HOME`. The corrected split
 therefore leaves `java.jdt.ls.java.home` unset, supplies Java 21 through
 `JDK_HOME`, and retains Java 17 in `JAVA_HOME`. Startup removes only the former

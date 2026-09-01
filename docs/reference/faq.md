@@ -31,10 +31,10 @@ Yes, if they are working on a team-imported project. When a student uses the **S
 
 ### What WPILib and Java version does CodeRunner use?
 
-The workspace image bundles the 2026 FRC stack, Temurin **17.0.15** for Gradle,
-project compilation, and simulation, Temurin **21.0.12.1** for JDT LS, and the
-**wpilibsuite.vscode-wpilib 2026.1.1** VS Code extension. The source of truth
-for all pinned versions is `containers/code/Dockerfile`.
+The bundled robot starter uses **GradleRIO 2026.2.1** and Temurin **17.0.15**
+for Gradle, project compilation, and simulation. The editor includes the
+**wpilibsuite.vscode-wpilib 2026.1.1** extension. Students do not need Java or
+VS Code installed on their own devices.
 
 ### Do students need accounts? What if I just want to try it?
 
@@ -62,6 +62,6 @@ The reference deployment uses a `c4-standard-4` VM (4 vCPU, 15 GB RAM) on Google
 
 Two separate warm-up steps happen on first use:
 
-1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles a full JDK, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
+1. **Docker image pull.** The first `docker compose pull` (or `up`) downloads `ghcr.io/mathewdunne/coderunner-workspace:latest`, which is several gigabytes (it bundles Java runtimes, WPILib, and VS Code). This only happens once per machine; subsequent starts reuse Docker's cached layers.
 
 2. **Gradle cache warm-up.** The workspace image primes the Gradle and WPILib dependency cache during its build by running a full `./gradlew build` against the bundled `robot-starter` module. This cache is stored at `/opt/frc-gradle-cache` inside the image and copied into each student's container on first start. Despite this priming, the very first build in a fresh container still runs the Java language server index and compiles the project from scratch. After that first run, incremental builds are much faster.
