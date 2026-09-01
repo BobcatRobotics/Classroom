@@ -150,6 +150,22 @@ export async function createAdvantageScopeDist(root: string): Promise<string> {
 	return ascopeDistDir;
 }
 
+export async function createPathPlannerDist(root: string): Promise<string> {
+	const pathplannerDistDir = join(root, "pathplanner-dist");
+	await mkdir(pathplannerDistDir, { recursive: true });
+	await writeFile(
+		join(pathplannerDistDir, "index.html"),
+		'<!doctype html><html><head><base href="/pathplanner/"><script src="main.dart.js" defer></script></head><body>PathPlanner test dist</body></html>',
+		"utf8",
+	);
+	await writeFile(
+		join(pathplannerDistDir, "main.dart.js"),
+		"console.log('pathplanner');\n",
+		"utf8",
+	);
+	return pathplannerDistDir;
+}
+
 export async function withApp<T>(
 	fn: (app: ControlApp, root: string) => Promise<T>,
 	options: Partial<ControlAppOptions> = {},
@@ -158,11 +174,13 @@ export async function withApp<T>(
 	const catalogDir = await createCatalogDir(root);
 	const webDistDir = await createWebDist(root);
 	const advantageScopeDistDir = await createAdvantageScopeDist(root);
+	const pathplannerDistDir = await createPathPlannerDist(root);
 	const app = await createApp({
 		dataDir: join(root, "data"),
 		catalogDir,
 		webDistDir,
 		advantageScopeDistDir,
+		pathplannerDistDir,
 		sessionSecret: "test-session-secret",
 		baseUrl: "http://localhost:4000",
 		idleStopMinutes: 30,

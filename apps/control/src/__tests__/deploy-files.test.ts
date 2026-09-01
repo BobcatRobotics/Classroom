@@ -277,3 +277,66 @@ describe("DELETE /u/:slug/api/deploy-files/:path", () => {
 		);
 	});
 });
+
+describe("GET /pathplanner/", () => {
+	test("serves the built app without auth (like /scope)", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const index = await app.fetch(
+					new Request("http://localhost/pathplanner/"),
+				);
+				expect(index.status).toBe(200);
+				expect(await index.text()).toContain("PathPlanner test dist");
+
+				const js = await app.fetch(
+					new Request("http://localhost/pathplanner/main.dart.js"),
+				);
+				expect(js.status).toBe(200);
+
+				// The iframe URL carries a query string; static serving ignores it.
+				const withQuery = await app.fetch(
+					new Request("http://localhost/pathplanner/?ws=alice"),
+				);
+				expect(withQuery.status).toBe(200);
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
+	// CONTROLLER CORRECTION (binding): the plan originally used
+	// "/pathplanner/%2e%2e/secrets" here. The WHATWG URL parser collapses
+	// %2e%2e as a dot segment *before routing*, so that pathname arrives as
+	// "/secrets" and never reaches pathplannerResponse — the 400 would be
+	// unreachable. "..%2fsecrets" is preserved by the parser, decodes to
+	// "../secrets", and is rejected by safeRelativeAssetPath. Use it as
+	// written below.
+	test("rejects traversal outside the dist dir", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const resp = await app.fetch(
+					new Request("http://localhost/pathplanner/..%2fsecrets"),
+				);
+				expect(resp.status).toBe(400);
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
+	test("503s the index when the dist is absent", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const resp = await app.fetch(
+					new Request("http://localhost/pathplanner/"),
+				);
+				expect(resp.status).toBe(503);
+			},
+			{
+				dockerRunner: docker.runner,
+				pathplannerDistDir: "/nonexistent-pathplanner-dist",
+			},
+		);
+	});
+});
