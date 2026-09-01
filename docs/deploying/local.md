@@ -109,10 +109,11 @@ become `healthy`.
 
 :::note[Why `workspace-template` exits]
 
-Docker Compose may report that `workspace-template` exited with code 0 or show
-it as `Exited`. This is expected: it is a pull-only helper that makes the
-workspace image available, not a service that stays running. The control plane
-starts a separate workspace container from that image when a student needs one.
+Docker Compose may report that `workspace-template` exited with code 0. This is
+expected: it is a short-lived helper that pulls the multi-gigabyte
+workspace image during startup, so the first student does not have to wait for
+it to download when they log in. The control plane starts a separate workspace
+container from that image when needed.
 
 :::
 
