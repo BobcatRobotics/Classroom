@@ -107,6 +107,15 @@ The first start downloads several gigabytes because the workspace image
 contains Java and WPILib. In `docker compose ps`, the control service should
 become `healthy`.
 
+:::note[Why `workspace-template` exits]
+
+Docker Compose may report that `workspace-template` exited with code 0 or show
+it as `Exited`. This is expected: it is a pull-only helper that makes the
+workspace image available, not a service that stays running. The control plane
+starts a separate workspace container from that image when a student needs one.
+
+:::
+
 Students can then open `http://<your-LAN-IP>:4000/`.
 
 ## 3. Sign in and allow students

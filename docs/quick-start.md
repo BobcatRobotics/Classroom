@@ -69,6 +69,15 @@ set "CODERUNNER_DEMO_MODE=1" && docker compose up
 
 The first start may take a while while Docker downloads the workspace image. When the services are ready, open [http://localhost:4000](http://localhost:4000), then follow [Using CodeRunner](./using-coderunner.md): load a project, edit the code, click **Start** in the Driver Station, and click **Enable** when the robot is ready.
 
+:::note[Why `workspace-template` exits]
+
+Docker Compose may report that `workspace-template` exited with code 0. This is
+expected: it is a pull-only helper that makes the workspace image available,
+not a service that stays running. The control plane starts a separate workspace
+container from that image when a student needs one.
+
+:::
+
 To stop CodeRunner, press `Ctrl-C`, then run:
 
 ```bash
