@@ -423,3 +423,47 @@ export type LessonModule = z.infer<typeof lessonModuleSchema>;
 export type LessonCatalog = z.infer<typeof lessonCatalogSchema>;
 export type LessonCatalogResponse = z.infer<typeof lessonCatalogResponseSchema>;
 export type LessonLoadRequest = z.infer<typeof lessonLoadRequestSchema>;
+
+// --- Deploy files (PathPlanner) schemas ---
+
+/** Only files under this project-relative root may be written or deleted. */
+export const DEPLOY_FILES_WRITE_ROOT = "src/main/deploy/pathplanner";
+
+/** Roots included in the snapshot; choreo is read-only in the GUI. */
+export const DEPLOY_FILES_READ_ROOTS = [
+	DEPLOY_FILES_WRITE_ROOT,
+	"src/main/deploy/choreo",
+] as const;
+
+// Segments start with an alphanumeric (blocks "..", ".hidden") and allow the
+// characters PathPlanner puts in user-named path/auto files (spaces, parens).
+export const deployFilePathSchema = z
+	.string()
+	.min(1)
+	.max(512)
+	.regex(
+		/^[A-Za-z0-9][A-Za-z0-9 ._()-]*(?:\/[A-Za-z0-9][A-Za-z0-9 ._()-]*)*$/,
+		"Path must be a relative path made of safe segments.",
+	);
+
+export const deployFileSchema = z.object({
+	path: deployFilePathSchema,
+	content: z.string(),
+});
+
+export const deployFilesSnapshotResponseSchema = z.object({
+	ok: z.literal(true),
+	files: z.array(deployFileSchema),
+});
+
+export const deployFilesWriteResponseSchema = z.object({
+	ok: z.literal(true),
+});
+
+export type DeployFile = z.infer<typeof deployFileSchema>;
+export type DeployFilesSnapshotResponse = z.infer<
+	typeof deployFilesSnapshotResponseSchema
+>;
+export type DeployFilesWriteResponse = z.infer<
+	typeof deployFilesWriteResponseSchema
+>;
