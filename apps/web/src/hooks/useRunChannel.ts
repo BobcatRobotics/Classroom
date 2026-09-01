@@ -32,7 +32,6 @@ export function useRunChannel(
 	const socketRef = useRef<WebSocket | null>(null);
 	const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const backoffRef = useRef(500);
-	const mountedRef = useRef(true);
 
 	const logLine = useCallback((line: string) => {
 		setConsoleLines((current) =>
@@ -47,13 +46,13 @@ export function useRunChannel(
 	}, []);
 
 	useEffect(() => {
-		mountedRef.current = true;
+		let disposed = false;
 		if (!workspaceSlug) {
 			return;
 		}
 
 		const connect = () => {
-			if (!mountedRef.current) return;
+			if (disposed) return;
 
 			const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 			const socket = new WebSocket(
@@ -63,7 +62,7 @@ export function useRunChannel(
 			setRunStatus("connecting");
 
 			socket.addEventListener("open", () => {
-				if (!mountedRef.current) return;
+				if (disposed || socketRef.current !== socket) return;
 				backoffRef.current = 500;
 				setConnection("connected");
 				setRunStatus("idle");
@@ -71,7 +70,7 @@ export function useRunChannel(
 			});
 
 			socket.addEventListener("message", (event) => {
-				if (!mountedRef.current) return;
+				if (disposed || socketRef.current !== socket) return;
 				try {
 					const message = runServerMessageSchema.parse(
 						JSON.parse(String(event.data)),
@@ -99,16 +98,17 @@ export function useRunChannel(
 			});
 
 			socket.addEventListener("close", () => {
-				if (!mountedRef.current) return;
-				if (socketRef.current === socket) {
-					socketRef.current = null;
-				}
+				if (disposed || socketRef.current !== socket) return;
+				socketRef.current = null;
 				setConnection("reconnecting");
 				logLine("Run channel disconnected. Reconnecting...");
 
 				const delay = backoffRef.current;
 				backoffRef.current = Math.min(backoffRef.current * 2, 10_000);
-				reconnectTimerRef.current = setTimeout(connect, delay);
+				reconnectTimerRef.current = setTimeout(() => {
+					reconnectTimerRef.current = null;
+					connect();
+				}, delay);
 			});
 
 			socket.addEventListener("error", () => {
@@ -118,7 +118,7 @@ export function useRunChannel(
 
 		connect();
 		return () => {
-			mountedRef.current = false;
+			disposed = true;
 			if (reconnectTimerRef.current) {
 				clearTimeout(reconnectTimerRef.current);
 				reconnectTimerRef.current = null;
