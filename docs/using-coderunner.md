@@ -5,6 +5,8 @@ title: Using CodeRunner
 
 # Using CodeRunner
 
+## Get started
+
 1. Sign in.
 2. Click **Switch project**, then load a lesson or import a public GitHub project.
 3. For a lesson, open its README and follow the instructions. For an imported
@@ -39,7 +41,7 @@ telemetry.
 4. Click **Stop** when you are finished, or **Restart** to stop the code and re-run with any changes you've made.
 
 Build output and robot output appear in the **Console** tab. Telemetry appears in
-AdvantageScope. Use the **Controls** tab to select a gamepad or keyboard input.
+AdvantageScope.
 
 ## Console lessons
 
@@ -47,3 +49,10 @@ AdvantageScope. Use the **Controls** tab to select a gamepad or keyboard input.
 do not run a robot simulation, the Driver Station and AdvantageScope are hidden,
 and the VS Code editor expands to fill the full screen. Use the editor's **Run**
 button to run them.
+
+## Explore more
+
+While a robot simulation is running, explore the Driver Station's **Auto** and
+**Controls** tabs. **Auto** appears when the robot code publishes an autonomous
+chooser; **Controls** lets you select a gamepad or keyboard input to control the
+simulation.
