@@ -72,6 +72,22 @@ RUN PATH="/usr/bin:${PATH}" bun scripts/build-ascope-lite.ts
 FROM scratch AS ascope-dist
 COPY --from=ascope-build /repo/dist/advantagescope /
 
+# ── Stage 3b: PathPlanner web dist ─────────────────────────────────────
+# Prebuilt in the pathplanner-web fork's CI (Flutter stays out of this
+# image, same reasoning as the prebuilt ascope-dist build context). The
+# download is best-effort until that fork publishes its first release:
+# on failure the dist stays empty and /pathplanner/ serves a 503 telling
+# the operator to rebuild once the release exists.
+FROM debian:bookworm-slim AS pathplanner-dist
+ARG PATHPLANNER_DIST_URL=https://github.com/mathewdunne/pathplanner-web/releases/latest/download/pathplanner-dist.tar.gz
+RUN apt-get update -qq \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /pathplanner-dist \
+    && { curl -fsSL "$PATHPLANNER_DIST_URL" -o /tmp/pathplanner-dist.tar.gz \
+         && tar -xzf /tmp/pathplanner-dist.tar.gz -C /pathplanner-dist \
+         || echo "WARNING: PathPlanner dist unavailable; /pathplanner will 503"; }
+
 # ── Stage 4: dist export (CI only) ─────────────────────────────────────
 # A filesystem-only stage holding just the built web shell + AdvantageScope
 # Lite dists. CI builds this with `--target dist-export --output type=local`
@@ -111,6 +127,7 @@ COPY scripts/ scripts/
 COPY catalog/ catalog/
 COPY --from=web-build /repo/apps/web/dist apps/web/dist
 COPY --from=ascope-dist / dist/advantagescope
+COPY --from=pathplanner-dist /pathplanner-dist dist/pathplanner
 
 # License texts travel with the image, not just the repo: this image ships a
 # patched AdvantageScope build, and BSD-3-Clause requires the notice to

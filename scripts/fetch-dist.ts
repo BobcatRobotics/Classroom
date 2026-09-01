@@ -21,7 +21,15 @@ const tag =
 		? Bun.argv[tagArgIndex + 1]
 		: (Bun.env.DEMO_RELEASE_TAG ?? "");
 
-type Artifact = { asset: string; destDir: string };
+type Artifact = {
+	asset: string;
+	destDir: string;
+	/** Overrides the CodeRunner release repo/tag (PathPlanner ships its own). */
+	repo?: string;
+	tag?: string;
+	/** Print a warning instead of failing when the asset is missing. */
+	optional?: boolean;
+};
 
 const artifacts: Artifact[] = [
 	{
@@ -29,13 +37,22 @@ const artifacts: Artifact[] = [
 		destDir: resolve(repoRoot, "dist/advantagescope"),
 	},
 	{ asset: "web-dist.tar.gz", destDir: resolve(repoRoot, "apps/web/dist") },
+	{
+		asset: "pathplanner-dist.tar.gz",
+		destDir: resolve(repoRoot, "dist/pathplanner"),
+		repo: Bun.env.PATHPLANNER_RELEASE_REPO ?? "mathewdunne/pathplanner-web",
+		tag: Bun.env.PATHPLANNER_RELEASE_TAG ?? "",
+		optional: true,
+	},
 ];
 
-function downloadUrl(asset: string): string {
-	const base = `https://github.com/${repo}/releases`;
-	return tag
-		? `${base}/download/${tag}/${asset}`
-		: `${base}/latest/download/${asset}`;
+function downloadUrl(artifact: Artifact): string {
+	const artifactRepo = artifact.repo ?? repo;
+	const artifactTag = artifact.repo ? (artifact.tag ?? "") : tag;
+	const base = `https://github.com/${artifactRepo}/releases`;
+	return artifactTag
+		? `${base}/download/${artifactTag}/${artifact.asset}`
+		: `${base}/latest/download/${artifact.asset}`;
 }
 
 async function run(command: string, args: string[]): Promise<void> {
@@ -56,13 +73,17 @@ async function fetchAndExtract(
 	artifact: Artifact,
 	scratch: string,
 ): Promise<void> {
-	const url = downloadUrl(artifact.asset);
+	const url = downloadUrl(artifact);
 	console.log(`\nDownloading ${artifact.asset} from ${url}`);
 	const response = await fetch(url);
 	if (!response.ok) {
+		const message = `Failed to download ${artifact.asset}: ${response.status} ${response.statusText}.`;
+		if (artifact.optional) {
+			console.warn(`${message} Skipping (optional artifact).`);
+			return;
+		}
 		throw new Error(
-			`Failed to download ${artifact.asset}: ${response.status} ${response.statusText}. ` +
-				`Check that release ${tag || "latest"} exists for ${repo} and includes this asset.`,
+			`${message} Check that release ${tag || "latest"} exists for ${repo} and includes this asset.`,
 		);
 	}
 
