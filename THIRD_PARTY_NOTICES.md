@@ -14,11 +14,11 @@ endorse or are affiliated with CodeRunner.
 | [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) (**modified**) | v26.0.2 | BSD-3-Clause | AS Lite assets compiled into the control image |
 | [VSCodium](https://github.com/VSCodium/vscodium) / Code – OSS (**modified**) | 1.126.04524 | MIT | `reh-web` build, base of the workspace image |
 | [linuxserver/vscodium-web](https://github.com/linuxserver/docker-vscodium-web) image | 1.126.04524-ls35 | GPL-3.0 | base image, unmodified |
-| [Eclipse Temurin JDK](https://adoptium.net/) | 17.0.15+6 | GPL-2.0 with Classpath Exception | installed in the workspace image |
+| [Eclipse Temurin JDK](https://adoptium.net/) | 17.0.15+6 and 21.0.12.1+1 | GPL-2.0 with Classpath Exception | project/simulation and JDT LS runtimes in the workspace image |
 | [WPILib](https://github.com/wpilibsuite/allwpilib) | 2026 | BSD-3-Clause | jars primed into the workspace image's Gradle cache |
 | [vscode-wpilib](https://github.com/wpilibsuite/vscode-wpilib) | 2026.1.1 | BSD-3-Clause | extension bundled in the workspace image |
 | [AdvantageKit](https://github.com/Mechanical-Advantage/AdvantageKit) | — | BSD-3-Clause | referenced by the bundled `robot-starter` lesson |
-| [redhat.java](https://github.com/redhat-developer/vscode-java) | 1.38.0 | EPL-2.0 | extension bundled in the workspace image |
+| [redhat.java](https://github.com/redhat-developer/vscode-java) | 1.55.0 | EPL-2.0 | extension bundled in the workspace image |
 | [vscjava.\*](https://github.com/microsoft/vscode-java-pack) Java extensions | see Dockerfile | MIT | extensions bundled in the workspace image |
 | [vscode-spotless-gradle](https://github.com/badsyntax/vscode-spotless-gradle) | 1.2.1 | MIT | extension bundled in the workspace image |
 | [GitHub CLI](https://github.com/cli/cli) | apt `stable` | MIT | installed in the workspace image |
@@ -152,7 +152,7 @@ components themselves and are available upstream:
 
 - **`linuxserver/vscodium-web` container image** — GNU General Public License v3.0.
   <https://github.com/linuxserver/docker-vscodium-web/blob/main/LICENSE>
-- **Eclipse Temurin JDK 17** — GNU General Public License v2.0 with the Classpath
+- **Eclipse Temurin JDK 17 and 21** — GNU General Public License v2.0 with the Classpath
   Exception, which explicitly permits linking independent modules.
   <https://openjdk.org/legal/gplv2+ce.html>
 - **`redhat.java` (Language Support for Java by Red Hat)** — Eclipse Public License 2.0.

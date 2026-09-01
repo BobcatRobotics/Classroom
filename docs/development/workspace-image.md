@@ -7,7 +7,7 @@ title: Workspace Image
 
 The workspace image (`ghcr.io/mathewdunne/coderunner-workspace`) is the
 per-student container that runs
-VSCodium reh-web (`codium-server`), Java 17, and the WPILib simulation stack in a single
+VSCodium reh-web (`codium-server`), Java 17/21, and the WPILib simulation stack in a single
 Docker image. The [workspace container overview](../about/workspace-container.md)
 explains the runtime contract from the application's perspective; the
 [container README](https://github.com/mathewdunne/CodeRunner/blob/main/containers/code/README.md)
@@ -19,8 +19,9 @@ development.
 
 ## Image size
 
-The built image is approximately 2.3 GiB uncompressed. That includes JDK 17
-(~300 MB), the VSCodium reh-web runtime, nine VS Code extensions, and one
+The built image is approximately 2.65 GiB uncompressed. That includes Temurin
+17 for projects and simulation plus Temurin 21 for JDT LS (~600 MB together),
+the VSCodium reh-web runtime, nine VS Code extensions, and one
 primed Gradle/WPILib dependency-cache layer (~1.2 GiB) baked in so first builds
 inside the container take seconds rather than minutes.
 
@@ -84,8 +85,23 @@ the current acceptance case), not only the editor shell.
 
 ## Editor acceptance smoke
 
-After an editor/base-image or critical-extension change, test the real built
-image in a fresh workspace rather than relying only on the mocked E2E tier:
+After an editor/base-image or critical-extension change, run the automated
+real-image Java smoke rather than relying only on the mocked E2E tier:
+
+```bash
+bun run docker:build:workspace
+bun run e2e:workspace-java
+```
+
+The smoke starts fresh `hello-world` and `robot-starter` containers. It waits
+for JDT LS and Gradle import, launches **Run Main** through F5, verifies terminal
+output and the registered Java Debug command list, invokes **WPILib: Build
+Robot Code**, asserts that WPILib selected Java 17 for both the generated
+command and Gradle daemon, checks Java 17 classfile output, and starts/stops the
+supported `start-sim.sh` → `run-sim.sh` headless simulation path. It rejects
+Spotless/JDK failures and every `No delegateCommandHandler` occurrence.
+
+For broader editor acceptance, also check:
 
 1. Open the bundled `robot-starter` project and wait for `Java: Ready`. Confirm
    no Gradle error item appears beside it and the Gradle output contains no
@@ -102,6 +118,14 @@ image in a fresh workspace rather than relying only on the mocked E2E tier:
 
 These are intentionally built-image acceptance checks. The mocked Playwright
 tier does not load the real editor or extension webviews.
+
+Red Hat Java 1.55 and Java Test 0.46 both ship the same ASM 9.10.1 OSGi
+bundles. A fresh workspace therefore logs nonfatal "already installed" entries
+for `org.objectweb.asm`, `.tree`, and `.commons` while JDT keeps the identical
+copies already supplied by Red Hat Java. The Java Test and Java Debug command
+sets still register, and the smoke proves `resolveMainMethod` plus F5 execution.
+Treat different duplicate-bundle versions, missing command enumeration, or any
+delegate-handler error as a regression.
 
 ## Refreshing running student containers
 

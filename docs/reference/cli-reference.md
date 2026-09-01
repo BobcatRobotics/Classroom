@@ -126,4 +126,5 @@ avoids needing either form for the first admin — see
 | `e2e:ui` | Opens the Playwright UI for interactive E2E debugging. |
 | `e2e:debug` | Runs E2E tests with `PWDEBUG=1` for step-through debugging. |
 | `e2e:security` | Runs Playwright security specs (~8 tests): CSRF, XSS, response headers. |
+| `e2e:workspace-java` | Runs the targeted real-container VSCodium/JDT/Java/WPILib smoke. Requires Docker and a locally built workspace image; intentionally outside `verify`. |
 | `e2e:report` | Opens the last Playwright HTML report. |

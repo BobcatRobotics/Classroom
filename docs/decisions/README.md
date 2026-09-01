@@ -12,6 +12,7 @@ Record active architecture decisions here.
 - [`035-multi-arch-images-and-workflow-split.md`](035-multi-arch-images-and-workflow-split.md) — both images publish linux/amd64 + linux/arm64 manifest lists built on native runners and merged by digest; the single deploy pipeline splits into CI (verify on PR/main), Release (on `v*` tag push), and Deploy (manual dispatch of a published tag); the emsdk stage builds once on amd64 and feeds the arm64 control build via a named build context.
 - [`036-vscodium-web-migration.md`](036-vscodium-web-migration.md) — the workspace editor moves from the abandoned openvscode-server to VSCodium `reh-web` via `linuxserver/vscodium-web`; chosen over `code-server` because `codium-server` keeps `--server-base-path`, so the pass-through proxy contract survives unchanged.
 - [`037-gradle-wrapper-alias-and-extension-pins.md`](037-gradle-wrapper-alias-and-extension-pins.md) — shares the primed Gradle distribution across wrapper layouts, enforces the pinned extension manifest, and disables workspace trust in the hosted workbench.
+- [`038-java-tooling-compatibility-and-smoke.md`](038-java-tooling-compatibility-and-smoke.md) — runs JDT LS on Java 21 while preserving the Java 17 WPILib path, reconciles managed extension pins, and adds a real-container Java smoke.
 
 ## Archive
 
