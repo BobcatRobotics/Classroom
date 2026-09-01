@@ -1,4 +1,4 @@
-import { constants as fsConstants } from "node:fs";
+import { existsSync, constants as fsConstants } from "node:fs";
 import {
 	lstat,
 	mkdir,
@@ -102,6 +102,39 @@ async function isRealPathInsideProject(
 ): Promise<boolean> {
 	const real = await realpath(dir).catch(() => null);
 	return real !== null && isInsideDirectory(realProjectRoot, real);
+}
+
+/**
+ * Whether this host exposes `/proc/self/fd`, which is what lets us resolve an
+ * open descriptor back to the file it actually refers to. Linux (every
+ * deployment target, and the CI/dev containers) has it; macOS does not, and
+ * Node exposes no portable equivalent.
+ */
+const HAS_PROC_SELF_FD = existsSync("/proc/self/fd");
+
+/**
+ * Confirm the file an open descriptor actually refers to lives inside the
+ * real project root.
+ *
+ * The directory-component checks are path-based, which makes them
+ * check-then-use: a student can write to their own deploy dir, so they can
+ * swap a real directory for a symlink in the window between the check and the
+ * open and have the open resolve somewhere else entirely. Resolving the
+ * descriptor we already hold closes that race — it names the inode we opened,
+ * which cannot be re-pointed underneath us.
+ *
+ * Returns true on a host without `/proc` rather than failing closed: there the
+ * path-based checks are all we have, and refusing every write would be worse
+ * than the race. Deployments run on Linux, where the check is live.
+ */
+async function isOpenFileInsideProject(
+	fd: number,
+	realProjectRoot: string,
+): Promise<boolean> {
+	if (!HAS_PROC_SELF_FD) {
+		return true;
+	}
+	return isRealPathInsideProject(`/proc/self/fd/${fd}`, realProjectRoot);
 }
 
 type SnapshotBudget = {
@@ -246,14 +279,17 @@ export async function deployFileWriteResponse(
 	// Final-component check: O_NOFOLLOW refuses to open through a symlink
 	// left as the last path segment, so a planted symlink can't be used to
 	// overwrite an arbitrary file the control-plane user can write.
+	//
+	// O_TRUNC is deliberately absent: the checks above are path-based and so
+	// lose a race against a directory swapped for a symlink mid-request. If
+	// that happens we want to have opened the wrong file, not to have already
+	// emptied it — the descriptor check below catches it while the contents
+	// are still intact.
 	let handle: Awaited<ReturnType<typeof open>>;
 	try {
 		handle = await open(
 			target,
-			fsConstants.O_WRONLY |
-				fsConstants.O_CREAT |
-				fsConstants.O_TRUNC |
-				fsConstants.O_NOFOLLOW,
+			fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW,
 		);
 	} catch (error) {
 		const code = (error as NodeJS.ErrnoException).code;
@@ -263,6 +299,10 @@ export async function deployFileWriteResponse(
 		throw error;
 	}
 	try {
+		if (!(await isOpenFileInsideProject(handle.fd, realProjectRoot))) {
+			return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+		}
+		await handle.truncate(0);
 		await handle.writeFile(body, "utf8");
 	} finally {
 		await handle.close();
@@ -312,6 +352,37 @@ export async function deployFileDeleteResponse(
 	if (!fileLstat.isFile()) {
 		return jsonResponse({ error: "File not found." }, { status: 404 });
 	}
+
+	// Same check-then-use race as the write path, narrowed the same way: open
+	// the target and confirm the descriptor resolves inside the project before
+	// unlinking. Node exposes no `unlinkat`, so the gap between this check and
+	// the `rm` below cannot be closed entirely — the residual is unlinking a
+	// leaf the caller already named, not the arbitrary overwrite the write path
+	// would otherwise allow.
+	let deleteHandle: Awaited<ReturnType<typeof open>>;
+	try {
+		deleteHandle = await open(
+			target,
+			fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW,
+		);
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === "ELOOP") {
+			return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+		}
+		if (code === "ENOENT") {
+			return jsonResponse({ error: "File not found." }, { status: 404 });
+		}
+		throw error;
+	}
+	try {
+		if (!(await isOpenFileInsideProject(deleteHandle.fd, realProjectRoot))) {
+			return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+		}
+	} finally {
+		await deleteHandle.close();
+	}
+
 	await rm(target);
 	return jsonResponse({ ok: true });
 }

@@ -151,6 +151,46 @@ describe("PUT /u/:slug/api/deploy-files/:path", () => {
 		);
 	});
 
+	test("overwriting a longer file leaves no trailing bytes", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const cookie = cookieFrom(await login(app, "alice"));
+				const url = `http://localhost/u/alice/api/deploy-files/${PP}/paths/Overwrite.path`;
+				const target = join(
+					workspaceProjectPath(app, "alice"),
+					PP,
+					"paths",
+					"Overwrite.path",
+				);
+
+				const first = await app.fetch(
+					new Request(url, {
+						method: "PUT",
+						headers: { cookie },
+						body: '{"waypoints": [1, 2, 3, 4, 5, 6, 7, 8]}',
+					}),
+				);
+				expect(first.status).toBe(200);
+
+				// The write path opens without O_TRUNC (so a lost symlink race
+				// can't destroy a file before the descriptor check runs) and
+				// truncates afterwards instead. Drop that truncate and this
+				// shorter body would leave the tail of the longer one behind.
+				const second = await app.fetch(
+					new Request(url, {
+						method: "PUT",
+						headers: { cookie },
+						body: "{}",
+					}),
+				);
+				expect(second.status).toBe(200);
+				expect(await readFile(target, "utf8")).toBe("{}");
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
 	test("handles URL-encoded names with spaces", async () => {
 		const docker = createFakeDocker();
 		await withApp(
