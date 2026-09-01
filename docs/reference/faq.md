@@ -40,7 +40,7 @@ VS Code installed on their own devices.
 
 For a real team deployment, students sign in with GitHub or Google, whichever OAuth provider you configure. You control who is allowed in via an email/domain allowlist. No accounts are created in advance; students sign in with their existing provider accounts, and their workspace is created automatically on first login.
 
-For a solo evaluation or demo, start the demo stack (`CODERUNNER_DEMO_MODE=1 docker compose up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick start](../quick-start.md) and [About demo mode](../quick-start.md#about-demo-mode).
+For a solo evaluation or demo, start the demo stack (`CODERUNNER_DEMO_MODE=1 docker compose up`, or `bun run demo:docker`). Demo mode bypasses all authentication. See [Quick Start](../quick-start.md).
 
 ### What happens to a student's work when they switch lessons?
 
