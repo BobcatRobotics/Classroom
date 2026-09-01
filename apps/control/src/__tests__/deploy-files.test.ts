@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DeployFilesSnapshotResponse } from "@frc-coderunner/contracts";
 import {
@@ -86,6 +86,37 @@ describe("GET /u/:slug/api/deploy-files/snapshot", () => {
 					}),
 				);
 				expect(resp.status).toBe(403);
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
+	test("caps the aggregate snapshot size, truncating rather than 500ing", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const cookie = cookieFrom(await login(app, "alice"));
+				const projectPath = workspaceProjectPath(app, "alice");
+				const pathsDir = join(projectPath, PP, "paths");
+				await mkdir(pathsDir, { recursive: true });
+
+				// 30 * 1 MiB comfortably exceeds the 25 MiB aggregate cap, while
+				// each file stays well under the 5 MiB per-file cap.
+				const oneMib = "x".repeat(1024 * 1024);
+				for (let i = 0; i < 30; i += 1) {
+					await writeFile(join(pathsDir, `Big${i}.path`), oneMib, "utf8");
+				}
+
+				const resp = await app.fetch(
+					new Request("http://localhost/u/alice/api/deploy-files/snapshot", {
+						headers: { cookie },
+					}),
+				);
+				expect(resp.status).toBe(200);
+				const body = (await resp.json()) as DeployFilesSnapshotResponse;
+				expect(body.ok).toBe(true);
+				expect(body.files.length).toBeGreaterThan(0);
+				expect(body.files.length).toBeLessThan(30);
 			},
 			{ dockerRunner: docker.runner },
 		);
@@ -229,6 +260,87 @@ describe("PUT /u/:slug/api/deploy-files/:path", () => {
 			{ dockerRunner: docker.runner },
 		);
 	});
+
+	test("rejects a symlink as the final path component, leaving the real target unchanged", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app, root) => {
+				const cookie = cookieFrom(await login(app, "alice"));
+				const projectPath = workspaceProjectPath(app, "alice");
+				await mkdir(join(projectPath, PP, "paths"), { recursive: true });
+
+				// A file the control-plane process can write but that lives
+				// entirely outside this student's project — the shared DB in
+				// spirit, a plain file in practice.
+				const outsideFile = join(root, "outside-target.db");
+				await writeFile(outsideFile, "untouched", "utf8");
+
+				// Plant a symlink as the final path component: a student with
+				// terminal/Gradle-task access to their own container could do
+				// exactly this from inside the read-write bind mount.
+				const evilPath = join(projectPath, PP, "paths", "Evil.path");
+				await symlink(outsideFile, evilPath);
+
+				const resp = await app.fetch(
+					new Request(
+						`http://localhost/u/alice/api/deploy-files/${PP}/paths/Evil.path`,
+						{
+							method: "PUT",
+							headers: { cookie },
+							body: '{"pwned": true}',
+						},
+					),
+				);
+				expect(resp.status).toBe(403);
+
+				const outsideContent = await readFile(outsideFile, "utf8");
+				expect(outsideContent).toBe("untouched");
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
+	test("rejects a directory symlink as an intermediate path component, leaving files outside the project unchanged", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app, root) => {
+				const cookie = cookieFrom(await login(app, "alice"));
+				const projectPath = workspaceProjectPath(app, "alice");
+				await mkdir(join(projectPath, PP), { recursive: true });
+
+				// A directory outside this student's project — could be another
+				// student's project root, or any control-plane-writable dir.
+				const outsideDir = join(root, "outside-project");
+				await mkdir(outsideDir, { recursive: true });
+				const victimFile = join(outsideDir, "Victim.path");
+				await writeFile(victimFile, "untouched", "utf8");
+
+				// Plant a directory symlink as an intermediate path component.
+				const evilDir = join(projectPath, PP, "evil");
+				await symlink(outsideDir, evilDir);
+
+				const resp = await app.fetch(
+					new Request(
+						`http://localhost/u/alice/api/deploy-files/${PP}/evil/Victim.path`,
+						{
+							method: "PUT",
+							headers: { cookie },
+							body: '{"pwned": true}',
+						},
+					),
+				);
+				expect(resp.status).toBe(403);
+
+				const victimContent = await readFile(victimFile, "utf8");
+				expect(victimContent).toBe("untouched");
+
+				// Nothing new should have been created inside the escaped dir.
+				const newFile = join(outsideDir, "New.path");
+				await expect(readFile(newFile, "utf8")).rejects.toThrow();
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
 });
 
 describe("DELETE /u/:slug/api/deploy-files/:path", () => {
@@ -272,6 +384,37 @@ describe("DELETE /u/:slug/api/deploy-files/:path", () => {
 					),
 				);
 				expect(resp.status).toBe(403);
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
+	test("rejects a symlink as the final path component, leaving the real target unchanged", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app, root) => {
+				const cookie = cookieFrom(await login(app, "alice"));
+				const projectPath = workspaceProjectPath(app, "alice");
+				await mkdir(join(projectPath, PP, "paths"), { recursive: true });
+
+				// A file outside the project that a naive follow-and-delete
+				// would unlink, e.g. the shared database in production.
+				const outsideFile = join(root, "outside-target.db");
+				await writeFile(outsideFile, "untouched", "utf8");
+
+				const evilPath = join(projectPath, PP, "paths", "EvilDelete.path");
+				await symlink(outsideFile, evilPath);
+
+				const resp = await app.fetch(
+					new Request(
+						`http://localhost/u/alice/api/deploy-files/${PP}/paths/EvilDelete.path`,
+						{ method: "DELETE", headers: { cookie } },
+					),
+				);
+				expect(resp.status).toBe(403);
+
+				const outsideContent = await readFile(outsideFile, "utf8");
+				expect(outsideContent).toBe("untouched");
 			},
 			{ dockerRunner: docker.runner },
 		);

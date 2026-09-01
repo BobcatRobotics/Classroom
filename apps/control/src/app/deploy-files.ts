@@ -1,4 +1,13 @@
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import {
+	lstat,
+	mkdir,
+	open,
+	readdir,
+	realpath,
+	rm,
+	stat,
+} from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 import {
 	DEPLOY_FILES_READ_ROOTS,
@@ -18,6 +27,17 @@ const log = getLogger("deploy-files");
  * not ours to sync.
  */
 const MAX_DEPLOY_FILE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Aggregate ceilings for a single snapshot response. Workspace containers
+ * have no disk quota, so without these a student could fill the deploy dir
+ * with GBs and force the control plane to buffer and JSON.stringify all of
+ * it in one response, starving every other student it's serving concurrently.
+ */
+const MAX_DEPLOY_SNAPSHOT_BYTES = 25 * 1024 * 1024;
+const MAX_DEPLOY_SNAPSHOT_FILES = 2000;
+
+const INVALID_PATH_ERROR = { error: "Invalid deploy file path." } as const;
 
 type DeployWorkspace = { project_path: string };
 
@@ -47,12 +67,59 @@ function resolveInProject(
 	return isInsideDirectory(projectRoot, target) ? target : null;
 }
 
+/**
+ * Walk up from `path` (lstat, so a symlink counts as "existing" without
+ * following it) to the nearest ancestor that actually exists on disk. Used
+ * to realpath-check for a planted directory symlink *before* `mkdir -p` has
+ * a chance to walk through it and create files on the other side.
+ */
+async function findDeepestExistingAncestor(path: string): Promise<string> {
+	let current = path;
+	for (;;) {
+		const exists = await lstat(current).then(
+			() => true,
+			() => false,
+		);
+		if (exists) {
+			return current;
+		}
+		const parent = dirname(current);
+		if (parent === current) {
+			return current;
+		}
+		current = parent;
+	}
+}
+
+/**
+ * Confirm `dir` (which must already exist) resolves, symlinks and all, to
+ * somewhere inside the real project root. Returns false on any resolution
+ * failure or escape.
+ */
+async function isRealPathInsideProject(
+	dir: string,
+	realProjectRoot: string,
+): Promise<boolean> {
+	const real = await realpath(dir).catch(() => null);
+	return real !== null && isInsideDirectory(realProjectRoot, real);
+}
+
+type SnapshotBudget = {
+	totalBytes: number;
+	fileCount: number;
+	truncated: boolean;
+};
+
 async function collectFiles(
 	directory: string,
 	rootDir: string,
 	rootPrefix: string,
 	out: DeployFile[],
+	budget: SnapshotBudget,
 ): Promise<void> {
+	if (budget.truncated) {
+		return;
+	}
 	const entries = await readdir(directory, { withFileTypes: true }).catch(
 		() => null,
 	);
@@ -60,20 +127,45 @@ async function collectFiles(
 		return;
 	}
 	for (const entry of entries) {
+		if (budget.truncated) {
+			return;
+		}
 		if (entry.name.startsWith(".")) {
 			continue;
 		}
 		const absolutePath = resolve(directory, entry.name);
 		if (entry.isDirectory()) {
-			await collectFiles(absolutePath, rootDir, rootPrefix, out);
+			await collectFiles(absolutePath, rootDir, rootPrefix, out, budget);
 			continue;
 		}
 		if (!entry.isFile()) {
 			continue;
 		}
 		const fileStat = await stat(absolutePath).catch(() => null);
-		if (!fileStat || fileStat.size > MAX_DEPLOY_FILE_BYTES) {
+		if (!fileStat) {
+			log.warn("deploy-files snapshot skipped missing file", {
+				path: absolutePath,
+			});
+			continue;
+		}
+		if (fileStat.size > MAX_DEPLOY_FILE_BYTES) {
 			log.warn("deploy-files snapshot skipped oversized file", {
+				path: absolutePath,
+			});
+			continue;
+		}
+		if (
+			budget.fileCount + 1 > MAX_DEPLOY_SNAPSHOT_FILES ||
+			budget.totalBytes + fileStat.size > MAX_DEPLOY_SNAPSHOT_BYTES
+		) {
+			budget.truncated = true;
+			return;
+		}
+		const content = await Bun.file(absolutePath)
+			.text()
+			.catch(() => null);
+		if (content === null) {
+			log.warn("deploy-files snapshot skipped unreadable file", {
 				path: absolutePath,
 			});
 			continue;
@@ -81,8 +173,10 @@ async function collectFiles(
 		const rel = relative(rootDir, absolutePath).split(sep).join("/");
 		out.push({
 			path: `${rootPrefix}/${rel}`,
-			content: await Bun.file(absolutePath).text(),
+			content,
 		});
+		budget.fileCount += 1;
+		budget.totalBytes += fileStat.size;
 	}
 }
 
@@ -90,9 +184,19 @@ export async function deployFilesSnapshotResponse(
 	workspace: DeployWorkspace,
 ): Promise<Response> {
 	const files: DeployFile[] = [];
+	const budget: SnapshotBudget = {
+		totalBytes: 0,
+		fileCount: 0,
+		truncated: false,
+	};
 	for (const root of DEPLOY_FILES_READ_ROOTS) {
 		const rootDir = resolve(workspace.project_path, root);
-		await collectFiles(rootDir, rootDir, root, files);
+		await collectFiles(rootDir, rootDir, root, files, budget);
+	}
+	if (budget.truncated) {
+		log.warn("deploy-files snapshot truncated by aggregate cap", {
+			projectPath: workspace.project_path,
+		});
 	}
 	return jsonResponse({ ok: true, files });
 }
@@ -114,13 +218,55 @@ export async function deployFileWriteResponse(
 	}
 	const target = resolveInProject(workspace, path);
 	if (!target) {
-		return jsonResponse(
-			{ error: "Invalid deploy file path." },
-			{ status: 400 },
-		);
+		return jsonResponse(INVALID_PATH_ERROR, { status: 400 });
 	}
-	await mkdir(dirname(target), { recursive: true });
-	await writeFile(target, body, "utf8");
+
+	const projectRoot = resolve(workspace.project_path);
+	const realProjectRoot = await realpath(projectRoot).catch(() => projectRoot);
+	const targetDir = dirname(target);
+
+	// Directory-component check #1: before creating anything, confirm the
+	// deepest ancestor that already exists (lstat, so a planted symlink
+	// counts) resolves inside the real project root. This must happen before
+	// `mkdir -p`, which would otherwise happily walk through a directory
+	// symlink and create files on the other side of it.
+	const deepestExisting = await findDeepestExistingAncestor(targetDir);
+	if (!(await isRealPathInsideProject(deepestExisting, realProjectRoot))) {
+		return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+	}
+
+	await mkdir(targetDir, { recursive: true });
+
+	// Directory-component check #2: re-check after mkdir in case the walk
+	// itself resolved through something unexpected.
+	if (!(await isRealPathInsideProject(targetDir, realProjectRoot))) {
+		return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+	}
+
+	// Final-component check: O_NOFOLLOW refuses to open through a symlink
+	// left as the last path segment, so a planted symlink can't be used to
+	// overwrite an arbitrary file the control-plane user can write.
+	let handle: Awaited<ReturnType<typeof open>>;
+	try {
+		handle = await open(
+			target,
+			fsConstants.O_WRONLY |
+				fsConstants.O_CREAT |
+				fsConstants.O_TRUNC |
+				fsConstants.O_NOFOLLOW,
+		);
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === "ELOOP" || code === "EEXIST") {
+			return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+		}
+		throw error;
+	}
+	try {
+		await handle.writeFile(body, "utf8");
+	} finally {
+		await handle.close();
+	}
 	return jsonResponse({ ok: true });
 }
 
@@ -136,13 +282,34 @@ export async function deployFileDeleteResponse(
 	}
 	const target = resolveInProject(workspace, path);
 	if (!target) {
-		return jsonResponse(
-			{ error: "Invalid deploy file path." },
-			{ status: 400 },
-		);
+		return jsonResponse(INVALID_PATH_ERROR, { status: 400 });
 	}
-	const fileStat = await stat(target).catch(() => null);
-	if (!fileStat || !fileStat.isFile()) {
+
+	const projectRoot = resolve(workspace.project_path);
+	const realProjectRoot = await realpath(projectRoot).catch(() => projectRoot);
+	const targetDir = dirname(target);
+
+	// Directory-component check: a planted directory symlink could make the
+	// lexical target land inside the project while its real location is
+	// elsewhere, e.g. shared across students.
+	const realTargetDir = await realpath(targetDir).catch(() => null);
+	if (!realTargetDir) {
+		return jsonResponse({ error: "File not found." }, { status: 404 });
+	}
+	if (!isInsideDirectory(realProjectRoot, realTargetDir)) {
+		return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+	}
+
+	// Final-component check: lstat has symlink semantics, so a planted
+	// symlink is refused instead of followed-and-deleted.
+	const fileLstat = await lstat(target).catch(() => null);
+	if (!fileLstat) {
+		return jsonResponse({ error: "File not found." }, { status: 404 });
+	}
+	if (fileLstat.isSymbolicLink()) {
+		return jsonResponse(INVALID_PATH_ERROR, { status: 403 });
+	}
+	if (!fileLstat.isFile()) {
 		return jsonResponse({ error: "File not found." }, { status: 404 });
 	}
 	await rm(target);
