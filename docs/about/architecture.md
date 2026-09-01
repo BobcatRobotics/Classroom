@@ -7,7 +7,8 @@ title: Architecture
 
 CodeRunner is a self-hosted web application that gives each student a full
 Java IDE and an FRC robot simulator in the browser. There is no software for
-students to install: they open a URL, sign in, write code, and click **Run**.
+students to install: they open a URL, sign in, write code, and click **Start**
+in the built-in Driver Station.
 
 At a high level there are three moving parts:
 
@@ -137,10 +138,9 @@ container side of this contract.
 
 ## Where to go next
 
-- [The Student Experience](./student-experience.md): what a student actually
-  sees and does.
+- [Using CodeRunner](../using-coderunner.md): the short student guide.
 - [The Workspace Container](./workspace-container.md): what is inside each
   student container.
 - [Security Model](./security-model.md): how access is gated and isolated.
-- [Quick Start](../quick-start.md): try it locally.
+- [Quick Start (Installation)](../quick-start.md): try it locally.
 - [Deploying](../deploying/overview.md): run it for a real team.

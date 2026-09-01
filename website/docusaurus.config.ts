@@ -111,7 +111,8 @@ const config: Config = {
         {
           title: 'Docs',
           items: [
-            {label: 'Quick Start', to: '/quick-start'},
+            {label: 'Using CodeRunner', to: '/using-coderunner'},
+            {label: 'Quick Start (Installation)', to: '/quick-start'},
             {label: 'Architecture', to: '/about/architecture'},
             {label: 'Deploying', to: '/deploying/overview'},
           ],

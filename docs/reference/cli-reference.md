@@ -12,7 +12,7 @@ All scripts are run from the repo root with `bun run NAME` and require Bun 1.3.1
 | Script | What it does |
 |--------|-------------|
 | `start` | Applies pending database migrations, then starts the control plane. The normal way to run CodeRunner from source. |
-| `demo` | Applies migrations, then starts the control plane in demo mode (`--demo`), from source. Auth is bypassed and every visitor shares one admin workspace — for local evaluation only. See [Quick Start](../quick-start.md). |
+| `demo` | Applies migrations, then starts the control plane in demo mode (`--demo`), from source. Auth is bypassed and every visitor shares one admin workspace — for local evaluation only. See [Quick Start (Installation)](../quick-start.md). |
 | `demo:docker` | Runs the containerized demo stack: `CODERUNNER_DEMO_MODE=1 docker compose up`. The containerized equivalent of `demo`. |
 | `dev:control` | Starts the control plane with `--watch` so it restarts automatically when source files change. Use during backend development. Always runs in port mode, regardless of `FRC_CONTAINER_NETWORK`. |
 | `dev:web` | Starts the Vite dev server for the React web shell with HMR. Use alongside `dev:control` during frontend development. |

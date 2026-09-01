@@ -8,7 +8,7 @@ title: Overview
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-CodeRunner is a self-hosted, browser-based IDE for teaching FRC robot programming. Students open a web page, log in, write Java in a real VS Code editor, click **Run**, and watch their robot simulate in real time. There is nothing to install on a student's machine and no per-laptop setup to maintain. Everything runs on a machine you control and is delivered through the browser.
+CodeRunner is a self-hosted, browser-based IDE for teaching FRC robot programming. Students open a web page, log in, write Java in a real VS Code editor, and simulate their robot from the built-in Driver Station. There is nothing to install on a student's machine and no per-laptop setup to maintain. Everything runs on a machine you control and is delivered through the browser.
 
 <video
   autoPlay
@@ -28,11 +28,22 @@ CodeRunner is a self-hosted, browser-based IDE for teaching FRC robot programmin
   <source src={useBaseUrl('/img/screenshots/hero-overview.mp4')} type="video/mp4" />
 </video>
 
+## How to use CodeRunner
+
+1. Click **Switch project** and load a lesson or import a team project.
+2. Follow the lesson instructions or open the files you want to edit.
+3. Click **Start** in the Driver Station at the bottom of the page.
+4. When robot code and communications are ready, choose a mode and click **Enable**.
+
+Use CodeRunner's **Start** button for robot projects, not the WPILib extension's simulation command. Console lessons are the exception: run those with the editor's ▷ button.
+
+[Read the short student guide →](./using-coderunner.md)
+
 ## What students get
 
 - **A real VS Code editor in the browser.** Each student works in VSCodium with the Java and WPILib extensions already installed, so they get auto-import, code completion, Ctrl-click into library classes, and inline diagnostics, the same tooling a mentor would use locally.
 - **An isolated workspace per student.** Every student gets their own Docker container, so one person's broken build or runaway process never affects anyone else.
-- **One-click simulation with a built-in Driver Station.** Clicking Run builds the project and starts a WPILib simulation. A Driver Station UI is built into the page for enabling the robot, switching modes, and driving with a gamepad.
+- **One-click simulation with a built-in Driver Station.** Clicking **Start** builds the project and starts a WPILib simulation. The Driver Station UI lets students enable the robot, switch modes, and drive with a gamepad.
 - **Live telemetry.** Robot data streams into an embedded AdvantageScope view, so students can see what their code is actually doing as it runs.
 
 ## Lessons and team projects
@@ -78,7 +89,8 @@ A recorded overview of CodeRunner, with some basic demos and high-level info on 
 
 ## Next steps
 
-- [Quick Start](./quick-start.md): get a demo instance running locally in a few commands.
-- [About CodeRunner](./about/architecture.md): how the pieces fit together and what the [student experience](./about/student-experience.md) looks like.
+- [Using CodeRunner](./using-coderunner.md): load a project, edit code, and run a simulation.
+- [Quick Start (Installation)](./quick-start.md): get a demo instance running locally in a few commands.
+- [About CodeRunner](./about/architecture.md): how the pieces fit together.
 - [Deploying](./deploying/overview.md): set up a real, multi-user instance with login.
 - [Lessons](./lessons/overview.md): what the bundled lessons cover and how to author your own.

@@ -113,8 +113,8 @@ For broader editor acceptance, also check:
 3. Open the **WPILib Vendor Dependencies** activity. Confirm the installed
    vendordeps render (not only the static **Update All** button), then use its
    refresh action once.
-4. Run the project through CodeRunner and confirm the normal build/simulation
-   path still starts.
+4. Click **Start** in CodeRunner's Driver Station and confirm the normal
+   build/simulation path starts.
 
 These are intentionally built-image acceptance checks. The mocked Playwright
 tier does not load the real editor or extension webviews.
