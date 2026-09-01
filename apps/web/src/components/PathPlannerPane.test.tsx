@@ -18,9 +18,12 @@ describe("PathPlannerPane", () => {
 		expect(screen.queryByText(/Loading PathPlanner/)).toBeNull();
 	});
 
-	test("renders no iframe without a slug", () => {
+	test("renders a calm empty state without a slug, not a stuck spinner", () => {
 		render(<PathPlannerPane workspaceSlug={null} />);
 		expect(screen.queryByTitle("PathPlanner")).toBeNull();
-		expect(screen.getByText(/Loading PathPlanner/)).toBeInTheDocument();
+		expect(screen.queryByText(/Loading PathPlanner/)).toBeNull();
+		expect(
+			screen.getByText(/PathPlanner is not available for this module/),
+		).toBeInTheDocument();
 	});
 });

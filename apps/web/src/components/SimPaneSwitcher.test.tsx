@@ -69,4 +69,54 @@ describe("SimPaneSwitcher", () => {
 			"true",
 		);
 	});
+
+	test("wires each tab to its panel via aria-controls/aria-labelledby", () => {
+		render(
+			<SimPaneSwitcher
+				scope={<div>scope-pane</div>}
+				pathplanner={<div>pathplanner-pane</div>}
+			/>,
+		);
+
+		const scopeTab = screen.getByRole("tab", { name: "AdvantageScope" });
+		const pathplannerTab = screen.getByRole("tab", { name: "PathPlanner" });
+		const [scopePanel, pathplannerPanel] = screen.getAllByRole("tabpanel", {
+			hidden: true,
+		});
+
+		expect(scopeTab).toHaveAttribute("aria-controls", scopePanel.id);
+		expect(scopePanel).toHaveAttribute("aria-labelledby", scopeTab.id);
+		expect(pathplannerTab).toHaveAttribute(
+			"aria-controls",
+			pathplannerPanel.id,
+		);
+		expect(pathplannerPanel).toHaveAttribute(
+			"aria-labelledby",
+			pathplannerTab.id,
+		);
+	});
+
+	test("ArrowRight from AdvantageScope selects and focuses PathPlanner", () => {
+		render(
+			<SimPaneSwitcher
+				scope={<div>scope-pane</div>}
+				pathplanner={<div>pathplanner-pane</div>}
+			/>,
+		);
+
+		const scopeTab = screen.getByRole("tab", { name: "AdvantageScope" });
+		const pathplannerTab = screen.getByRole("tab", { name: "PathPlanner" });
+
+		expect(scopeTab).toHaveAttribute("tabindex", "0");
+		expect(pathplannerTab).toHaveAttribute("tabindex", "-1");
+
+		fireEvent.keyDown(scopeTab.parentElement as HTMLElement, {
+			key: "ArrowRight",
+		});
+
+		expect(pathplannerTab).toHaveAttribute("aria-selected", "true");
+		expect(pathplannerTab).toHaveAttribute("tabindex", "0");
+		expect(scopeTab).toHaveAttribute("tabindex", "-1");
+		expect(pathplannerTab).toHaveFocus();
+	});
 });

@@ -31,11 +31,18 @@ export const PathPlannerPane = forwardRef<
 					onLoad={handleLoad}
 				/>
 			)}
-			{(!iframeLoaded || workspaceSlug === null) && (
+			{workspaceSlug !== null && !iframeLoaded && (
 				<div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card">
 					<Loader2 className="size-8 animate-spin text-muted-foreground" />
 					<span className="font-mono text-sm text-muted-foreground">
 						Loading PathPlanner…
+					</span>
+				</div>
+			)}
+			{workspaceSlug === null && (
+				<div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card">
+					<span className="font-mono text-sm text-muted-foreground">
+						PathPlanner is not available for this module.
 					</span>
 				</div>
 			)}
