@@ -226,7 +226,9 @@ export function WorkspacePage() {
 				scope={
 					<SimPanePanels
 						scope={<ScopePane ref={scopeFrameRef} />}
-						pathplanner={<PathPlannerPane workspaceSlug={simSlug} />}
+						pathplanner={
+							<PathPlannerPane key={reloadNonce} workspaceSlug={simSlug} />
+						}
 					/>
 				}
 				driverStation={

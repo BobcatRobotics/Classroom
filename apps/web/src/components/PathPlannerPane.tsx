@@ -9,8 +9,6 @@ interface PathPlannerPaneProps {
  * Iframe host for the PathPlanner web build served at /pathplanner/. The
  * app inside reads `?ws=<slug>` to address its deploy-files API base; the
  * session cookie (same origin) authenticates those calls.
- *
- * NOTE: not yet mounted anywhere — see TODO(pathplanner) in WorkspacePage.
  */
 export const PathPlannerPane = forwardRef<
 	HTMLIFrameElement,
