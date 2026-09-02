@@ -4,7 +4,9 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { DriverStation } from "@/components/DriverStation";
 import { EditorPane } from "@/components/EditorPane";
 import { IDELayout } from "@/components/IDELayout";
+import { PathPlannerPane } from "@/components/PathPlannerPane";
 import { ScopePane } from "@/components/ScopePane";
+import { SimPanePanels, SimPaneTabs } from "@/components/SimPaneSwitcher";
 import { SwitchProjectDialog } from "@/components/SwitchProjectDialog";
 import { Topbar } from "@/components/Topbar";
 import { useAutoChoosers } from "@/hooks/useAutoChoosers";
@@ -199,7 +201,7 @@ export function WorkspacePage() {
 		sessionState.status === "error" ? sessionState.message : undefined;
 
 	return (
-		<div className="flex h-screen flex-col bg-background">
+		<SimPaneTabs className="flex h-screen flex-col gap-0 bg-background">
 			{isDemo && <DemoBanner />}
 			<Topbar
 				displayName={displayName}
@@ -207,6 +209,7 @@ export function WorkspacePage() {
 				avatarUrl={avatarUrl}
 				isAdmin={isAdmin}
 				onSwitchProject={() => setSwitchOpen(true)}
+				showSimPaneTabs={!isConsoleModule}
 			/>
 			<IDELayout
 				showSimPanels={!isConsoleModule}
@@ -220,18 +223,12 @@ export function WorkspacePage() {
 						errorDetail={editorErrorDetail}
 					/>
 				}
-				// TODO(pathplanner): once the PathPlanner integration ships
-				// end-to-end (pathplanner-web build published + verified against the
-				// deploy-files API), swap this pane for the tabbed switcher:
-				//   scope={
-				//     <SimPaneSwitcher
-				//       scope={<ScopePane ref={scopeFrameRef} />}
-				//       pathplanner={<PathPlannerPane workspaceSlug={simSlug} />}
-				//     />
-				//   }
-				// Components + tests already exist: SimPaneSwitcher.tsx,
-				// PathPlannerPane.tsx.
-				scope={<ScopePane ref={scopeFrameRef} />}
+				scope={
+					<SimPanePanels
+						scope={<ScopePane ref={scopeFrameRef} />}
+						pathplanner={<PathPlannerPane workspaceSlug={simSlug} />}
+					/>
+				}
 				driverStation={
 					<DriverStation
 						simulationStatus={simulation.status}
@@ -271,6 +268,6 @@ export function WorkspacePage() {
 				currentModule={currentModule}
 				onSwapComplete={onSwapComplete}
 			/>
-		</div>
+		</SimPaneTabs>
 	);
 }

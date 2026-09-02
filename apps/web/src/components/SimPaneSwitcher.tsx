@@ -1,19 +1,17 @@
-import type { KeyboardEvent, ReactNode } from "react";
-import { useCallback, useRef, useState } from "react";
+import type { TabsTab } from "@base-ui/react/tabs";
+import type { ReactNode } from "react";
+import { useCallback, useState } from "react";
+import {
+	Tabs,
+	TabsContent,
+	TabsIndicator,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs";
 
 type SimPaneTab = "scope" | "pathplanner";
 
 const STORAGE_KEY = "coderunner:sim-pane-tab";
-
-const TAB_IDS: Record<SimPaneTab, string> = {
-	scope: "sim-pane-tab-scope",
-	pathplanner: "sim-pane-tab-pathplanner",
-};
-
-const PANEL_IDS: Record<SimPaneTab, string> = {
-	scope: "sim-pane-panel-scope",
-	pathplanner: "sim-pane-panel-pathplanner",
-};
 
 function readStoredTab(): SimPaneTab {
 	try {
@@ -25,119 +23,71 @@ function readStoredTab(): SimPaneTab {
 	}
 }
 
-interface SimPaneSwitcherProps {
-	scope: ReactNode;
-	pathplanner: ReactNode;
+interface SimPaneTabsProps {
+	className?: string;
+	children: ReactNode;
 }
 
 /**
- * Tab toggle for the right-hand sim pane: AdvantageScope or PathPlanner.
- * Both children stay mounted — the hidden PathPlanner iframe holds an
- * in-memory working copy and a save queue that unmounting would discard.
- *
- * Implements the WAI-ARIA tabs pattern (tab/tabpanel association, roving
- * tabindex, Left/Right arrow navigation) for the two fixed tabs.
- *
- * NOTE: not yet mounted anywhere — see TODO(pathplanner) in WorkspacePage.
+ * Tabs root for the right-hand sim pane: AdvantageScope (default) or
+ * PathPlanner. The selector lives in the topbar and the panels live in the
+ * sim pane, so the root has to wrap both — hence a page-level provider.
+ * The choice persists for the session.
  */
-export function SimPaneSwitcher({ scope, pathplanner }: SimPaneSwitcherProps) {
-	const [active, setActive] = useState<SimPaneTab>(readStoredTab);
-	const tabRefs = useRef<Record<SimPaneTab, HTMLButtonElement | null>>({
-		scope: null,
-		pathplanner: null,
-	});
+export function SimPaneTabs({ className, children }: SimPaneTabsProps) {
+	const [tab, setTab] = useState<SimPaneTab>(readStoredTab);
 
-	const select = useCallback((tab: SimPaneTab) => {
-		setActive(tab);
+	const onValueChange = useCallback((value: TabsTab.Value) => {
+		const next: SimPaneTab = value === "pathplanner" ? "pathplanner" : "scope";
+		setTab(next);
 		try {
-			sessionStorage.setItem(STORAGE_KEY, tab);
+			sessionStorage.setItem(STORAGE_KEY, next);
 		} catch {
 			// Session storage unavailable (private mode); the toggle still works.
 		}
 	}, []);
 
-	const selectAndFocus = useCallback(
-		(tab: SimPaneTab) => {
-			select(tab);
-			tabRefs.current[tab]?.focus();
-		},
-		[select],
+	return (
+		<Tabs value={tab} onValueChange={onValueChange} className={className}>
+			{children}
+		</Tabs>
 	);
+}
 
-	const handleKeyDown = useCallback(
-		(event: KeyboardEvent<HTMLDivElement>) => {
-			if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-				event.preventDefault();
-				selectAndFocus(active === "scope" ? "pathplanner" : "scope");
-			}
-		},
-		[active, selectAndFocus],
+/** Pill toggle rendered in the topbar. Must sit inside `SimPaneTabs`. */
+export function SimPaneTabSelector() {
+	return (
+		<TabsList aria-label="Simulation pane" variant="pill" className="p-[3px]">
+			<TabsIndicator />
+			<TabsTrigger value="scope" className="px-3 text-[12.5px]">
+				AdvantageScope
+			</TabsTrigger>
+			<TabsTrigger value="pathplanner" className="px-3 text-[12.5px]">
+				PathPlanner
+			</TabsTrigger>
+		</TabsList>
 	);
+}
 
-	const tabClass = (selected: boolean) =>
-		`px-3 py-1.5 text-[12px] font-medium border-b-2 ${
-			selected
-				? "border-primary text-foreground"
-				: "border-transparent text-muted-foreground hover:text-foreground"
-		}`;
+interface SimPanePanelsProps {
+	scope: ReactNode;
+	pathplanner: ReactNode;
+}
 
+/**
+ * The two sim panes. Both stay mounted (`keepMounted`) — the hidden iframes
+ * hold live state (an AdvantageScope session, PathPlanner's in-memory working
+ * copy and save queue) that unmounting would discard.
+ */
+export function SimPanePanels({ scope, pathplanner }: SimPanePanelsProps) {
 	return (
 		<div className="flex h-full min-h-0 flex-col">
-			<div
-				role="tablist"
-				aria-label="Simulation pane"
-				className="flex shrink-0 border-b border-border bg-card"
-				onKeyDown={handleKeyDown}
-			>
-				<button
-					ref={(el) => {
-						tabRefs.current.scope = el;
-					}}
-					id={TAB_IDS.scope}
-					type="button"
-					role="tab"
-					aria-selected={active === "scope"}
-					aria-controls={PANEL_IDS.scope}
-					tabIndex={active === "scope" ? 0 : -1}
-					className={tabClass(active === "scope")}
-					onClick={() => select("scope")}
-				>
-					AdvantageScope
-				</button>
-				<button
-					ref={(el) => {
-						tabRefs.current.pathplanner = el;
-					}}
-					id={TAB_IDS.pathplanner}
-					type="button"
-					role="tab"
-					aria-selected={active === "pathplanner"}
-					aria-controls={PANEL_IDS.pathplanner}
-					tabIndex={active === "pathplanner" ? 0 : -1}
-					className={tabClass(active === "pathplanner")}
-					onClick={() => select("pathplanner")}
-				>
-					PathPlanner
-				</button>
-			</div>
-			<div
-				id={PANEL_IDS.scope}
-				role="tabpanel"
-				aria-labelledby={TAB_IDS.scope}
-				className="min-h-0 flex-1"
-				hidden={active !== "scope"}
-			>
+			<TabsContent value="scope" keepMounted className="min-h-0 flex-1">
 				{scope}
-			</div>
-			<div
-				id={PANEL_IDS.pathplanner}
-				role="tabpanel"
-				aria-labelledby={TAB_IDS.pathplanner}
-				className="min-h-0 flex-1"
-				hidden={active !== "pathplanner"}
-			>
+			</TabsContent>
+			<TabsContent value="pathplanner" keepMounted className="min-h-0 flex-1">
 				{pathplanner}
-			</div>
+			</TabsContent>
 		</div>
 	);
 }

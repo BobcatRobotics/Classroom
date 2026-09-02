@@ -1,6 +1,23 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test } from "vitest";
-import { SimPaneSwitcher } from "./SimPaneSwitcher";
+import {
+	SimPanePanels,
+	SimPaneTabSelector,
+	SimPaneTabs,
+} from "./SimPaneSwitcher";
+
+function renderSwitcher() {
+	return render(
+		<SimPaneTabs>
+			<SimPaneTabSelector />
+			<SimPanePanels
+				scope={<div>scope-pane</div>}
+				pathplanner={<div>pathplanner-pane</div>}
+			/>
+		</SimPaneTabs>,
+	);
+}
 
 describe("SimPaneSwitcher", () => {
 	afterEach(() => {
@@ -8,12 +25,7 @@ describe("SimPaneSwitcher", () => {
 	});
 
 	test("defaults to the AdvantageScope tab with both panes mounted", () => {
-		render(
-			<SimPaneSwitcher
-				scope={<div>scope-pane</div>}
-				pathplanner={<div>pathplanner-pane</div>}
-			/>,
-		);
+		renderSwitcher();
 
 		// Both stay mounted so the hidden iframe keeps its state.
 		expect(screen.getByText("scope-pane")).toBeInTheDocument();
@@ -30,12 +42,7 @@ describe("SimPaneSwitcher", () => {
 	});
 
 	test("switches tabs and persists the choice", () => {
-		render(
-			<SimPaneSwitcher
-				scope={<div>scope-pane</div>}
-				pathplanner={<div>pathplanner-pane</div>}
-			/>,
-		);
+		renderSwitcher();
 
 		fireEvent.click(screen.getByRole("tab", { name: "PathPlanner" }));
 
@@ -58,12 +65,8 @@ describe("SimPaneSwitcher", () => {
 
 	test("restores the persisted tab", () => {
 		sessionStorage.setItem("coderunner:sim-pane-tab", "pathplanner");
-		render(
-			<SimPaneSwitcher
-				scope={<div>scope-pane</div>}
-				pathplanner={<div>pathplanner-pane</div>}
-			/>,
-		);
+		renderSwitcher();
+
 		expect(screen.getByRole("tab", { name: "PathPlanner" })).toHaveAttribute(
 			"aria-selected",
 			"true",
@@ -71,12 +74,7 @@ describe("SimPaneSwitcher", () => {
 	});
 
 	test("wires each tab to its panel via aria-controls/aria-labelledby", () => {
-		render(
-			<SimPaneSwitcher
-				scope={<div>scope-pane</div>}
-				pathplanner={<div>pathplanner-pane</div>}
-			/>,
-		);
+		renderSwitcher();
 
 		const scopeTab = screen.getByRole("tab", { name: "AdvantageScope" });
 		const pathplannerTab = screen.getByRole("tab", { name: "PathPlanner" });
@@ -96,13 +94,8 @@ describe("SimPaneSwitcher", () => {
 		);
 	});
 
-	test("ArrowRight from AdvantageScope selects and focuses PathPlanner", () => {
-		render(
-			<SimPaneSwitcher
-				scope={<div>scope-pane</div>}
-				pathplanner={<div>pathplanner-pane</div>}
-			/>,
-		);
+	test("ArrowRight moves focus and Enter activates PathPlanner", async () => {
+		renderSwitcher();
 
 		const scopeTab = screen.getByRole("tab", { name: "AdvantageScope" });
 		const pathplannerTab = screen.getByRole("tab", { name: "PathPlanner" });
@@ -110,13 +103,18 @@ describe("SimPaneSwitcher", () => {
 		expect(scopeTab).toHaveAttribute("tabindex", "0");
 		expect(pathplannerTab).toHaveAttribute("tabindex", "-1");
 
-		fireEvent.keyDown(scopeTab.parentElement as HTMLElement, {
-			key: "ArrowRight",
-		});
+		const user = userEvent.setup();
+		scopeTab.focus();
+		await user.keyboard("{ArrowRight}");
+
+		// Manual activation: arrowing only moves focus, so a keyboard user can
+		// pass over PathPlanner without swapping the pane's iframe.
+		await waitFor(() => expect(pathplannerTab).toHaveFocus());
+		expect(scopeTab).toHaveAttribute("aria-selected", "true");
+
+		await user.keyboard("{Enter}");
 
 		expect(pathplannerTab).toHaveAttribute("aria-selected", "true");
-		expect(pathplannerTab).toHaveAttribute("tabindex", "0");
-		expect(scopeTab).toHaveAttribute("tabindex", "-1");
-		expect(pathplannerTab).toHaveFocus();
+		expect(scopeTab).toHaveAttribute("aria-selected", "false");
 	});
 });
