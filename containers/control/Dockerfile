@@ -89,9 +89,11 @@ COPY --from=ascope-build /repo/dist/advantagescope /
 # `/releases/latest/download/...` indirection); pinning it to a real tag
 # once one exists both fixes the release fetched and changes the composed
 # URL text below, which busts the cache and forces a fresh download attempt.
-ARG PATHPLANNER_DIST_TAG=latest
 FROM debian:bookworm-slim AS pathplanner-dist
-ARG PATHPLANNER_DIST_TAG
+# The default belongs on the in-stage ARG: an ARG between stages is scoped to
+# the preceding stage, so a default declared there never reaches this one and
+# the tag would expand empty (composing a 404 `/download//...` URL).
+ARG PATHPLANNER_DIST_TAG=latest
 RUN apt-get update -qq \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
