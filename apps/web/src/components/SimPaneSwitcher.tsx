@@ -1,6 +1,8 @@
 import type { TabsTab } from "@base-ui/react/tabs";
 import type { ReactNode } from "react";
 import { useCallback, useState } from "react";
+import advantagescopeLogo from "@/assets/advantagescope-logo.png";
+import pathplannerLogo from "@/assets/pathplanner-logo.png";
 import {
 	Tabs,
 	TabsContent,
@@ -60,9 +62,11 @@ export function SimPaneTabSelector() {
 		<TabsList aria-label="Simulation pane" variant="pill" className="p-[3px]">
 			<TabsIndicator />
 			<TabsTrigger value="scope" className="px-3 text-[12.5px]">
+				<img src={advantagescopeLogo} alt="" className="size-4 shrink-0" />
 				AdvantageScope
 			</TabsTrigger>
 			<TabsTrigger value="pathplanner" className="px-3 text-[12.5px]">
+				<img src={pathplannerLogo} alt="" className="size-4 shrink-0" />
 				PathPlanner
 			</TabsTrigger>
 		</TabsList>
