@@ -1,4 +1,4 @@
-# 039 — PathPlanner integration (deploy-files API + dormant UI)
+# 039 — PathPlanner integration
 
 Status: **Accepted** — 2026-08-30
 
@@ -25,21 +25,27 @@ that repo (`docs/superpowers/specs/2026-08-30-coderunner-web-design.md`).
   the API calls the embedded app makes). The shell iframes
   `/pathplanner/?ws=<slug>`.
 - **Packaging**: a prebuilt `pathplanner-dist.tar.gz` from the fork's
-  GitHub releases — fetched by `scripts/fetch-dist.ts` (optional artifact)
-  and baked into the control image by a best-effort Dockerfile stage.
-  Flutter never enters this repo's toolchain. Until the fork publishes a
-  release, `/pathplanner/` serves a 503 and everything else is unaffected.
-- **UI is dormant**: `PathPlannerPane` and `SimPaneSwitcher` exist with
-  tests but are not mounted; `WorkspacePage` carries a TODO(pathplanner)
-  with the exact wiring. Both panes stay mounted when hidden so the
-  PathPlanner iframe keeps its in-memory working copy.
+  GitHub releases, fetched by `scripts/fetch-pathplanner-dist.ts` and baked
+  into the control image by a dedicated Dockerfile stage. Flutter never
+  enters this repo's toolchain. Whether a missing artifact is fatal depends
+  on the caller: it is **required** for release paths (`bun run build`, and
+  the control image whenever `PATHPLANNER_DIST_TAG` names a real release
+  tag — which `release.yml` pins so both arch builds resolve the same
+  artifact) and **optional** for demo/recovery paths (`fetch:dist`, and a
+  local `docker:build:control`, which leaves the tag at `latest`). When it
+  is skipped, `/pathplanner/` serves a 503 and everything else is
+  unaffected.
+- **UI**: a topbar tab selector switches the right-hand pane between
+  AdvantageScope and PathPlanner. Both iframes stay mounted when hidden so
+  their live state is preserved, and the selected tab persists for the browser
+  session. A project swap reloads the PathPlanner iframe to fetch the new
+  snapshot. Plain-Java console modules hide the tabs and simulation panes.
 
 ## Consequences
 
 - External edits (VSCodium, lesson load, imports) reach PathPlanner only
-  on iframe reload — accepted for v1; the shell should reload the iframe
-  on project swaps when the UI is wired.
+  on iframe reload — accepted for v1. Project swaps trigger that reload;
+  ordinary edits made in VSCodium require a manual reload.
 - NT4 telemetry/hot-reload is deferred: the NT4 proxy pins the upstream
   client name to `AdvantageScopeLite`, so a second client needs a name
   passthrough (recorded in the fork's spec).
-- User/operator docs land together with the UI wiring, not before.

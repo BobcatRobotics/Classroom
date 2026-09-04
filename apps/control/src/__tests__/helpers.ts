@@ -155,12 +155,23 @@ export async function createPathPlannerDist(root: string): Promise<string> {
 	await mkdir(pathplannerDistDir, { recursive: true });
 	await writeFile(
 		join(pathplannerDistDir, "index.html"),
-		'<!doctype html><html><head><base href="/pathplanner/"><script src="main.dart.js" defer></script></head><body>PathPlanner test dist</body></html>',
+		'<!doctype html><html><head><base href="/pathplanner/"><script src="main.dart.js" defer></script></head><body data-fake-pathplanner-ready="true">PathPlanner test dist</body></html>',
 		"utf8",
 	);
+	// Loads are counted in sessionStorage (shared with the parent page — same
+	// origin) so E2E specs can prove the iframe actually reloaded after a
+	// project swap; its `src` is unchanged by the remount, so the counter is
+	// the only observable difference.
 	await writeFile(
 		join(pathplannerDistDir, "main.dart.js"),
-		"console.log('pathplanner');\n",
+		`const key = "e2e:pathplanner-loads";
+let loads = 1;
+try {
+	loads = Number(sessionStorage.getItem(key) ?? "0") + 1;
+	sessionStorage.setItem(key, String(loads));
+} catch {}
+document.body.dataset.fakePathplannerLoads = String(loads);
+`,
 		"utf8",
 	);
 	return pathplannerDistDir;

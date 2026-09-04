@@ -74,21 +74,21 @@ COPY --from=ascope-build /repo/dist/advantagescope /
 
 # ── Stage 3b: PathPlanner web dist ─────────────────────────────────────
 # Prebuilt in the pathplanner-web fork's CI (Flutter stays out of this
-# image, same reasoning as the prebuilt ascope-dist build context). The
-# download is best-effort until that fork publishes its first release:
-# on failure the dist stays empty and /pathplanner/ serves a 503 telling
-# the operator to rebuild once the release exists.
+# image, same reasoning as the prebuilt ascope-dist build context).
 #
-# Cache hazard: this RUN layer is keyed on its inputs, which include the
-# resolved URL below. Before that fork's first release exists, the curl
-# fails and Docker still caches the resulting "WARNING: ... will 503"
-# layer. Every later build with the same inputs reuses that cached layer
-# and silently ships an empty dist forever, even after the release lands —
-# including PathPlanner's debut release, unless something in the RUN
-# command's text changes. PATHPLANNER_DIST_TAG defaults to "latest" (today's
-# `/releases/latest/download/...` indirection); pinning it to a real tag
-# once one exists both fixes the release fetched and changes the composed
-# URL text below, which busts the cache and forces a fresh download attempt.
+# PATHPLANNER_DIST_TAG doubles as the failure policy:
+#   - a real tag (what release.yml passes) is a pinned, required artifact —
+#     a failed download fails the build rather than publishing a control
+#     image that silently 503s on /pathplanner/.
+#   - the "latest" default (local `docker:build:control`) is best-effort:
+#     the dist stays empty and /pathplanner/ serves a 503 explaining how to
+#     install it, so an offline or rate-limited local build still works.
+#
+# Pinning also sidesteps a cache hazard: this RUN layer is keyed on its
+# inputs, which include the resolved URL below. With "latest" the URL text
+# never changes, so a cached layer built against an older release is reused
+# even after a newer one is published — and the amd64/arm64 jobs could
+# otherwise resolve different releases if "latest" moved between them.
 FROM debian:bookworm-slim AS pathplanner-dist
 # The default belongs on the in-stage ARG: an ARG between stages is scoped to
 # the preceding stage, so a default declared there never reaches this one and
@@ -100,12 +100,19 @@ RUN apt-get update -qq \
     && mkdir -p /pathplanner-dist \
     && if [ "$PATHPLANNER_DIST_TAG" = "latest" ]; then \
          url="https://github.com/mathewdunne/pathplanner-web/releases/latest/download/pathplanner-dist.tar.gz"; \
+         required=0; \
        else \
          url="https://github.com/mathewdunne/pathplanner-web/releases/download/${PATHPLANNER_DIST_TAG}/pathplanner-dist.tar.gz"; \
+         required=1; \
        fi \
-    && { curl -fsSL "$url" -o /tmp/pathplanner-dist.tar.gz \
-         && tar -xzf /tmp/pathplanner-dist.tar.gz -C /pathplanner-dist \
-         || echo "WARNING: PathPlanner dist unavailable; /pathplanner will 503"; }
+    && if curl -fsSL "$url" -o /tmp/pathplanner-dist.tar.gz; then \
+         tar -xzf /tmp/pathplanner-dist.tar.gz -C /pathplanner-dist; \
+       elif [ "$required" = "1" ]; then \
+         echo "ERROR: pinned PathPlanner dist $PATHPLANNER_DIST_TAG could not be downloaded from $url"; \
+         exit 1; \
+       else \
+         echo "WARNING: PathPlanner dist unavailable; /pathplanner will 503"; \
+       fi
 
 # ── Stage 4: dist export (CI only) ─────────────────────────────────────
 # A filesystem-only stage holding just the built web shell + AdvantageScope

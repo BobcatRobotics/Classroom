@@ -13,7 +13,7 @@ Record active architecture decisions here.
 - [`036-vscodium-web-migration.md`](036-vscodium-web-migration.md) — the workspace editor moves from the abandoned openvscode-server to VSCodium `reh-web` via `linuxserver/vscodium-web`; chosen over `code-server` because `codium-server` keeps `--server-base-path`, so the pass-through proxy contract survives unchanged.
 - [`037-gradle-wrapper-alias-and-extension-pins.md`](037-gradle-wrapper-alias-and-extension-pins.md) — shares the primed Gradle distribution across wrapper layouts, enforces the pinned extension manifest, and disables workspace trust in the hosted workbench.
 - [`038-java-tooling-compatibility-and-smoke.md`](038-java-tooling-compatibility-and-smoke.md) — runs JDT LS on Java 21 while preserving the Java 17 WPILib path, reconciles managed extension pins, and adds a real-container Java smoke.
-- [`039-pathplanner-integration.md`](039-pathplanner-integration.md) — additive deploy-files API (snapshot/PUT/DELETE under `src/main/deploy/pathplanner` and `src/main/deploy/choreo`, behind `requireWorkspaceOwnership`) plus a dormant PathPlanner web pane, served statically at `/pathplanner/` from an optional prebuilt dist.
+- [`039-pathplanner-integration.md`](039-pathplanner-integration.md) — serves the PathPlanner web app in a tab beside AdvantageScope and syncs its project files through an ownership-checked deploy-files API.
 
 ## Archive
 
