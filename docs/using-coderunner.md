@@ -53,8 +53,10 @@ editor. For path and auto editing basics, see the
 ![Pathplanner open alongside the editor, with a path being edited](/img/screenshots/pathplanner-overview.png)
 
 PathPlanner writes to `src/main/deploy/pathplanner/**` in the current project.
-These are ordinary project files: inspect them in VSCodium and commit them with
-Git. Files under `src/main/deploy/choreo/**` are visible but read-only.
+Files under `src/main/deploy/choreo/**` are visible but read-only.
+If you edit a PathPlanner file directly in VSCodium, refresh the CodeRunner page
+before looking for that change in PathPlanner. Switching or resetting the
+project reloads PathPlanner with the new project's files.
 
 PathPlanner robot telemetry and hot reload are not connected. Use AdvantageScope
 for simulated robot telemetry.
