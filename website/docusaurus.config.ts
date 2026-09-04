@@ -6,7 +6,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 const config: Config = {
   title: 'CodeRunner Docs',
-  tagline: 'Browser-based IDE and simulator for FRC programming training',
+  tagline: 'Browser-based IDE, simulator, telemetry, and path planning for FRC programming training',
   favicon: 'img/coderunner-icon.png',
 
   future: {
@@ -111,7 +111,8 @@ const config: Config = {
         {
           title: 'Docs',
           items: [
-            {label: 'Quick Start', to: '/quick-start'},
+            {label: 'Using CodeRunner', to: '/using-coderunner'},
+            {label: 'Quick Start (Installation)', to: '/quick-start'},
             {label: 'Architecture', to: '/about/architecture'},
             {label: 'Deploying', to: '/deploying/overview'},
           ],

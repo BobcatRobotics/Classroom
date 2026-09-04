@@ -23,6 +23,12 @@ import type { WorkspaceRuntimeProvider } from "../runtime";
 import type { AppStorage } from "../storage";
 import { webAssetResponse, webShellResponse } from "./assets";
 import {
+	deployFileDeleteResponse,
+	deployFilesSnapshotResponse,
+	deployFileWriteResponse,
+	parseDeployFilePath,
+} from "./deploy-files";
+import {
 	halsimWebSocketResponse,
 	nt4AliveResponse,
 	nt4WebSocketResponse,
@@ -484,6 +490,29 @@ export async function handleWorkspaceRoute(
 			workspace: auth.workspace,
 			userId: auth.user.id,
 		} satisfies LessonLoadSocketData);
+	}
+
+	// --- Deploy files (PathPlanner) endpoints ---
+	if (suffix === "/api/deploy-files/snapshot" && request.method === "GET") {
+		return deployFilesSnapshotResponse(auth.workspace);
+	}
+
+	if (suffix.startsWith("/api/deploy-files/")) {
+		const rawPath = suffix.slice("/api/deploy-files/".length);
+		const filePath = parseDeployFilePath(rawPath);
+		if (!filePath) {
+			return jsonResponse(
+				{ error: "Invalid deploy file path." },
+				{ status: 400 },
+			);
+		}
+		if (request.method === "PUT") {
+			return deployFileWriteResponse(auth.workspace, filePath, request);
+		}
+		if (request.method === "DELETE") {
+			return deployFileDeleteResponse(auth.workspace, filePath);
+		}
+		return jsonResponse({ error: "Method not allowed." }, { status: 405 });
 	}
 
 	// --- Import endpoints ---

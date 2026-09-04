@@ -5,9 +5,11 @@ title: Testing
 
 # Testing
 
-This page covers the test suite you'll run while working on CodeRunner. All
-tiers are runnable without Docker and without any external services. For the
-CI gate that runs all tiers in sequence, see [Development Servers](./dev-servers.md).
+This page covers the test suite you'll run while working on CodeRunner. The
+default verification tiers are runnable without Docker and without external
+services; the targeted Java workspace smoke requires Docker and a locally
+built image. For the CI gate that runs the default tiers in sequence, see
+[Development Servers](./dev-servers.md).
 For the full script list, see the [CLI reference](../reference/cli-reference.md).
 
 ## First-time setup
@@ -30,12 +32,13 @@ Runs Bun's built-in test runner across the control plane
 (`apps/control/`), shared contracts (`packages/contracts/`), scripts
 (`scripts/`), and the two frontend files that live in Bun test style
 (`apps/web/src/lib/keyboard-mapping.test.ts` and
-`keyboard-mapping.property.test.ts`). Approximately 350 tests covering:
+`keyboard-mapping.property.test.ts`). Coverage includes:
 
 - Authentication: session creation, cookie HMAC signing, allowlist enforcement, role gating
 - Proxy layer: hop-by-hop header stripping, WebSocket upgrade, base-path routing
 - Run manager: build lifecycle, timeout handling, state recovery, concurrent-run gating
 - Lessons catalog: bundled catalog load, module discovery, catalog integrity
+- PathPlanner: deploy-file access controls and static asset routing
 - Security: SSRF/path-traversal/command-injection validators, admin-route enumeration
 - Property-based tests via `fast-check`: URL validation, slug generation, contract schema round-trips, audit-filter SQL parameterization
 - Metrics: route-templating cardinality
@@ -46,12 +49,13 @@ Runs Bun's built-in test runner across the control plane
 bun run test:web
 ```
 
-Runs Vitest inside `apps/web/`. Approximately 80 tests covering:
+Runs Vitest inside `apps/web/`. Coverage includes:
 
 - React hooks: `useSession`, `useLessons`, `useSimulationState`, `useContainerStatus`, `useAutoChoosers`, `useGamepad`, `useRunChannel`
 - DriverStation components: Enable/Disable button state machine, mode switching
 - Zustand store: input-mode transitions, gamepad selection persistence
 - Keyboard and gamepad mappings
+- PathPlanner iframe URL, pane switching, keyboard navigation, and saved tab choice
 
 ### `bun run e2e`: Playwright mocked tier
 
@@ -71,6 +75,7 @@ flow, including:
 - Driver Station: enable/disable payload shape, mode switching, multi-tab sync
 - Gamepad: controller selection persistence across run cycles, unplug-while-enabled safety, pre-run no-lease behavior, keyboard tile focus gating, auto-chooser refresh on restart
 - Telemetry: AdvantageScope iframe load, NT4 per-workspace isolation
+- Sim pane tools: AdvantageScope selected first, the PathPlanner iframe mounted while hidden, tab switching without unloading it, the tab choice surviving a reload, and a project swap reloading PathPlanner
 - Admin: capacity cap enforcement, audit log entries, user management
 - Public routes: health check, OpenAPI endpoint
 
@@ -79,10 +84,28 @@ added to components are marked `test.fixme`; they appear in Playwright
 reports as expected-not-implemented markers and do not fail the suite.
 Their HTTP-layer counterparts run as normal tests.
 
-Real-container (Docker smoke) tests are intentionally not implemented.
-The unit and mocked E2E tiers already cover the logic paths; container
-behaviour (JNI loading, Gradle lock isolation, headless GUI removal) is
-upstream-owned and manually validated during image updates.
+### `bun run e2e:workspace-java`: real Java workspace smoke
+
+```bash
+bun run docker:build:workspace
+bun run e2e:workspace-java
+```
+
+Runs a targeted Playwright test against fresh containers from the real
+workspace image. It opens `hello-world` in real VSCodium, verifies that JDT LS
+uses Java 21, waits for `Java: Ready`, launches **Run Main** with F5, verifies
+`Hello, World!`, and
+asserts that JDT logs enumerate `vscode.java.resolveMainMethod` without any
+`No delegateCommandHandler` error. It then opens `robot-starter`, waits for
+the real Gradle import, invokes **WPILib: Build Robot Code**, verifies that
+WPILib generated a Java 17 command and launched its Gradle daemon on Java 17,
+rejects Spotless/JDK failures, checks Java 17 classfiles, and starts/stops the
+supported `start-sim.sh` → `run-sim.sh` path.
+
+This focused tier is intentionally outside `bun run verify`: it requires a
+Docker daemon, a prebuilt multi-gigabyte image, and several minutes. Run it
+whenever the JDK, VSCodium base, Java/WPILib extensions, or workspace startup
+logic changes.
 
 ### `bun run e2e:security`: security E2E tests
 
@@ -155,7 +178,18 @@ drive gamepad state from test code via `page.evaluate()`.
 
 `e2e/fixtures/runtime.ts`: helpers (`seedRuntimeRunning`,
 `seedRuntimeMissing`) that configure the `MockWorkspaceRuntimeProvider` with
-fake endpoint URLs pointing at the in-process fake servers.
+fake endpoint URLs pointing at the in-process fake servers, plus
+`seedWorkspaceProject` for specs that need a non-empty project (an empty one
+auto-opens the Switch Project dialog).
+
+The two tool panes are served from throwaway dists built by
+`createAdvantageScopeDist` / `createPathPlannerDist` in
+`apps/control/src/__tests__/helpers.ts` — not the real builds, so the mocked
+tier needs neither emscripten nor a PathPlanner download. The fake PathPlanner
+page counts its own loads in `sessionStorage` and publishes the count as
+`data-fake-pathplanner-loads` on `<body>`: a project swap remounts that iframe
+without changing its `src`, so the counter is the only way to observe the
+reload.
 
 ## Debugging helpers
 
@@ -177,4 +211,4 @@ The `playwright.config.ts` defines three projects:
 |---|---|---|
 | `mocked` | `bun run e2e` | All specs except `smoke-docker/` and `security/` |
 | `security` | `bun run e2e:security` | Specs under `e2e/specs/security/` |
-| `docker-smoke` | _(not wired to a top-level script)_ | Specs under `e2e/specs/smoke-docker/`; requires Docker daemon |
+| `docker-smoke` | `bun run e2e:workspace-java` | Real VSCodium/JDT/Java/WPILib smoke under `e2e/specs/smoke-docker/`; requires Docker and a built workspace image |

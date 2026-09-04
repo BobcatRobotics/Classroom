@@ -25,18 +25,20 @@ top:
 | Component | Version |
 |---|---|
 | VSCodium reh-web (`codium-server`) | 1.126.04524 |
-| Adoptium Temurin JDK | 17.0.15+6 (x64/aarch64) |
-| redhat.java (JDT Language Server) | 1.38.0 |
+| Adoptium Temurin project JDK | 17.0.15+6 (x64/aarch64) |
+| Adoptium Temurin JDT LS JDK | 21.0.12.1+1 (x64/aarch64) |
+| redhat.java (JDT Language Server) | 1.55.0 |
 | vscode-wpilib (WPILib extension) | 2026.1.1 |
-| Java Extension Pack | debugger, test runner, Maven/Gradle, project manager |
+| Java Extension Pack | 0.31.1 (members pinned individually) |
 | Spotless Gradle | 1.2.1 |
 | GitHub CLI (`gh`) | latest stable at image build time |
 | Gradle + WPILib dependency cache | pre-primed at build time |
 | Bundled lesson catalog | baked in at `/opt/frc-catalog/` |
 
-The total uncompressed image size is approximately 2.3 GiB, of which roughly
-1.2 GiB is the single primed Gradle and WPILib dependency-cache layer that
-makes first builds take seconds rather than minutes.
+The total uncompressed image size is approximately 2.65 GiB, including both
+JDKs and roughly 1.2 GiB for the single primed Gradle and WPILib
+dependency-cache layer that makes first builds take seconds rather than
+minutes.
 
 ## Classroom-density memory defaults
 
@@ -129,14 +131,16 @@ script runs before the editor starts:
 
 1. Copies the primed Gradle cache from `/opt/frc-gradle-cache/` into
    `/config/.gradle/`.
-2. Copies the pre-installed VS Code extensions from `/opt/frc-extensions-cache/`
-   into `/config/extensions/`.
+2. Installs the pre-bundled CodeRunner-managed VS Code extensions from
+   `/opt/frc-extensions-cache/` into `/config/extensions/`.
 3. Seeds bounded Java/Gradle settings and the dark theme into the editor's
    Remote/Machine configuration.
 
-On subsequent starts these copies are skipped because the directories already
-exist. A settings-migration step still runs to lower any legacy `-Xmx8G` JDT
-LS setting that may have been imported from a WPILib project.
+On subsequent starts the Gradle copy is skipped. The extension step selectively
+reconciles only CodeRunner-managed IDs to the image versions, preserving
+unrelated student-installed extensions. A settings-migration step also lowers
+any legacy `-Xmx8G` JDT LS setting that may have been imported from a WPILib
+project.
 
 ## Idle auto-stop
 

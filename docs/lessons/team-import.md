@@ -70,9 +70,8 @@ When a valid URL is submitted, the control plane:
 5. Clears the editor's workspace cache so VS Code re-opens the new folder
    cleanly.
 
-The workspace is then treated as a plain robot project. The Driver Station and
-AdvantageScope telemetry panels are shown in full, matching the `robot` lesson
-kind.
+The workspace is then treated as a robot project. The Driver Station and the
+AdvantageScope/PathPlanner tabs are available, matching a `robot` lesson.
 
 ## Pushing and pulling after import
 
@@ -93,9 +92,9 @@ The server does not store, inject, or manage any Git credentials.
 ## Running an imported project
 
 Imported projects run through the same Driver Station flow as `robot` lessons:
-click **Enable** in the Driver Station panel, Gradle builds and starts the
-simulation, and telemetry flows to AdvantageScope and the Driver Station
-panel.
+click **Start** to build and start the simulation. When robot code and
+communications are ready, choose a mode and click **Enable**. Use AdvantageScope
+for telemetry or PathPlanner for the project's paths and autos.
 
 No changes to `build.gradle` are required, even if the project calls
 `wpi.sim.addGui()` or `wpi.sim.addDriverstation()`. At run time, a Gradle

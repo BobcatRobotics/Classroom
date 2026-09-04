@@ -55,9 +55,9 @@ one-off operator commands, not for day-to-day use.
 ## Single entry point
 
 The control plane is the only process that listens on a public port (default
-`4000`, set by `PORT`). Every request (web shell assets, editor traffic, run
-commands, telemetry, gamepad input) enters through that one port and is
-authenticated before any proxying takes place.
+`4000`, set by `PORT`). Web shell, AdvantageScope, and PathPlanner static assets
+are public. Workspace-specific editor traffic, commands, telemetry, gamepad
+input, and file requests require a session and enter through that same port.
 
 How workspace container ports are exposed depends on deployment mode. In
 **port mode** (the host dev loop, `bun run dev:control`) each container's
@@ -106,6 +106,13 @@ A student whose session is valid but whose slug does not match the URL receives
 a `403`. An unauthenticated request is redirected to the login page for browser
 requests or returns `401` for API requests. There is no mechanism for a student
 to reach another student's editor, simulator, or files through normal routes.
+
+PathPlanner's app files under `/pathplanner/` contain no student data and are
+served publicly, like AdvantageScope's `/scope/` assets. Its deploy-files API
+is under `/u/<slug>/api/deploy-files/`, so the ownership check above applies.
+The API exposes only `src/main/deploy/pathplanner/**` and
+`src/main/deploy/choreo/**`; writes and deletes are limited to the PathPlanner
+subtree.
 
 ## Container isolation
 

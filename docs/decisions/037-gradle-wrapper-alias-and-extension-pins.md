@@ -49,9 +49,10 @@ walkthroughs, formatter/classpath UI, and the Gradle extension's Install New JDK
 integration, so removing it would be a user-visible change with no remaining
 technical benefit.
 
-Extension seeding remains first-boot-only. Existing `/config/extensions`
-directories are preserved, including user-installed extensions, and are not
-reset to the new baked manifest during an image upgrade.
+This decision originally kept extension seeding first-boot-only. That part is
+superseded by decision 038: container startup now reconciles only the nine
+CodeRunner-managed IDs to the new baked manifest while preserving unrelated
+user-installed extensions. Gallery resolution remains disabled.
 
 ## 3. Disable workspace trust in the hosted workbench
 

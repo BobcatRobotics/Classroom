@@ -12,13 +12,14 @@
 	],
 	"scripts": {
 		"start": "bun run migrate && bun apps/control/src/main.ts",
-		"build": "bun run build:web && bun run build:ascope && bun run docker:pull:workspace",
+		"build": "bun run build:web && bun run build:ascope && bun run fetch:pathplanner && bun run docker:pull:workspace",
 		"clean": "bun scripts/clean.ts",
 		"dev:control": "bun --watch apps/control/src/main.ts",
 		"dev:web": "bun run --cwd apps/web dev",
 		"build:web": "bun run --cwd apps/web build",
 		"build:ascope": "bun scripts/build-ascope-lite.ts",
 		"fetch:dist": "bun scripts/fetch-dist.ts",
+		"fetch:pathplanner": "bun scripts/fetch-pathplanner-dist.ts",
 		"setup:demo": "bun run docker:pull:workspace && bun run fetch:dist",
 		"demo": "bun run migrate && bun apps/control/src/main.ts --demo",
 		"docs:dev": "bun run --cwd website start",
@@ -54,6 +55,7 @@
 		"e2e:ui": "E2E_TEST=1 bun --bun playwright test --project=mocked --ui",
 		"e2e:debug": "E2E_TEST=1 PWDEBUG=1 playwright test --project=mocked",
 		"e2e:security": "E2E_TEST=1 bun --bun playwright test --project=security",
+		"e2e:workspace-java": "E2E_TEST=1 PLAYWRIGHT_SKIP_WEB_BUILD=1 bun --bun playwright test --project=docker-smoke",
 		"e2e:report": "playwright show-report"
 	},
 	"devDependencies": {

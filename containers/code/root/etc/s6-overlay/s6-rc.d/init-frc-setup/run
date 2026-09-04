@@ -9,6 +9,9 @@ PROJECT_SETTINGS="/workspace/project/.vscode/settings.json"
 SIM_LOG_FILE="${SIM_LOG_FILE:-${HOME}/sim.log}"
 DEFAULT_JDT_LS_VMARGS="-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xms64m -Xmx512m -XX:ReservedCodeCacheSize=96m -Xlog:disable"
 DEFAULT_GRADLE_JVMARGS="-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
+TOOLING_JAVA_HOME="${JDK_HOME:-/usr/lib/jvm/jdk-21}"
+PROJECT_JAVA_HOME="${PROJECT_JAVA_HOME:-/usr/lib/jvm/jdk-17}"
+LEGACY_CODERUNNER_JDT_HOME="/usr/lib/jvm/jdk-21"
 LEGACY_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
 CODERUNNER_JDT_LS_VMARGS="${CODERUNNER_JDT_LS_VMARGS:-${DEFAULT_JDT_LS_VMARGS}}"
 CODERUNNER_GRADLE_JVMARGS="${CODERUNNER_GRADLE_JVMARGS:-${DEFAULT_GRADLE_JVMARGS}}"
@@ -27,11 +30,14 @@ if [[ -d "${GRADLE_USER_HOME}/wrapper" && ! -e "${GRADLE_USER_HOME}/permwrapper"
   ln -s wrapper "${GRADLE_USER_HOME}/permwrapper"
 fi
 
-# Seed extensions on first run.
-if [[ -d /opt/frc-extensions-cache ]] && [[ -z "$(ls -A "${EXTENSIONS_DIR}" 2>/dev/null)" ]]; then
-  echo "Seeding VS Code extensions from image..."
-  cp -a /opt/frc-extensions-cache/. "${EXTENSIONS_DIR}"/
-  lsiown -R abc:abc "${EXTENSIONS_DIR}"
+# Reconcile only the extensions managed by CodeRunner. Student-installed
+# extensions and their manifest entries remain untouched.
+if [[ -d /opt/frc-extensions-cache ]]; then
+  extension_reconciliation="$(/usr/local/bin/reconcile-frc-extensions /opt/frc-extensions-cache "${EXTENSIONS_DIR}")"
+  if [[ "${extension_reconciliation}" == changed ]]; then
+    echo "Updated CodeRunner-managed VS Code extensions from image."
+    lsiown -R abc:abc "${EXTENSIONS_DIR}"
+  fi
 fi
 
 GRADLE_PROPERTIES="${GRADLE_USER_HOME}/gradle.properties"
@@ -64,6 +70,9 @@ merge_vscode_settings() {
   tmp_settings="$(mktemp)"
   if jq \
     --arg jdtVmargs "${CODERUNNER_JDT_LS_VMARGS}" \
+    --arg toolingJavaHome "${TOOLING_JAVA_HOME}" \
+    --arg legacyJdtJavaHome "${LEGACY_CODERUNNER_JDT_HOME}" \
+    --arg projectJavaHome "${PROJECT_JAVA_HOME}" \
     --arg gradleJvmargs "${CODERUNNER_GRADLE_JVMARGS}" \
     --arg defaultGradleJvmargs "${DEFAULT_GRADLE_JVMARGS}" \
     --arg legacyGradleArgs "${LEGACY_GRADLE_ARGS}" \
@@ -84,9 +93,28 @@ merge_vscode_settings() {
           .
         end
       end
+      # CodeRunner formerly set this to Java 21. WPILib treats the JDT setting
+      # as its project JDK, so remove only our old value and let redhat.java
+      # discover Java 21 through JDK_HOME instead.
+      | if ."java.jdt.ls.java.home" == $legacyJdtJavaHome
+        then del(."java.jdt.ls.java.home")
+        else .
+        end
+      | ."java.import.gradle.java.home" //= $projectJavaHome
+      | ."java.configuration.runtimes" //= [
+          {
+            "name": "JavaSE-17",
+            "path": $projectJavaHome,
+            "default": true
+          },
+          {
+            "name": "JavaSE-21",
+            "path": $toolingJavaHome
+          }
+        ]
       | ."java.gradle.buildServer.enabled" //= "off"
       | ."gradle.autoDetect" //= "off"
-      # vscode-gradle 3.17.3 passes this setting to Tooling API
+      # vscode-gradle passes this setting to Tooling API
       # BuildLauncher.setJvmArguments(), which Gradle 8.11 rejects as build
       # arguments. gradle.properties already applies the same daemon limits.
       | if $mode != "project" or

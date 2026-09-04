@@ -21,9 +21,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WORKSPACE_IMAGE: docker.io/bobcatrobotics/coderunner-workspace
-  CONTROL_IMAGE: docker.io/bobcatrobotics/coderunner-control
-  RELEASE_BRANCH: release/2026
+  WORKSPACE_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-workspace
+  CONTROL_IMAGE: ghcr.io/${{ github.repository_owner }}/coderunner-control
 
 jobs:
   validate:
@@ -167,6 +166,8 @@ jobs:
           context: .
           file: containers/control/Dockerfile
           platforms: linux/amd64
+          build-args: |
+            PATHPLANNER_DIST_TAG=${{ env.PATHPLANNER_DIST_TAG }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.validate.outputs.tag_sha }}
@@ -259,6 +260,8 @@ jobs:
           context: .
           file: containers/control/Dockerfile
           platforms: linux/arm64
+          build-args: |
+            PATHPLANNER_DIST_TAG=${{ env.PATHPLANNER_DIST_TAG }}
           build-contexts: |
             ascope-dist=${{ runner.temp }}/ascope-dist
           labels: |
