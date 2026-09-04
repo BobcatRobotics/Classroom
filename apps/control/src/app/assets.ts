@@ -265,6 +265,40 @@ export async function scopeResponse(
 	return staticFileResponse(storage.config.advantageScopeDistDir, assetPath);
 }
 
+export async function pathplannerResponse(
+	storage: AppStorage,
+	pathname: string,
+): Promise<Response> {
+	let suffix =
+		pathname === "/pathplanner" ? "" : pathname.slice("/pathplanner/".length);
+	if (suffix === "" || suffix === "/") {
+		suffix = "index.html";
+	}
+
+	let assetPath: string;
+	try {
+		assetPath = decodeURIComponent(suffix);
+	} catch {
+		return new Response("Invalid PathPlanner asset path.", { status: 400 });
+	}
+	const safePath = safeRelativeAssetPath(assetPath);
+	if (!safePath) {
+		return new Response("Invalid PathPlanner asset path.", { status: 400 });
+	}
+
+	const response = await staticFileResponse(
+		storage.config.pathplannerDistDir,
+		safePath,
+	);
+	if (response.status === 404 && safePath === "index.html") {
+		return htmlResponse(
+			"PathPlanner has not been fetched yet. Run `bun run fetch:dist` (or rebuild the control image) to install the PathPlanner web dist.",
+			{ status: 503 },
+		);
+	}
+	return response;
+}
+
 export function userAssetsPath(workspace: {
 	id: string;
 	project_path: string;

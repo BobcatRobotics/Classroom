@@ -82,15 +82,12 @@ keep something, they should copy it out or move to an imported team project.
 
 ## The two bundled demo modules
 
-The bundled catalog ships with two modules that double as a smoke test of the
-whole edit → run → telemetry loop:
+The bundled catalog ships with two modules that exercise the main workflows:
 
 - **Hello, World**: a bare-bones Java project to make sure everything works. 
   The student uses the editor's **Run** button; no robot simulation is involved.
 - **Robot Starter**: a minimal WPILib command-based robot project. The student
-  clicks **Start** in the Driver Station, then **Enable** once the simulation is
-  ready, and watches telemetry appear in AdvantageScope and the Driver Station
-  panel.
+  can edit code, run a simulation, inspect telemetry, and open PathPlanner.
 
 ![The bundled lesson catalog: Hello, World and Robot Starter modules](/img/screenshots/lesson-catalog-modules.png)
 
