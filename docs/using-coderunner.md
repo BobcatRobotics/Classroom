@@ -40,14 +40,30 @@ telemetry.
 3. Select **Teleop**, **Auto**, or **Test**, then click **Enable**.
 4. Click **Stop** when you are finished, or **Restart** to stop the code and re-run with any changes you've made.
 
-Build output and robot output appear in the **Console** tab. Telemetry appears in
-AdvantageScope.
+Build output and robot output appear in the **Console** tab. Use the top-bar
+**AdvantageScope** and **PathPlanner** tabs to switch the tool beside the editor.
+AdvantageScope opens by default, and switching tabs does not reload either tool.
+
+## PathPlanner
+
+For robot lessons and imported projects, the **PathPlanner** tab opens the path
+editor. For path and auto editing basics, see the
+[official PathPlanner guide](https://pathplanner.dev/gui-editing-paths-and-autos.html).
+
+![Pathplanner open alongside the editor, with a path being edited](/img/screenshots/pathplanner-overview.png)
+
+PathPlanner writes to `src/main/deploy/pathplanner/**` in the current project.
+These are ordinary project files: inspect them in VSCodium and commit them with
+Git. Files under `src/main/deploy/choreo/**` are visible but read-only.
+
+PathPlanner robot telemetry and hot reload are not connected. Use AdvantageScope
+for simulated robot telemetry.
 
 ## Console lessons
 
 `Console` type lessons are pure Java exercises, not robot projects. Because they
-do not run a robot simulation, the Driver Station and AdvantageScope are hidden,
-and the VS Code editor expands to fill the full screen. Use the editor's **Run**
+do not run a robot simulation, the entire simulation and tool pane is hidden.
+The VS Code editor expands to fill the full screen. Use the editor's **Run**
 button to run them.
 
 ## Explore more

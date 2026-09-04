@@ -112,7 +112,6 @@ const config: Config = {
           title: 'Docs',
           items: [
             {label: 'Using CodeRunner', to: '/using-coderunner'},
-            {label: 'Using PathPlanner', to: '/using-pathplanner'},
             {label: 'Quick Start (Installation)', to: '/quick-start'},
             {label: 'Architecture', to: '/about/architecture'},
             {label: 'Deploying', to: '/deploying/overview'},

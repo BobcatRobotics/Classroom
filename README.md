@@ -35,7 +35,7 @@ bun run docs:dev
 Main sections:
 
 - [Quick Start](docs/quick-start.md) — demo mode walkthrough
-- [Using PathPlanner](docs/using-pathplanner.md) — browser path and auto editing
+- [Using CodeRunner](docs/using-coderunner.md) — student guide: projects, running a simulation, PathPlanner
 - [Architecture](docs/about/architecture.md) — how the system is put together
 - [Lessons & Modules](docs/lessons/overview.md) — lesson catalog, module authoring, GitHub import
 - [Deploying](docs/deploying/overview.md) — running a real multi-user instance
