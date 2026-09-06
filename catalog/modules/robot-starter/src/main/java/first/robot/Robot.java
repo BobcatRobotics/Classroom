@@ -10,8 +10,7 @@ import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
-import org.wpilib.command2.Command;
-import org.wpilib.command2.CommandScheduler;
+import org.wpilib.command3.*;;
 
 public class Robot extends LoggedRobot {
   private Command autonomousCommand;
@@ -78,7 +77,7 @@ public class Robot extends LoggedRobot {
     autonomousCommand = robotContainer.getAutonomousCommand();
 
     if (autonomousCommand != null) {
-      CommandScheduler.getInstance().schedule(autonomousCommand);
+      Scheduler.getDefault().schedule(autonomousCommand);
     }
   }
 
@@ -91,7 +90,7 @@ public class Robot extends LoggedRobot {
   @Override
   public void teleopInit() {
     if (autonomousCommand != null) {
-      autonomousCommand.cancel();
+      Scheduler.getDefault().cancel(autonomousCommand);
     }
   }
 
@@ -103,7 +102,7 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void utilityInit() {
-    CommandScheduler.getInstance().cancelAll();
+    Scheduler.getDefault().cancelAll();
   }
 
   @Override

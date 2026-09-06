@@ -5,13 +5,10 @@
 package first.robot;
 
 import org.littletonrobotics.junction.Logger;
-import org.wpilib.command2.Command;
-import org.wpilib.command2.CommandScheduler;
-import org.wpilib.command2.Commands;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.system.Timer;
-
+import org.wpilib.command3.*;
 
 public class RobotContainer {
   private final Timer timer = new Timer();
@@ -25,13 +22,15 @@ public class RobotContainer {
   private void configureBindings() {}
 
   public Command getAutonomousCommand() {
-    return Commands.print("No autonomous command configured");
+    return Command.noRequirements(coroutine -> {
+      System.out.println("No autonomous command configured");
+    }).named("Comamnd Not Configured");
   }
 
   /** Called every loop while the robot is running. Add your own logic here. */
   public void robotPeriodic() {
     // Run the command scheduler so subsystems and commands you add keep working.
-    CommandScheduler.getInstance().run();
+    Scheduler.getDefault().run();
 
     // A counter that ticks up once per loop.
     counter++;
