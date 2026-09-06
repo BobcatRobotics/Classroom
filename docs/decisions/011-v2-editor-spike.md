@@ -60,7 +60,7 @@ Future stages should not re-run F12/ctrl-click proof checks for `Pose2d` or othe
 
 ```dockerfile
 FROM gitpod/openvscode-server:1.105.1
-# JDK 17 (Temurin Linux x64) installed to /usr/lib/jvm/jdk-17
+# JDK 25 (Temurin Linux x64) installed to /usr/lib/jvm/jdk-25
 # JAVA_HOME set, on PATH
 # Extensions pre-installed via --install-extension from .vsix files
 # ENTRYPOINT: openvscode-server --without-connection-token --host 0.0.0.0 --port 3000

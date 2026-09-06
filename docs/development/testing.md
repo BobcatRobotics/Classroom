@@ -98,8 +98,8 @@ uses Java 21, waits for `Java: Ready`, launches **Run Main** with F5, verifies
 asserts that JDT logs enumerate `vscode.java.resolveMainMethod` without any
 `No delegateCommandHandler` error. It then opens `robot-starter`, waits for
 the real Gradle import, invokes **WPILib: Build Robot Code**, verifies that
-WPILib generated a Java 17 command and launched its Gradle daemon on Java 17,
-rejects Spotless/JDK failures, checks Java 17 classfiles, and starts/stops the
+WPILib generated a Java 25 command and launched its Gradle daemon on Java 25,
+rejects Spotless/JDK failures, checks Java 25 classfiles, and starts/stops the
 supported `start-sim.sh` → `run-sim.sh` path.
 
 This focused tier is intentionally outside `bun run verify`: it requires a

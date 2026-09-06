@@ -1,25 +1,31 @@
-package frc.robot;
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
+package first.robot;
+
 import org.littletonrobotics.junction.Logger;
+import org.wpilib.command2.Command;
+import org.wpilib.command2.CommandScheduler;
+import org.wpilib.command2.Commands;
+import org.wpilib.math.geometry.Pose2d;
+import org.wpilib.math.geometry.Rotation2d;
+import org.wpilib.system.Timer;
 
-/**
- * The robot's behavior lives here. {@link Robot} handles the AdvantageKit logging setup and calls
- * {@link #robotPeriodic()} every loop, so you can focus on your code below.
- *
- * <p>This starter logs a counter that increments every loop and a robot pose that drives in a
- * circle, both through AdvantageKit's {@link Logger}. Open them in AdvantageScope to confirm that
- * edit -> run -> telemetry works end to end, then start replacing this with your own code.
- */
+
 public class RobotContainer {
   private final Timer timer = new Timer();
   private long counter = 0;
 
   public RobotContainer() {
     timer.start();
+    configureBindings();
+  }
+
+  private void configureBindings() {}
+
+  public Command getAutonomousCommand() {
+    return Commands.print("No autonomous command configured");
   }
 
   /** Called every loop while the robot is running. Add your own logic here. */

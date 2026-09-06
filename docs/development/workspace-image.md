@@ -7,7 +7,7 @@ title: Workspace Image
 
 The workspace image (`docker.io/bobcatrobotics/coderunner-workspace`) is the
 per-student container that runs
-VSCodium reh-web (`codium-server`), Java 17/21, and the WPILib simulation stack in a single
+VSCodium reh-web (`codium-server`), Java 25/21, and the WPILib simulation stack in a single
 Docker image. The [workspace container overview](../about/workspace-container.md)
 explains the runtime contract from the application's perspective; the
 [container README](https://github.com/mathewdunne/CodeRunner/blob/main/containers/code/README.md)
@@ -20,7 +20,7 @@ development.
 ## Image size
 
 The built image is approximately 2.65 GiB uncompressed. That includes Temurin
-17 for projects and simulation plus Temurin 21 for JDT LS (~600 MB together),
+25 for projects and simulation plus Temurin 21 for JDT LS (~600 MB together),
 the VSCodium reh-web runtime, nine VS Code extensions, and one
 primed Gradle/WPILib dependency-cache layer (~1.2 GiB) baked in so first builds
 inside the container take seconds rather than minutes.
@@ -96,8 +96,8 @@ bun run e2e:workspace-java
 The smoke starts fresh `hello-world` and `robot-starter` containers. It waits
 for JDT LS and Gradle import, launches **Run Main** through F5, verifies terminal
 output and the registered Java Debug command list, invokes **WPILib: Build
-Robot Code**, asserts that WPILib selected Java 17 for both the generated
-command and Gradle daemon, checks Java 17 classfile output, and starts/stops the
+Robot Code**, asserts that WPILib selected Java 25 for both the generated
+command and Gradle daemon, checks Java 25 classfile output, and starts/stops the
 supported `start-sim.sh` → `run-sim.sh` headless simulation path. It rejects
 Spotless/JDK failures and every `No delegateCommandHandler` occurrence.
 

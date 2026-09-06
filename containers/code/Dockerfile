@@ -22,7 +22,7 @@ RUN apt-get update -qq \
     && npx vsce package --no-dependencies --out /tmp/vscode-spotless-gradle.vsix
 
 # V2 merged code container
-# Layers JDK 17/21 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
+# Layers JDK 25/21 + Gradle/WPILib cache + FRC extensions on linuxserver/vscodium-web
 # Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
 # PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
 # docs/decisions/036-vscodium-web-migration.md
@@ -64,7 +64,7 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
 # ── JDKs (Adoptium Temurin) ───────────────────────────────────────────
 # TARGETARCH (amd64/arm64, set by buildx) picks the Temurin arch classifier.
 ARG TARGETARCH
-ARG JDK17_VERSION=17.0.15+6
+ARG JDK25_VERSION=25.0.4.1+1
 ARG JDK21_VERSION=21.0.12.1+1
 
 RUN case "${TARGETARCH}" in \
@@ -73,12 +73,12 @@ RUN case "${TARGETARCH}" in \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && mkdir -p /usr/lib/jvm \
-    && JDK17_TAG="jdk-$(echo "${JDK17_VERSION}" | sed 's/+/%2B/')" \
-    && JDK17_FILE="OpenJDK17U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK17_VERSION}" | tr + _).tar.gz" \
-    && wget -q "https://github.com/adoptium/temurin17-binaries/releases/download/${JDK17_TAG}/${JDK17_FILE}" -O /tmp/jdk17.tar.gz \
-    && tar xzf /tmp/jdk17.tar.gz -C /usr/lib/jvm \
-    && rm /tmp/jdk17.tar.gz \
-    && ln -s "/usr/lib/jvm/jdk-${JDK17_VERSION}" /usr/lib/jvm/jdk-17 \
+    && JDK25_TAG="jdk-$(echo "${JDK25_VERSION}" | sed 's/+/%2B/')" \
+    && JDK25_FILE="OpenJDK25U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK25_VERSION}" | tr + _).tar.gz" \
+    && wget -q "https://github.com/adoptium/temurin25-binaries/releases/download/${JDK25_TAG}/${JDK25_FILE}" -O /tmp/jdk25.tar.gz \
+    && tar xzf /tmp/jdk25.tar.gz -C /usr/lib/jvm \
+    && rm /tmp/jdk25.tar.gz \
+    && ln -s "/usr/lib/jvm/jdk-${JDK25_VERSION}" /usr/lib/jvm/jdk-25 \
     && JDK21_TAG="jdk-$(echo "${JDK21_VERSION}" | sed 's/+/%2B/')" \
     && JDK21_FILE="OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_$(echo "${JDK21_VERSION}" | tr + _).tar.gz" \
     && wget -q "https://github.com/adoptium/temurin21-binaries/releases/download/${JDK21_TAG}/${JDK21_FILE}" -O /tmp/jdk21.tar.gz \
@@ -86,7 +86,7 @@ RUN case "${TARGETARCH}" in \
     && rm /tmp/jdk21.tar.gz \
     && ln -s "/usr/lib/jvm/jdk-${JDK21_VERSION}" /usr/lib/jvm/jdk-21
 
-ENV JAVA_HOME=/usr/lib/jvm/jdk-17
+ENV JAVA_HOME=/usr/lib/jvm/jdk-25
 ENV JDK_HOME=/usr/lib/jvm/jdk-21
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
@@ -108,7 +108,7 @@ RUN chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
 
 # ── Download and install VS Code extensions ────────────────────────────
 ARG REDHAT_JAVA_VERSION=1.55.0
-ARG WPILIB_EXT_VERSION=2026.1.1
+ARG WPILIB_EXT_VERSION=2027.0.0-alpha-6
 ARG JAVA_DEBUG_VERSION=0.59.0
 ARG JAVA_TEST_VERSION=0.46.0
 ARG MAVEN_VERSION=0.45.3
@@ -172,8 +172,8 @@ ENV GRADLE_USER_HOME=/config/.gradle
 RUN mkdir -p /opt/frc-gradle-cache /workspace \
     && chown -R abc:abc /opt/frc-gradle-cache /workspace
 
-# WPILib templates use permwrapper/dists while the catalog uses wrapper/dists.
-# Gradle keys distributions by URL, so both paths can share the primed cache.
+# WPILib 2027 templates and the bundled catalog both use permwrapper/dists,
+# so the primed Gradle cache is used directly at runtime.
 USER abc
 WORKDIR /workspace
 RUN cp -a /opt/frc-catalog/modules/robot-starter /workspace/template \
@@ -182,10 +182,7 @@ RUN cp -a /opt/frc-catalog/modules/robot-starter /workspace/template \
     && GRADLE_USER_HOME=/opt/frc-gradle-cache ./gradlew --no-daemon --console=plain build \
     && GRADLE_USER_HOME=/opt/frc-gradle-cache ./gradlew --no-daemon --stop \
     && cd /workspace \
-    && rm -rf /workspace/template \
-    && test ! -e /opt/frc-gradle-cache/permwrapper \
-    && test ! -L /opt/frc-gradle-cache/permwrapper \
-    && ln -s wrapper /opt/frc-gradle-cache/permwrapper
+    && rm -rf /workspace/template
 
 USER root
 

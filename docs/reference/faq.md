@@ -38,9 +38,9 @@ the same behavior as the desktop PathPlanner app.
 
 ### What WPILib and Java version does CodeRunner use?
 
-The bundled robot starter uses **GradleRIO 2026.2.1** and Temurin **17.0.15**
+The bundled robot starter uses **GradleRIO 2027.0.0-alpha-6** and Temurin **25.0.4.1**
 for Gradle, project compilation, and simulation. The editor includes the
-**wpilibsuite.vscode-wpilib 2026.1.1** extension. Students do not need Java or
+**wpilibsuite.vscode-wpilib 2027.0.0-alpha-7** extension. Students do not need Java or
 VS Code installed on their own devices.
 
 ### Can I build or start simulation from the WPILib extension?

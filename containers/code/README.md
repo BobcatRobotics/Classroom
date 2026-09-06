@@ -8,10 +8,10 @@ Merged per-student container for V2. Combines VSCodium reh-web (`codium-server`)
 |---|---|---|---|
 | Base image | linuxserver/vscodium-web:1.126.04524-ls35 | GPL-3.0 | Ubuntu 24.04, s6-overlay, codium-server, PUID/PGID |
 | VSCodium reh-web (`codium-server`) | 1.126.04524 (from base) | MIT | Browser-based VS Code editor |
-| Project JDK | Temurin 17.0.15+6 | GPL-2.0 w/ Classpath Exception | Gradle, Java compilation, and robot simulation |
+| Project JDK | Temurin 25.0.4.1+1 | GPL-2.0 w/ Classpath Exception | Gradle, Java compilation, and robot simulation |
 | Tooling JDK | Temurin 21.0.12.1+1 | GPL-2.0 w/ Classpath Exception | Java language server runtime |
 | redhat.java | 1.55.0 | EPL-2.0 | Java language support (JDT LS) |
-| vscode-wpilib | 2026.1.1 | BSD-3-Clause | WPILib project tooling |
+| vscode-wpilib | 2027.0.0-alpha-7 | BSD-3-Clause | WPILib project tooling |
 | Java Extension Pack | 0.31.1 | MIT | Debugger, test runner, Maven/Gradle, project manager |
 | Spotless Gradle | 1.2.1 | MIT | Code formatting via Spotless |
 | Gradle cache | Primed from template | BSD-3-Clause (WPILib) | Fast first builds (~seconds vs ~minutes) |
@@ -25,8 +25,8 @@ The runtime seeds conservative memory defaults for classroom density:
   Debug/JDT bundles, discovered through `JDK_HOME`. The
   `java.jdt.ls.java.home` setting is deliberately unset because WPILib treats
   it as the project JDK. `JAVA_HOME`, WPILib builds, Gradle import, project
-  compilation, and robot simulation remain on Java 17; projects declare Java
-  17 source/target.
+  compilation, and robot simulation remain on Java 25; projects declare Java
+  25 source/target.
 - JDT LS defaults to `-Xmx512m` instead of the WPILib-generated `-Xmx8G`.
 - The VS Code Gradle Build Server path is disabled by default; JDT LS still imports Gradle projects through the Java extension.
 - Gradle runs are bounded by `/config/.gradle/gradle.properties`: `-Xmx384m`, no daemon, no VFS watching, and two workers. Those limits are deliberately not duplicated into the editor's `java.import.gradle.*` settings, which reject them (decision 037).

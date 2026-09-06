@@ -2,26 +2,29 @@ import org.gradle.internal.os.OperatingSystem
 
 pluginManagement {
     repositories {
+        String wpilibYear = '2027_alpha5'
+        File wpilibHome
+        if (OperatingSystem.current().isWindows()) {
+            String publicFolder = System.getenv('PUBLIC')
+            if (publicFolder == null) {
+                publicFolder = "C:\\Users\\Public"
+            }
+            def homeRoot = new File(publicFolder, "wpilib")
+            wpilibHome = new File(homeRoot, wpilibYear)
+        } else {
+            def userFolder = System.getProperty("user.home")
+            def homeRoot = new File(userFolder, "wpilib")
+            wpilibHome = new File(homeRoot, wpilibYear)
+        }
+        def wpilibHomeMaven = new File(wpilibHome, 'maven')
+        maven {
+            name = 'wpilibHome'
+            url = wpilibHomeMaven
+        }
         mavenLocal()
         gradlePluginPortal()
-        maven { url 'https://frcmaven.wpi.edu/artifactory/release/' }
-        // Local frcHome lookup retained for non-container dev convenience.
-        String frcYear = '2026'
-        File frcHome
-        if (OperatingSystem.current().isWindows()) {
-            String publicFolder = System.getenv('PUBLIC') ?: 'C:\\Users\\Public'
-            frcHome = new File(new File(publicFolder, 'wpilib'), frcYear)
-        } else {
-            frcHome = new File(new File(System.getProperty('user.home'), 'wpilib'), frcYear)
-        }
-        def frcHomeMaven = new File(frcHome, 'maven')
-        if (frcHomeMaven.exists()) {
-            maven { name = 'frcHome'; url = frcHomeMaven }
-        }
     }
 }
 
-Properties props = System.getProperties()
-props.setProperty('org.gradle.internal.native.headers.unresolved.dependencies.ignore', 'true')
-
-rootProject.name = 'frc-training-robot'
+Properties props = System.getProperties();
+props.setProperty("org.gradle.internal.native.headers.unresolved.dependencies.ignore", "true");

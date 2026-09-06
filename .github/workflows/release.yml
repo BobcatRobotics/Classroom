@@ -23,7 +23,7 @@ concurrency:
 env:
   WORKSPACE_IMAGE: docker.io/bobcatrobotics/coderunner-workspace
   CONTROL_IMAGE: docker.io/bobcatrobotics/coderunner-control
-  RELEASE_BRANCH: release/2026
+  RELEASE_BRANCH: release/2027
   # Pinned PathPlanner web release (mathewdunne/pathplanner-web). Both control
   # builds must resolve the same artifact, and a pinned tag makes a failed
   # download fatal instead of silently shipping an empty dist — see the

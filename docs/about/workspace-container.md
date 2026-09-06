@@ -25,10 +25,10 @@ top:
 | Component | Version |
 |---|---|
 | VSCodium reh-web (`codium-server`) | 1.126.04524 |
-| Adoptium Temurin project JDK | 17.0.15+6 (x64/aarch64) |
+| Adoptium Temurin project JDK | 25.0.4.1+1 (x64/aarch64) |
 | Adoptium Temurin JDT LS JDK | 21.0.12.1+1 (x64/aarch64) |
 | redhat.java (JDT Language Server) | 1.55.0 |
-| vscode-wpilib (WPILib extension) | 2026.1.1 |
+| vscode-wpilib (WPILib extension) | 2027.0.0-alpha-7 |
 | Java Extension Pack | 0.31.1 (members pinned individually) |
 | Spotless Gradle | 1.2.1 |
 | GitHub CLI (`gh`) | latest stable at image build time |

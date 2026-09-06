@@ -10,7 +10,7 @@ SIM_LOG_FILE="${SIM_LOG_FILE:-${HOME}/sim.log}"
 DEFAULT_JDT_LS_VMARGS="-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xms64m -Xmx512m -XX:ReservedCodeCacheSize=96m -Xlog:disable"
 DEFAULT_GRADLE_JVMARGS="-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
 TOOLING_JAVA_HOME="${JDK_HOME:-/usr/lib/jvm/jdk-21}"
-PROJECT_JAVA_HOME="${PROJECT_JAVA_HOME:-/usr/lib/jvm/jdk-17}"
+PROJECT_JAVA_HOME="${PROJECT_JAVA_HOME:-/usr/lib/jvm/jdk-25}"
 LEGACY_CODERUNNER_JDT_HOME="/usr/lib/jvm/jdk-21"
 LEGACY_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
 CODERUNNER_JDT_LS_VMARGS="${CODERUNNER_JDT_LS_VMARGS:-${DEFAULT_JDT_LS_VMARGS}}"
@@ -103,7 +103,7 @@ merge_vscode_settings() {
       | ."java.import.gradle.java.home" //= $projectJavaHome
       | ."java.configuration.runtimes" //= [
           {
-            "name": "JavaSE-17",
+            "name": "JavaSE-25",
             "path": $projectJavaHome,
             "default": true
           },

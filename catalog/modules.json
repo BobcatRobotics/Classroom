@@ -12,7 +12,7 @@
 		{
 			"id": "robot-starter",
 			"title": "Robot Starter",
-			"description": "A minimal WPILib and AdvantageKit command-based robot you run from the Driver Station.",
+			"description": "A minimal WPILib and AdvantageKit command-based (v2) robot you run from the Driver Station.",
 			"subdir": "modules/robot-starter",
 			"kind": "robot",
 			"order": 20

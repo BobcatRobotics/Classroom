@@ -247,7 +247,7 @@ async function wpilibBuildEvidence(name: string): Promise<string> {
 				name,
 				"bash",
 				"-lc",
-				"cat /config/wpilib/2026/logs/wpilibtoollog.txt 2>/dev/null || true; find /config/.gradle/daemon -type f -name '*.out.log' -exec cat {} + 2>/dev/null || true; test -f /workspace/project/build/classes/java/main/frc/robot/Main.class && echo CODERUNNER_ROBOT_CLASS_PRESENT || true; pgrep -af '[o]rg.gradle.wrapper.GradleWrapperMain build' >/dev/null || echo CODERUNNER_WPILIB_BUILD_IDLE",
+				"find /config/wpilib -path '*/logs/wpilibtoollog.txt' -type f -exec cat {} + 2>/dev/null || true; find /config/.gradle/daemon -type f -name '*.out.log' -exec cat {} + 2>/dev/null || true; test -f /workspace/project/build/classes/java/main/first/Main.class && echo CODERUNNER_ROBOT_CLASS_PRESENT || true; pgrep -af '[o]rg.gradle.wrapper.GradleWrapperMain build' >/dev/null || echo CODERUNNER_WPILIB_BUILD_IDLE",
 			],
 			{ allowFailure: true },
 		)
@@ -256,13 +256,13 @@ async function wpilibBuildEvidence(name: string): Promise<string> {
 
 async function waitForWpilibEditorBuild(name: string): Promise<string> {
 	return waitFor(
-		"WPILib editor Java 17 build",
+		"WPILib editor Java 25 build",
 		() => wpilibBuildEvidence(name),
 		(evidence) =>
-			/_commandLine.*\.\/gradlew build.*org\.gradle\.java\.home=\\?"\/usr\/lib\/jvm\/jdk-17\\?"/.test(
+			/_commandLine.*\.\/gradlew build.*org\.gradle\.java\.home=\\?"\/usr\/lib\/jvm\/jdk-25\\?"/.test(
 				evidence,
 			) &&
-			/javaHome=\/usr\/lib\/jvm\/jdk-17[^,]*/.test(evidence) &&
+			/javaHome=\/usr\/lib\/jvm\/jdk-25[^,]*/.test(evidence) &&
 			evidence.includes("BUILD SUCCESSFUL") &&
 			evidence.includes("CODERUNNER_ROBOT_CLASS_PRESENT") &&
 			evidence.includes("CODERUNNER_WPILIB_BUILD_IDLE"),
@@ -273,7 +273,7 @@ async function waitForWpilibEditorBuild(name: string): Promise<string> {
 test.describe("real workspace Java tooling", () => {
 	test.describe.configure({ mode: "serial" });
 
-	test("runs plain Java and imports/builds/simulates a Java 17 robot", async ({
+	test("runs plain Java and imports/builds/simulates a Java 25 robot", async ({
 		page,
 	}) => {
 		test.setTimeout(600_000);
@@ -295,7 +295,7 @@ test.describe("real workspace Java tooling", () => {
 			expect(jdtProcess.stdout).toMatch(
 				/\/usr\/lib\/jvm\/jdk-21(?:[.0-9+_-]+)?\/bin\/java/,
 			);
-			expect(jdtProcess.stdout).not.toContain("/usr/lib/jvm/jdk-17");
+			expect(jdtProcess.stdout).not.toContain("/usr/lib/jvm/jdk-25");
 			console.log("[java-smoke] Java ready; launching Run Main");
 			await page.keyboard.press("F5");
 			await waitFor(
@@ -340,7 +340,7 @@ test.describe("real workspace Java tooling", () => {
 			await openJavaFile(
 				page,
 				robotWorkspace,
-				"src/main/java/frc/robot/Robot.java",
+				"src/main/java/first/robot/Robot.java",
 				false,
 				true,
 			);
@@ -370,7 +370,7 @@ test.describe("real workspace Java tooling", () => {
 			expect(build).not.toMatch(/google-java-format.*found problem/i);
 			expect(build).not.toContain("NoSuchMethodError");
 			console.log(
-				"[java-smoke] WPILib editor build succeeded on Java 17; starting simulation",
+				"[java-smoke] WPILib editor build succeeded on Java 25; starting simulation",
 			);
 
 			const classVersion = await docker([
@@ -378,9 +378,9 @@ test.describe("real workspace Java tooling", () => {
 				robotWorkspace.name,
 				"bash",
 				"-lc",
-				"/usr/lib/jvm/jdk-17/bin/javap -verbose /workspace/project/build/classes/java/main/frc/robot/Main.class | grep 'major version'",
+				"/usr/lib/jvm/jdk-25/bin/javap -verbose /workspace/project/build/classes/java/main/first/Main.class | grep 'major version'",
 			]);
-			expect(classVersion.stdout).toContain("major version: 61");
+			expect(classVersion.stdout).toContain("major version: 69");
 
 			await docker([
 				"exec",

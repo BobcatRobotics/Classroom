@@ -28,7 +28,7 @@ The image contains two pinned, multi-architecture Temurin JDKs:
 
 | Role | Version | Configuration |
 |---|---|---|
-| Project, Gradle CLI, robot simulation | 17.0.15+6 | `JAVA_HOME=/usr/lib/jvm/jdk-17` |
+| Project, Gradle CLI, robot simulation | 17.0.15+6 | `JAVA_HOME=/usr/lib/jvm/jdk-25` |
 | JDT Language Server | 21.0.12.1+1 | `JDK_HOME=/usr/lib/jvm/jdk-21` |
 
 Machine settings also declare JavaSE-17 as the default project runtime and set

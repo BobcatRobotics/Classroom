@@ -71,7 +71,7 @@ describe("Code container VS Code defaults", () => {
 			'TOOLING_JAVA_HOME="$' + '{JDK_HOME:-/usr/lib/jvm/jdk-21}"',
 		);
 		expect(contents).toContain(
-			'PROJECT_JAVA_HOME="$' + '{PROJECT_JAVA_HOME:-/usr/lib/jvm/jdk-17}"',
+			'PROJECT_JAVA_HOME="$' + '{PROJECT_JAVA_HOME:-/usr/lib/jvm/jdk-25}"',
 		);
 		expect(contents).toContain(
 			'if ."java.jdt.ls.java.home" == $legacyJdtJavaHome',
@@ -80,7 +80,7 @@ describe("Code container VS Code defaults", () => {
 		expect(contents).toContain(
 			'."java.import.gradle.java.home" //= $projectJavaHome',
 		);
-		expect(contents).toContain('"name": "JavaSE-17"');
+		expect(contents).toContain('"name": "JavaSE-25"');
 		expect(contents).toContain('"default": true');
 	});
 
