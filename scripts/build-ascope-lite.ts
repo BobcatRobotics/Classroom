@@ -1,4 +1,4 @@
-import { cp, rm, stat } from "node:fs/promises";
+import { cp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { applyAdvantageScopePatches } from "./apply-ascope-patches";
 
@@ -6,6 +6,7 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const ascopeRoot = resolve(repoRoot, "vendor", "AdvantageScope");
 const ascopeLiteStatic = resolve(ascopeRoot, "lite", "static");
 const distDir = resolve(repoRoot, "dist", "advantagescope");
+const teamAssetsDir = resolve(repoRoot, "assets", "advantagescope");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 async function exists(path: string): Promise<boolean> {
@@ -170,6 +171,72 @@ async function resolveSymlinksInDist(): Promise<void> {
 	}
 }
 
+const requiredAssetFiles: Record<string, string> = {
+	Field2d: "image.png",
+	Field3d: "model.glb",
+	Robot: "model.glb",
+	Joystick: "image.png",
+};
+
+/**
+ * Adds team-managed AdvantageScope assets after the upstream Lite bundle is
+ * staged. These assets are served to every workspace as bundled assets; keep
+ * them outside the pinned AdvantageScope submodule.
+ */
+export async function stageTeamAssets(
+	sourceDir = teamAssetsDir,
+	targetDir = resolve(distDir, "bundledAssets"),
+): Promise<void> {
+	if (!(await exists(sourceDir))) {
+		return;
+	}
+
+	for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
+		if (entry.name.startsWith(".")) continue;
+		if (!entry.isDirectory()) {
+			throw new Error(`AdvantageScope asset ${entry.name} must be a directory.`);
+		}
+
+		const match = /^(Field2d|Field3d|Robot|Joystick)_[A-Za-z0-9][A-Za-z0-9._-]*$/u.exec(
+			entry.name,
+		);
+		if (!match) {
+			throw new Error(
+				`Invalid AdvantageScope asset directory name: ${entry.name}.`,
+			);
+		}
+
+		const assetDir = resolve(sourceDir, entry.name);
+		const configPath = resolve(assetDir, "config.json");
+		const requiredFile = requiredAssetFiles[match[1]];
+		let config: unknown;
+		try {
+			config = JSON.parse(await readFile(configPath, "utf8"));
+		} catch {
+			throw new Error(`AdvantageScope asset ${entry.name} has invalid config.json.`);
+		}
+		if (
+			typeof config !== "object" ||
+			config === null ||
+			typeof (config as { name?: unknown }).name !== "string"
+		) {
+			throw new Error(
+				`AdvantageScope asset ${entry.name} config.json must include a name.`,
+			);
+		}
+		if (!(await exists(resolve(assetDir, requiredFile)))) {
+			throw new Error(
+				`AdvantageScope asset ${entry.name} is missing ${requiredFile}.`,
+			);
+		}
+
+		await cp(assetDir, resolve(targetDir, entry.name), {
+			recursive: true,
+			force: true,
+		});
+	}
+}
+
 async function stageBundle(): Promise<void> {
 	if (!(await exists(ascopeLiteStatic))) {
 		throw new Error(
@@ -180,6 +247,7 @@ async function stageBundle(): Promise<void> {
 	await rm(distDir, { recursive: true, force: true });
 	await cp(ascopeLiteStatic, distDir, { recursive: true });
 	await resolveSymlinksInDist();
+	await stageTeamAssets();
 }
 
 async function runPostinstallForLite(): Promise<void> {
@@ -251,9 +319,11 @@ async function main(): Promise<void> {
 	console.log(`\nAdvantageScope Lite staged at ${distDir}`);
 }
 
-try {
-	await main();
-} catch (error) {
-	console.error(error instanceof Error ? error.message : String(error));
-	process.exit(1);
+if (import.meta.main) {
+	try {
+		await main();
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error));
+		process.exit(1);
+	}
 }

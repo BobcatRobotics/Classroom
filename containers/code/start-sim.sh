@@ -7,6 +7,7 @@ GRADLE_PROJECT_CACHE_DIR="${GRADLE_PROJECT_CACHE_DIR:-$HOME/.gradle-project-sim}
 DEFAULT_GRADLE_SIM_JVMARGS="-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
 GRADLE_SIM_JVMARGS="${GRADLE_SIM_JVMARGS:-$DEFAULT_GRADLE_SIM_JVMARGS}"
 GRADLE_MAX_WORKERS="${GRADLE_MAX_WORKERS:-2}"
+# DEFAULT_ROBOT_SIM_JVMARGS="--add-opens=java.base/jdk.internal.vm=ALL-UNNAMED -Xms32m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=96m -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
 DEFAULT_ROBOT_SIM_JVMARGS="-Xms32m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=96m -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
 ROBOT_SIM_JVMARGS="${ROBOT_SIM_JVMARGS:-$DEFAULT_ROBOT_SIM_JVMARGS}"
 pid_file="${SIM_PID_FILE:-$HOME/sim.pid}"

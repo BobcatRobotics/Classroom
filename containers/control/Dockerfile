@@ -54,6 +54,7 @@ WORKDIR /repo
 COPY .git/modules/vendor/AdvantageScope/ .git/modules/vendor/AdvantageScope/
 COPY vendor/ vendor/
 COPY patches/ patches/
+COPY assets/ assets/
 # Only the two scripts this stage runs — copying all of scripts/ would rerun
 # the expensive wasm compile whenever any unrelated ops script changes.
 COPY scripts/build-ascope-lite.ts scripts/apply-ascope-patches.ts scripts/
