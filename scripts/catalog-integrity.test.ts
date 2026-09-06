@@ -56,11 +56,11 @@ describe("bundled lesson catalog", () => {
 				"modules/robot-starter/gradle/wrapper/gradle-wrapper.jar",
 			),
 			expectCatalogFile(
-				"modules/robot-starter/vendordeps/WPILibNewCommands.json",
+				"modules/robot-starter/vendordeps/CommandsV2.json",
 			),
 			expectCatalogFile("modules/robot-starter/README.md"),
 			expectCatalogFile(
-				"modules/robot-starter/src/main/java/frc/robot/Robot.java",
+				"modules/robot-starter/src/main/java/first/robot/Robot.java",
 			),
 		]);
 	});
