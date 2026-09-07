@@ -1,11 +1,11 @@
 /**
- * The sim pane's tool tabs, wired end to end: WorkspacePage + topbar selector +
- * both iframe panes + the project-swap remount. The component tests cover the
- * switcher in isolation; these cover the assembly.
+ * The optional sim tools, wired end to end: WorkspacePage + topbar selector +
+ * the PathPlanner iframe and its project-swap remount. The component tests
+ * cover the switcher in isolation; these cover the assembly.
  *
  * The fake PathPlanner dist (createPathPlannerDist) counts its loads in
- * sessionStorage and exposes the count on <body>, which is the only way to tell
- * a real iframe reload from a no-op — the iframe's `src` never changes.
+ * sessionStorage and exposes the count on <body>, which makes iframe mounts
+ * and project-swap reloads observable even when the iframe's `src` is stable.
  */
 import type { Page } from "@playwright/test";
 import type { AppFixtures } from "../../fixtures/app";
@@ -51,15 +51,16 @@ async function pathplannerLoads(po: WorkspacePage): Promise<number> {
 	return Number(await body.getAttribute("data-fake-pathplanner-loads"));
 }
 
-function scopeTab(page: Page) {
-	return page.getByRole("tab", { name: "AdvantageScope" });
+function toolsMenu(page: Page) {
+	return page.getByRole("button", { name: /Tools/ });
 }
 
-function pathplannerTab(page: Page) {
-	return page.getByRole("tab", { name: "PathPlanner" });
+async function selectPathPlanner(page: Page) {
+	await toolsMenu(page).click();
+	await page.getByRole("menuitem", { name: "PathPlanner" }).click();
 }
 
-test("AdvantageScope is selected first, with PathPlanner mounted but hidden", async ({
+test("no simulation tool is mounted until one is selected", async ({
 	page,
 	app,
 	runtime,
@@ -72,17 +73,11 @@ test("AdvantageScope is selected first, with PathPlanner mounted but hidden", as
 		"Planner Default",
 	);
 
-	await expect(scopeTab(page)).toHaveAttribute("aria-selected", "true");
-	await expect(pathplannerTab(page)).toHaveAttribute("aria-selected", "false");
-	await expect(po.scopeIframe().locator("body")).toContainText("AS Lite");
-
-	// Mounted (so its in-memory state survives a tab switch) but not shown.
-	await expect(po.pathplannerFrameElement()).toBeAttached();
-	await expect(po.pathplannerFrameElement()).not.toBeVisible();
-	expect(await pathplannerLoads(po)).toBe(1);
+	await expect(po.scopeIframe().locator("body")).not.toBeAttached();
+	await expect(po.pathplannerFrameElement()).not.toBeAttached();
 });
 
-test("switching to PathPlanner reveals it, and switching back keeps it loaded", async ({
+test("selecting PathPlanner loads it, and closing it unmounts it", async ({
 	page,
 	app,
 	runtime,
@@ -94,25 +89,26 @@ test("switching to PathPlanner reveals it, and switching back keeps it loaded", 
 		{ app, runtime, fakeVscode, fakeHalsim },
 		"Planner Switch",
 	);
-	const loadsBefore = await pathplannerLoads(po);
 
-	await pathplannerTab(page).click();
-	await expect(pathplannerTab(page)).toHaveAttribute("aria-selected", "true");
+	await selectPathPlanner(page);
 	await expect(po.pathplannerFrameElement()).toBeVisible();
 	await expect(po.pathplannerIframe().locator("body")).toContainText(
 		"PathPlanner test dist",
 	);
+	const loadsBefore = await pathplannerLoads(po);
 
-	await scopeTab(page).click();
+	await toolsMenu(page).click();
+	await page.getByRole("menuitem", { name: "Close tool(s)" }).click();
 	await expect(po.pathplannerFrameElement()).not.toBeVisible();
 
-	await pathplannerTab(page).click();
+	await selectPathPlanner(page);
 	await expect(po.pathplannerFrameElement()).toBeVisible();
-	// Never unloaded: the round trip did not re-run the page's script.
-	expect(await pathplannerLoads(po)).toBe(loadsBefore);
+	// Closing the optional tool unmounts it, so selecting it again creates a new
+	// iframe document.
+	expect(await pathplannerLoads(po)).toBeGreaterThan(loadsBefore);
 });
 
-test("the selected tool tab survives a page reload", async ({
+test("PathPlanner is loaded only after selecting it from the Tools menu", async ({
 	page,
 	app,
 	runtime,
@@ -125,14 +121,13 @@ test("the selected tool tab survives a page reload", async ({
 		"Planner Reload",
 	);
 
-	await pathplannerTab(page).click();
+	await selectPathPlanner(page);
 	await expect(po.pathplannerFrameElement()).toBeVisible();
 
 	await page.reload();
 
-	// sessionStorage-backed, so the reload comes back on PathPlanner.
-	await expect(pathplannerTab(page)).toHaveAttribute("aria-selected", "true");
-	await expect(po.pathplannerFrameElement()).toBeVisible();
+	// Tool selection is local UI state, so a reload closes the optional pane.
+	await expect(po.pathplannerFrameElement()).not.toBeAttached();
 });
 
 test("a project swap reloads the PathPlanner iframe", async ({
@@ -147,6 +142,7 @@ test("a project swap reloads the PathPlanner iframe", async ({
 		{ app, runtime, fakeVscode, fakeHalsim },
 		"Planner Swap",
 	);
+	await selectPathPlanner(page);
 	const loadsBefore = await pathplannerLoads(po);
 
 	await page.getByRole("button", { name: "Switch project" }).click();
