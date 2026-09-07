@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { access, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stageTeamAssets } from "./build-ascope-lite";
@@ -22,11 +22,7 @@ describe("AdvantageScope team asset staging", () => {
 		try {
 			const source = join(root, "source");
 			const target = join(root, "bundledAssets");
-			await writeAsset(
-				source,
-				"Robot_Team177",
-				'{"name":"Team 177 Robot"}',
-			);
+			await writeAsset(source, "Robot_Team177", '{"name":"Team 177 Robot"}');
 			await writeFile(join(source, ".DS_Store"), "ignored");
 
 			await stageTeamAssets(source, target);
@@ -49,9 +45,9 @@ describe("AdvantageScope team asset staging", () => {
 				"not-a-model.txt",
 			);
 
-			await expect(stageTeamAssets(source, join(root, "target"))).rejects.toThrow(
-				"missing model.glb",
-			);
+			await expect(
+				stageTeamAssets(source, join(root, "target")),
+			).rejects.toThrow("missing model.glb");
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}

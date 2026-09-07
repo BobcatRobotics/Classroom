@@ -1,4 +1,4 @@
-import { cp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { cp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { applyAdvantageScopePatches } from "./apply-ascope-patches";
 
@@ -194,12 +194,15 @@ export async function stageTeamAssets(
 	for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
 		if (entry.name.startsWith(".")) continue;
 		if (!entry.isDirectory()) {
-			throw new Error(`AdvantageScope asset ${entry.name} must be a directory.`);
+			throw new Error(
+				`AdvantageScope asset ${entry.name} must be a directory.`,
+			);
 		}
 
-		const match = /^(Field2d|Field3d|Robot|Joystick)_[A-Za-z0-9][A-Za-z0-9._-]*$/u.exec(
-			entry.name,
-		);
+		const match =
+			/^(Field2d|Field3d|Robot|Joystick)_[A-Za-z0-9][A-Za-z0-9._-]*$/u.exec(
+				entry.name,
+			);
 		if (!match) {
 			throw new Error(
 				`Invalid AdvantageScope asset directory name: ${entry.name}.`,
@@ -213,7 +216,9 @@ export async function stageTeamAssets(
 		try {
 			config = JSON.parse(await readFile(configPath, "utf8"));
 		} catch {
-			throw new Error(`AdvantageScope asset ${entry.name} has invalid config.json.`);
+			throw new Error(
+				`AdvantageScope asset ${entry.name} has invalid config.json.`,
+			);
 		}
 		if (
 			typeof config !== "object" ||

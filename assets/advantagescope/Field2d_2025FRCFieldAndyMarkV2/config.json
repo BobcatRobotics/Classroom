@@ -1,16 +1,10 @@
 {
-  "name": "2025 Field (AndyMark)",
-  "isFTC": false,
-  "coordinateSystem": "wall-blue",
-  "sourceUrl": "https://www.chiefdelphi.com/t/4k-field-image-2025-reefscape/478797",
-  "topLeft": [
-    421,
-    91
-  ],
-  "bottomRight": [
-    3352,
-    1437
-  ],
-  "widthInches": 690.875,
-  "heightInches": 316.614
+	"name": "2025 Field (AndyMark)",
+	"isFTC": false,
+	"coordinateSystem": "wall-blue",
+	"sourceUrl": "https://www.chiefdelphi.com/t/4k-field-image-2025-reefscape/478797",
+	"topLeft": [421, 91],
+	"bottomRight": [3352, 1437],
+	"widthInches": 690.875,
+	"heightInches": 316.614
 }
