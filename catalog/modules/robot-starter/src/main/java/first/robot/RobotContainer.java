@@ -29,9 +29,6 @@ public class RobotContainer {
 
   /** Called every loop while the robot is running. Add your own logic here. */
   public void robotPeriodic() {
-    // Run the command scheduler so subsystems and commands you add keep working.
-    Scheduler.getDefault().run();
-
     // A counter that ticks up once per loop.
     counter++;
     Logger.recordOutput("Counter", counter);
