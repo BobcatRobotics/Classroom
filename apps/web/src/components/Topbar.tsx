@@ -1,8 +1,8 @@
-import { Replace } from "lucide-react";
 import coderunnerHeaderImg from "@/assets/coderunner-header.png";
-import { SimPaneTabSelector } from "@/components/SimPaneSwitcher";
-import { UserMenu } from "@/components/UserMenu";
-import { Button } from "@/components/ui/button";
+import { ProjectMenu } from "@/components/Menu/ProjectMenu";
+import { ToolsMenu } from "@/components/Menu/ToolsMenu";
+import { UserMenu } from "@/components/Menu/UserMenu";
+import type { WorkspaceTool } from "@/components/SimPaneSwitcher";
 
 interface TopbarProps {
 	displayName: string;
@@ -10,8 +10,9 @@ interface TopbarProps {
 	avatarUrl: string | null;
 	isAdmin: boolean;
 	onSwitchProject: () => void;
-	/** Only for layouts that render the sim pane; requires a `SimPaneTabs` root. */
-	showSimPaneTabs?: boolean;
+	onSelectTool: (tool: WorkspaceTool) => void;
+	onCloseTool: () => void;
+	showTools?: boolean;
 }
 
 export function Topbar({
@@ -20,7 +21,9 @@ export function Topbar({
 	avatarUrl,
 	isAdmin,
 	onSwitchProject,
-	showSimPaneTabs = false,
+	onSelectTool,
+	onCloseTool,
+	showTools,
 }: TopbarProps) {
 	return (
 		<header className="flex h-[48px] shrink-0 items-center border-b border-border px-4">
@@ -31,17 +34,10 @@ export function Topbar({
 				</strong>
 			</div>
 			<div className="ml-auto flex items-center gap-5">
-				{showSimPaneTabs && <SimPaneTabSelector />}
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					className="h-8 gap-1.5 px-2.5 text-[12.5px]"
-					onClick={onSwitchProject}
-				>
-					<Replace className="size-[15px] text-muted-foreground" />
-					Switch project
-				</Button>
+				{showTools && (
+					<ToolsMenu onSelectTool={onSelectTool} onCloseTool={onCloseTool} />
+				)}
+				<ProjectMenu onSwitchProject={onSwitchProject} />
 				<UserMenu
 					displayName={displayName}
 					email={email}

@@ -6,6 +6,7 @@ import {
 	ResizablePanelGroup,
 	useResizableLayout,
 } from "@/components/ui/resizable";
+import type { ActiveTool } from "./SimPaneSwitcher";
 
 interface IDELayoutProps {
 	editor: ReactNode;
@@ -17,6 +18,7 @@ interface IDELayoutProps {
 	 * to run from the editor's Run button.
 	 */
 	showSimPanels?: boolean;
+	activeTool: ActiveTool;
 }
 
 export function IDELayout({
@@ -24,6 +26,7 @@ export function IDELayout({
 	scope,
 	driverStation,
 	showSimPanels = true,
+	activeTool,
 }: IDELayoutProps) {
 	// Pane sizes survive a refresh but not a new tab/session.
 	const rows = useResizableLayout({
@@ -72,23 +75,28 @@ export function IDELayout({
 				>
 					<ResizablePanel
 						id="ide-editor"
-						defaultSize={50}
-						minSize={25}
+						defaultSize={activeTool === null ? 100 : 50}
+						minSize={activeTool === null ? 100 : 25}
 						data-pane="editor"
 						className="min-h-0"
 					>
 						<div className="h-full min-h-0 min-w-0 bg-card">{editor}</div>
 					</ResizablePanel>
-					<ResizableHandle withHandle data-pane="scope-handle" />
-					<ResizablePanel
-						id="ide-scope"
-						defaultSize={50}
-						minSize={25}
-						className="hidden min-h-0 min-[901px]:block"
-						data-pane="scope"
-					>
-						{scope}
-					</ResizablePanel>
+
+					{activeTool !== null && (
+						<>
+							<ResizableHandle withHandle data-pane="scope-handle" />
+							<ResizablePanel
+								id="ide-scope"
+								defaultSize={50}
+								minSize={25}
+								data-pane="tool"
+								className="min-h-0"
+							>
+								{scope}
+							</ResizablePanel>
+						</>
+					)}
 				</ResizablePanelGroup>
 			</ResizablePanel>
 			<ResizableHandle withHandle />

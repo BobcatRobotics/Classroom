@@ -6,7 +6,11 @@ import { EditorPane } from "@/components/EditorPane";
 import { IDELayout } from "@/components/IDELayout";
 import { PathPlannerPane } from "@/components/PathPlannerPane";
 import { ScopePane } from "@/components/ScopePane";
-import { SimPanePanels, SimPaneTabs } from "@/components/SimPaneSwitcher";
+import {
+	type ActiveTool,
+	SimPanePanels,
+	type WorkspaceTool,
+} from "@/components/SimPaneSwitcher";
 import { SwitchProjectDialog } from "@/components/SwitchProjectDialog";
 import { Topbar } from "@/components/Topbar";
 import { useAutoChoosers } from "@/hooks/useAutoChoosers";
@@ -53,6 +57,7 @@ export function WorkspacePage() {
 	const simSlug = isConsoleModule ? null : workspaceSlug;
 
 	const [switchOpen, setSwitchOpen] = useState(false);
+	const [activeTool, setActiveTool] = useState<ActiveTool>(null);
 
 	const { connection: runConnection, consoleLines } = useRunChannel(simSlug);
 	const simulation = useSimulationState(simSlug);
@@ -66,7 +71,7 @@ export function WorkspacePage() {
 		errorDetail: editorErrorDetail,
 	} = useEditorReachability(editorUrl);
 	const scopeFrameRef = useRef<HTMLIFrameElement>(null);
-	useScopeHandshake(simSlug, scopeFrameRef);
+	useScopeHandshake(activeTool === "scope" ? simSlug : null, scopeFrameRef);
 
 	const gamepad = useGamepad();
 	const channel = useGamepadChannel(simSlug);
@@ -83,6 +88,12 @@ export function WorkspacePage() {
 		() => gamepadStateToVisualizerFrame(keyboardState),
 		[keyboardState],
 	);
+
+	useEffect(() => {
+		if (isConsoleModule) {
+			setActiveTool(null);
+		}
+	}, [isConsoleModule]);
 
 	// Bridge: when a gamepad frame arrives, ship the WPILib-mapped state to
 	// the channel. pushState handles its own throttle / heartbeat / diffing,
@@ -149,6 +160,14 @@ export function WorkspacePage() {
 		}
 	}, [channel, inputMode]);
 
+	const onSelectTool = useCallback((tool: WorkspaceTool) => {
+		setActiveTool(tool);
+	}, []);
+
+	const onCloseTool = useCallback(() => {
+		setActiveTool(null);
+	}, []);
+
 	// Safety: if the selected gamepad disappears (useGamepad clears
 	// selectedIndex), tell the server to release.
 	const lastSelectedRef = useRef<number | null>(null);
@@ -201,7 +220,7 @@ export function WorkspacePage() {
 		sessionState.status === "error" ? sessionState.message : undefined;
 
 	return (
-		<SimPaneTabs className="flex h-screen flex-col gap-0 bg-background">
+		<div className="flex h-screen flex-col gap-0 bg-background">
 			{isDemo && <DemoBanner />}
 			<Topbar
 				displayName={displayName}
@@ -209,9 +228,12 @@ export function WorkspacePage() {
 				avatarUrl={avatarUrl}
 				isAdmin={isAdmin}
 				onSwitchProject={() => setSwitchOpen(true)}
-				showSimPaneTabs={!isConsoleModule}
+				onSelectTool={onSelectTool}
+				onCloseTool={onCloseTool}
+				showTools={!isConsoleModule}
 			/>
 			<IDELayout
+				activeTool={activeTool}
 				showSimPanels={!isConsoleModule}
 				editor={
 					<EditorPane
@@ -225,10 +247,12 @@ export function WorkspacePage() {
 				}
 				scope={
 					<SimPanePanels
+						activeTool={activeTool}
 						scope={<ScopePane ref={scopeFrameRef} />}
 						pathplanner={
 							<PathPlannerPane key={reloadNonce} workspaceSlug={simSlug} />
 						}
+						bline={null} // TODO: When bline is ready
 					/>
 				}
 				driverStation={
@@ -270,6 +294,6 @@ export function WorkspacePage() {
 				currentModule={currentModule}
 				onSwapComplete={onSwapComplete}
 			/>
-		</SimPaneTabs>
+		</div>
 	);
 }

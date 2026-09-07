@@ -1,4 +1,4 @@
-# CodeRunner
+# Classroom
 
 A self-hosted, browser-based IDE for learning FRC robot programming. Students get a hosted VS Code editor, isolated Docker workspaces, one-click robot simulation, live AdvantageScope telemetry, and PathPlanner — all with no local setup. Lesson modules guide beginners, while GitHub team import supports real robot projects.
 
@@ -7,8 +7,9 @@ A self-hosted, browser-based IDE for learning FRC robot programming. Students ge
 Try CodeRunner locally in demo mode — no OAuth, no allowlist, no configuration required. Just Docker:
 
 ```bash
-git clone https://github.com/mathewdunne/CodeRunner coderunner
+git clone https://github.com/BobcatRobotics/Classroom.git coderunner
 cd coderunner
+git switch release/2027
 CODERUNNER_DEMO_MODE=1 docker compose up
 ```
 
