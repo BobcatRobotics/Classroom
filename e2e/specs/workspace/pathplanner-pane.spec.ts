@@ -145,7 +145,8 @@ test("a project swap reloads the PathPlanner iframe", async ({
 	await selectPathPlanner(page);
 	const loadsBefore = await pathplannerLoads(po);
 
-	await page.getByRole("button", { name: "Switch project" }).click();
+	await page.getByRole("button", { name: "Projects" }).click();
+	await page.getByRole("menuitem", { name: "Switch project" }).click();
 	const dialog = page.getByRole("dialog");
 
 	// The bundled-catalog fixture offers a console module and a robot module;
