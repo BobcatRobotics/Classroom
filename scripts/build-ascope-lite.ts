@@ -211,7 +211,13 @@ export async function stageTeamAssets(
 
 		const assetDir = resolve(sourceDir, entry.name);
 		const configPath = resolve(assetDir, "config.json");
-		const requiredFile = requiredAssetFiles[match[1]];
+		const assetType = match[1] as keyof typeof requiredAssetFiles;
+		const requiredFile = requiredAssetFiles[assetType];
+		if (requiredFile === undefined) {
+			throw new Error(
+				`Invalid AdvantageScope asset directory name: ${entry.name}.`,
+			);
+		}
 		let config: unknown;
 		try {
 			config = JSON.parse(await readFile(configPath, "utf8"));
