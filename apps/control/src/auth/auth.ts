@@ -53,7 +53,59 @@ export function slugFromEmail(email: string): string {
 export type AuthCallbacks = {
 	/** Called after OAuth callback for new users to create their workspace. */
 	ensureWorkspace: (userId: string, slug: string) => Promise<void>;
+	configureWorkspaceGitIdentity: (
+		userId: string,
+		name: string,
+		email: string,
+	) => Promise<void>;
 };
+
+function hasGithubAccount(db: Database, userId: string): boolean {
+	const account = db
+		.query("SELECT 1 FROM account WHERE userId = ? AND providerId = ? LIMIT 1")
+		.get(userId, "github");
+	return Boolean(account);
+}
+
+async function githubPrimaryEmail(
+	db: Database,
+	userId: string,
+	fallback: string,
+): Promise<string> {
+	const account = db
+		.query(
+			"SELECT accessToken FROM account WHERE userId = ? AND providerId = ? LIMIT 1",
+		)
+		.get(userId, "github") as { accessToken: string | null } | null;
+	if (!account?.accessToken) return fallback;
+
+	try {
+		const response = await fetch("https://api.github.com/user/emails", {
+			headers: {
+				Accept: "application/vnd.github+json",
+				Authorization: `Bearer ${account.accessToken}`,
+				"X-GitHub-Api-Version": "2022-11-28",
+				"User-Agent": "CodeRunner",
+			},
+		});
+		if (!response.ok) throw new Error(`GitHub returned ${response.status}.`);
+		const emails = (await response.json()) as Array<{
+			email?: string;
+			primary?: boolean;
+			verified?: boolean;
+		}>;
+		return (
+			emails.find((entry) => entry.primary && entry.verified && entry.email)
+				?.email ?? fallback
+		);
+	} catch (error) {
+		log.warn("could not resolve GitHub primary email", {
+			userId,
+			err: error instanceof Error ? error.message : String(error),
+		});
+		return fallback;
+	}
+}
 
 export function createAuth(
 	db: Database,
@@ -162,6 +214,25 @@ export function createAuth(
 							slug,
 						});
 						await callbacks.ensureWorkspace(user.id, slug);
+						if (hasGithubAccount(db, user.id)) {
+							try {
+								const gitEmail = await githubPrimaryEmail(
+									db,
+									user.id,
+									newSession.user.email,
+								);
+								await callbacks.configureWorkspaceGitIdentity(
+									user.id,
+									newSession.user.name,
+									gitEmail,
+								);
+							} catch (error) {
+								log.warn("could not configure workspace Git identity", {
+									userId: user.id,
+									err: error instanceof Error ? error.message : String(error),
+								});
+							}
+						}
 					}
 				}
 			}),

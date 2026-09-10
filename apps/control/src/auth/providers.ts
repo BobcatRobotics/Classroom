@@ -10,6 +10,7 @@ export type SocialProviders = {
 	github?: {
 		clientId: string;
 		clientSecret: string;
+		scope: string[];
 		overrideUserInfoOnSignIn: boolean;
 	};
 	google?: {
@@ -45,6 +46,7 @@ export function buildSocialProviders(config: ControlConfig): SocialProviders {
 			providers.github = {
 				clientId: config.githubClientId!,
 				clientSecret: config.githubClientSecret!,
+				scope: ["read:user", "user:email"],
 				overrideUserInfoOnSignIn: true,
 			};
 		}

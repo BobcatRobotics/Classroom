@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type {
 	ContainerRole,
@@ -157,6 +157,9 @@ export class AppStorage {
 		this.auth = createAuth(this.db, this.config, {
 			ensureWorkspace: async (userId, slug) => {
 				await this.ensureWorkspaceForUser(userId, slug);
+			},
+			configureWorkspaceGitIdentity: async (userId, name, email) => {
+				await this.configureWorkspaceGitIdentity(userId, name, email);
 			},
 		});
 		const { getMigrations } = await import("better-auth/db/migration");
@@ -350,6 +353,51 @@ export class AppStorage {
 		}
 
 		return workspace;
+	}
+
+	private async configureWorkspaceGitIdentity(
+		userId: string,
+		name: string,
+		email: string,
+	): Promise<void> {
+		const workspace = this.findWorkspaceByUserId(userId);
+		if (!workspace) throw new Error(`Workspace for user ${userId} not found.`);
+		const homeDir = resolve(dirname(workspace.project_path), "home");
+		const gitConfigPath = resolve(homeDir, ".gitconfig");
+		const safeName = name.trim().replace(/[\r\n]+/gu, " ");
+		const safeEmail = email.trim().replace(/[\r\n]+/gu, "");
+		if (!safeName || !safeEmail) return;
+
+		let existingName: string | null = null;
+		let existingEmail: string | null = null;
+		try {
+			const existing = await readFile(gitConfigPath, "utf8");
+			const userSection = existing.match(
+				/(?:^|\n)\s*\[user\]\s*\n([\s\S]*?)(?=\n\s*\[[^\]]+\]|$)/i,
+			)?.[1];
+			existingName =
+				userSection?.match(/^\s*name\s*=\s*(\S.*)$/im)?.[1]?.trim() ?? null;
+			existingEmail =
+				userSection?.match(/^\s*email\s*=\s*(\S.*)$/im)?.[1]?.trim() ?? null;
+			if (
+				existingName &&
+				existingEmail?.toLowerCase() === safeEmail.toLowerCase()
+			) {
+				return;
+			}
+		} catch (error) {
+			const code =
+				error instanceof Error
+					? (error as NodeJS.ErrnoException).code
+					: undefined;
+			if (code !== "ENOENT") throw error;
+		}
+
+		await writeFile(
+			gitConfigPath,
+			`[user]\n\tname = ${existingName ?? safeName}\n\temail = ${safeEmail}\n`,
+			{ encoding: "utf8", mode: 0o600 },
+		);
 	}
 
 	touchWorkspace(workspaceId: WorkspaceId): void {
