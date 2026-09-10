@@ -318,8 +318,8 @@ export function WorkspacePage() {
 							<LoaderPinwheel className="size-6 animate-spin text-primary" />
 						</div>
 						<div className="flex flex-col items-center gap-1 text-center font-mono text-sm text-foreground">
-								<div>Please wait while your workspace loads.</div>
-								<div>This may take a few minutes...</div>
+							<div>Please wait while your workspace loads.</div>
+							<div>This may take a few minutes...</div>
 						</div>
 					</div>
 				</div>
