@@ -1,4 +1,4 @@
-# Classroom
+# CodeRunner
 
 A self-hosted, browser-based IDE for learning FRC robot programming. Students get a hosted VS Code editor, isolated Docker workspaces, one-click robot simulation, live AdvantageScope telemetry, and PathPlanner — all with no local setup. Lesson modules guide beginners, while GitHub team import supports real robot projects.
 

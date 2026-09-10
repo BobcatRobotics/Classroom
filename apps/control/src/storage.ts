@@ -72,7 +72,7 @@ export type AuthContext = {
 
 export class SlugTakenError extends Error {
 	constructor(slug: string) {
-		super(`The classroom name "${slug}" is already taken.`);
+		super(`The coderunner name "${slug}" is already taken.`);
 		this.name = "SlugTakenError";
 	}
 }
