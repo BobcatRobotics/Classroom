@@ -7,6 +7,7 @@ EXTENSIONS_DIR="${HOME}/extensions"
 MACHINE_SETTINGS="${HOME}/data/Machine/settings.json"
 PROJECT_SETTINGS="/workspace/project/.vscode/settings.json"
 SIM_LOG_FILE="${SIM_LOG_FILE:-${HOME}/sim.log}"
+READY_MARKER="${HOME}/.coderunner-workspace-ready"
 DEFAULT_JDT_LS_VMARGS="-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xms64m -Xmx512m -XX:ReservedCodeCacheSize=96m -Xlog:disable"
 DEFAULT_GRADLE_JVMARGS="-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8"
 TOOLING_JAVA_HOME="${JDK_HOME:-/usr/lib/jvm/jdk-21}"
@@ -16,6 +17,7 @@ LEGACY_GRADLE_ARGS="--no-daemon --no-watch-fs --max-workers=2"
 CODERUNNER_JDT_LS_VMARGS="${CODERUNNER_JDT_LS_VMARGS:-${DEFAULT_JDT_LS_VMARGS}}"
 CODERUNNER_GRADLE_JVMARGS="${CODERUNNER_GRADLE_JVMARGS:-${DEFAULT_GRADLE_JVMARGS}}"
 
+rm -f "${READY_MARKER}"
 mkdir -p "${GRADLE_USER_HOME}" "${EXTENSIONS_DIR}" "${HOME}/data/Machine" "${HOME}/data/User"
 
 # Seed Gradle cache on first run.
@@ -168,3 +170,5 @@ lsiown abc:abc \
   "${SIM_LOG_FILE}"
 echo "setting permissions::workspace"
 lsiown -R abc:abc /workspace/project
+touch "${READY_MARKER}"
+lsiown abc:abc "${READY_MARKER}"

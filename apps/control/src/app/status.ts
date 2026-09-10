@@ -24,12 +24,17 @@ export async function containersStatusResponse(
 		const runtime = await runtimeProvider.ensureWorkspaceRunning(
 			auth.workspace.id,
 		);
+		const setup = await runtimeProvider.exec(auth.workspace.id, [
+			"test",
+			"-f",
+			"/config/.coderunner-workspace-ready",
+		]);
 		const status: ContainersStatusResponse = {
 			workspace: {
 				id: auth.workspace.id,
 				slug: auth.workspace.slug,
 			},
-			code: codeStatusFromRuntime(runtime),
+			code: { ...codeStatusFromRuntime(runtime), ready: setup.exitCode === 0 },
 		};
 		return jsonResponse(status);
 	} catch (error) {

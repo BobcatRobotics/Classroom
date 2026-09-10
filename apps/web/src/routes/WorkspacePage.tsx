@@ -1,3 +1,4 @@
+import { LoaderPinwheel } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { DemoBanner } from "@/components/DemoBanner";
@@ -14,6 +15,7 @@ import {
 import { SwitchProjectDialog } from "@/components/SwitchProjectDialog";
 import { Topbar } from "@/components/Topbar";
 import { useAutoChoosers } from "@/hooks/useAutoChoosers";
+import { useContainerStatus } from "@/hooks/useContainerStatus";
 import { useEditorReachability } from "@/hooks/useEditorReachability";
 import { type GamepadInfo, useGamepad } from "@/hooks/useGamepad";
 import { useGamepadChannel } from "@/hooks/useGamepadChannel";
@@ -41,7 +43,9 @@ export function WorkspacePage() {
 
 	// Bumped after a project swap so the session refetches and the editor remounts.
 	const [reloadNonce, setReloadNonce] = useState(0);
+	const [editorLoaded, setEditorLoaded] = useState(false);
 	const sessionState = useSession(workspaceSlug, reloadNonce);
+	const containerStatus = useContainerStatus(workspaceSlug);
 
 	const workspace =
 		sessionState.status === "ready" ? sessionState.session.workspace : null;
@@ -196,6 +200,7 @@ export function WorkspacePage() {
 	}, [projectEmpty]);
 
 	const onSwapComplete = useCallback(() => {
+		setEditorLoaded(false);
 		setReloadNonce((n) => n + 1);
 	}, []);
 
@@ -216,11 +221,17 @@ export function WorkspacePage() {
 		sessionState.status === "ready" && sessionState.session.demo === true;
 
 	const sessionReady = sessionState.status === "ready";
+	const workspaceReady =
+		sessionReady &&
+		containerStatus?.code.ready === true &&
+		editorStatus === "reachable" &&
+		editorLoaded;
+	const workspaceSettingUp = sessionReady && !workspaceReady;
 	const errorMessage =
 		sessionState.status === "error" ? sessionState.message : undefined;
 
 	return (
-		<div className="flex h-screen flex-col gap-0 bg-background">
+		<div className="relative flex h-screen flex-col gap-0 bg-background">
 			{isDemo && <DemoBanner />}
 			<Topbar
 				displayName={displayName}
@@ -243,6 +254,7 @@ export function WorkspacePage() {
 						errorMessage={errorMessage}
 						waitingSeconds={editorWaitingSeconds}
 						errorDetail={editorErrorDetail}
+						onReady={() => setEditorLoaded(true)}
 					/>
 				}
 				scope={
@@ -294,6 +306,24 @@ export function WorkspacePage() {
 				currentModule={currentModule}
 				onSwapComplete={onSwapComplete}
 			/>
+			{workspaceSettingUp && (
+				<div
+					className="absolute inset-0 z-50 flex items-center justify-center bg-background/95 px-6 text-center backdrop-blur-sm"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Workspace setup in progress"
+				>
+					<div className="flex max-w-lg flex-col items-center gap-4">
+						<div className="flex size-12 items-center justify-center rounded-full border border-border bg-card">
+							<LoaderPinwheel className="size-6 animate-spin text-primary" />
+						</div>
+						<div className="flex flex-col items-center gap-1 text-center font-mono text-sm text-foreground">
+								<div>Please wait while your workspace loads.</div>
+								<div>This may take a few minutes...</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

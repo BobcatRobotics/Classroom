@@ -87,6 +87,7 @@ export const containersStatusResponseSchema = z.object({
 	code: z.object({
 		role: z.literal("code"),
 		state: containerStateSchema,
+		ready: z.boolean(),
 		image: z.string().min(1),
 		containerName: z.string().min(1).nullable(),
 		simPortAllocated: z.boolean(),

@@ -69,6 +69,7 @@ export function codeStatusFromRuntime(
 	return {
 		role: "code",
 		state: runtime.state,
+		ready: false,
 		image: runtime.image,
 		containerName: runtime.runtimeName,
 		// "Allocated" means the upstream endpoint is resolvable. In port mode the

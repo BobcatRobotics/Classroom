@@ -23,6 +23,7 @@ export function statusFromLease(
 	return {
 		role: "code",
 		state,
+		ready: false,
 		image,
 		containerName: lease?.vscode_container ?? null,
 		simPortAllocated: networkReachable || (lease?.nt4_port ?? null) !== null,

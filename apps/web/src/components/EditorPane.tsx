@@ -1,5 +1,5 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorStatus } from "@/hooks/useEditorReachability";
 
 interface EditorPaneProps {
@@ -10,6 +10,7 @@ interface EditorPaneProps {
 	waitingSeconds?: number;
 	/** The proxy's explanation of a failed start, when it sent one. */
 	errorDetail?: string | null;
+	onReady?: () => void;
 }
 
 export function EditorPane({
@@ -18,15 +19,53 @@ export function EditorPane({
 	errorMessage,
 	waitingSeconds = 0,
 	errorDetail = null,
+	onReady,
 }: EditorPaneProps) {
 	const [iframeLoaded, setIframeLoaded] = useState(false);
+	const iframeRef = useRef<HTMLIFrameElement>(null);
+	const readinessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const editorReachable = editorStatus === "reachable";
 
 	useEffect(() => {
 		setIframeLoaded(false);
+		return () => {
+			if (readinessTimerRef.current !== null) {
+				clearTimeout(readinessTimerRef.current);
+			}
+		};
 	}, []);
 
-	const handleLoad = useCallback(() => setIframeLoaded(true), []);
+	const handleLoad = useCallback(() => {
+		setIframeLoaded(true);
+
+		// The iframe load event only means the web client document arrived. Wait
+		// for the VS Code workbench to mount and settle before unlocking the shell.
+		const startedAt = Date.now();
+		let stableSince: number | null = null;
+		const checkWorkbench = () => {
+			const document = iframeRef.current?.contentDocument;
+			const workbenchMounted = Boolean(
+				document?.querySelector(
+					".monaco-workbench, [data-fake-vscode-ready='true']",
+				),
+			);
+			if (workbenchMounted && document?.readyState === "complete") {
+				stableSince ??= Date.now();
+				if (Date.now() - stableSince >= 5_000) {
+					onReady?.();
+					return;
+				}
+			} else {
+				stableSince = null;
+			}
+
+			// Keep checking while the workbench and extension host finish starting.
+			if (Date.now() - startedAt < 120_000) {
+				readinessTimerRef.current = setTimeout(checkWorkbench, 250);
+			}
+		};
+		checkWorkbench();
+	}, [onReady]);
 
 	if (!editorUrl) {
 		return (
@@ -42,6 +81,7 @@ export function EditorPane({
 		<div className="relative h-full w-full">
 			{editorReachable && (
 				<iframe
+					ref={iframeRef}
 					title="VS Code Editor"
 					data-pane="editor"
 					src={editorUrl}
