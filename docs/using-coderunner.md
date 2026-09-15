@@ -26,7 +26,8 @@ commit and push any work you want to keep.
 The WPILib extension can start a simulation, but you should not use it here.
 Click **Start** in the Driver Station at the bottom of the page so CodeRunner
 can use its supported headless simulation setup and connect the controls and
-telemetry.
+telemetry. Standalone builds can still be run from the extension when you only
+want to compile and check your code.
 
 :::
 
