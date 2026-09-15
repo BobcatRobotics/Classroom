@@ -75,7 +75,7 @@ ownership check (read-only, GET-only). `plain-java` lessons get a Preview
 show/hide button in the selector's slot; `IDELayout` splits `showRightPane`
 from `showDriverStation` to make that possible. See
 `docs/decisions/041-project-preview.md` and
-[`docs/lessons/preview.md`](./docs/lessons/preview.md).
+[`docs/using-coderunner.md`](./docs/using-coderunner.md).
 
 **Containerized control plane (post-V2):** the control plane ships as a Docker
 image (`containers/control/Dockerfile` → `ghcr.io/mathewdunne/coderunner-control`)

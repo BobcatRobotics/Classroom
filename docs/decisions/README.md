@@ -4,7 +4,7 @@ Record active architecture decisions here.
 
 ## Active (V2 and post-V2)
 
-011–040 are the current decision logs (see files in this directory). The latest:
+011–042 are the current decision logs (see files in this directory). The latest:
 
 - [`032-canonical-image-naming.md`](032-canonical-image-naming.md) — one canonical name per image, derived from `CODERUNNER_IMAGE_NS` + `CODERUNNER_TAG`.
 - [`033-workspace-disk-read-limit.md`](033-workspace-disk-read-limit.md) — workspace containers get a per-device `--device-read-bps` cap (`CODE_DISK_READ_LIMIT`) so one memory-thrashing container cannot saturate host disk throughput and freeze the VM; `CODE_MEMORY_LIMIT` default raised to `4096m`.
@@ -18,6 +18,7 @@ Record active architecture decisions here.
 - [`040-selinux-container-mounts.md`](040-selinux-container-mounts.md) — exempts the control plane from SELinux labeling and relabels student bind mounts for shared access while preserving demo named volumes.
 
 - [`041-project-preview.md`](041-project-preview.md) — reads project Markdown and generated HTML reports in the right pane, isolating student HTML in an opaque-origin sandbox and authorising its resources with a signed path token instead of the session cookie.
+- [`042-collapsible-workspace-panes.md`](042-collapsible-workspace-panes.md) — editor, right pane, and Driver Station collapse by zeroing their panel size and hiding/inerting contents rather than unmounting, with visibility owned by the workspace page so boundary buttons, the Layout menu, and the tool selector share one state.
 
 ## Archive
 

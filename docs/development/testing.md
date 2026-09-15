@@ -67,9 +67,8 @@ bun run e2e
 
 Runs the Playwright test suite against the `mocked` project. No Docker
 daemon required. Each test gets a fully isolated control-plane instance;
-see [Fixture architecture](#fixture-architecture) below. Approximately
-75 tests covering the full login→editor→run→telemetry→driver-station
-flow, including:
+see [Fixture architecture](#fixture-architecture) below. Covers the full
+login→editor→run→telemetry→driver-station flow, including:
 
 - Auth: session isolation, cross-workspace 403 gating, allowlist enforcement, role gating
 - Editor proxy: iframe load, WebSocket upgrade, hop-by-hop header stripping, asset base path

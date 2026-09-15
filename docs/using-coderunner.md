@@ -9,8 +9,8 @@ title: Using CodeRunner
 
 1. Sign in.
 2. Click **Switch project**, then load a lesson or import a public GitHub project.
-3. For a lesson, open its README and follow the instructions. For an imported
-   project, open the files you want to work on.
+3. For a lesson, select **Preview** to read its README and follow the
+   instructions. For an imported project, open the files you want to work on.
 
 :::warning[Switching projects discards your current workspace]
 
@@ -67,12 +67,11 @@ for simulated robot telemetry.
 
 ## Preview
 
-Use **Preview** to read project Markdown and generated HTML reports beside the
-editor. Choose a file from the searchable picker, then click **Refresh** after a
-build or edit. Preview uses local files, so external images and CDN assets will
-not load.
+Use **Preview** to read project Markdown and HTML reports beside the editor. A
+root `README.md` opens automatically; use the searchable picker to find other
+documents by name or path, including generated files under `build/reports/**`.
 
-See [Reading Documents](./lessons/preview.md) for the full details.
+Click **Refresh** after a build or edit to see updated changes.
 
 ## Console lessons
 
