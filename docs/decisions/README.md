@@ -17,6 +17,8 @@ Record active architecture decisions here.
 
 - [`040-selinux-container-mounts.md`](040-selinux-container-mounts.md) — exempts the control plane from SELinux labeling and relabels student bind mounts for shared access while preserving demo named volumes.
 
+- [`041-project-preview.md`](041-project-preview.md) — reads project Markdown and generated HTML reports in the right pane, isolating student HTML in an opaque-origin sandbox and authorising its resources with a signed path token instead of the session cookie.
+
 ## Archive
 
 V1 decision logs 007–010 and MVP decision logs 001–006 are archived because V1 is no longer the runtime model and the MVP phase is complete:

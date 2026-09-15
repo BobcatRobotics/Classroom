@@ -41,8 +41,12 @@ telemetry.
 4. Click **Stop** when you are finished, or **Restart** to stop the code and re-run with any changes you've made.
 
 Build output and robot output appear in the **Console** tab. Use the top-bar
-**AdvantageScope** and **PathPlanner** tabs to switch the tool beside the editor.
-AdvantageScope opens by default, and switching tabs does not reload either tool.
+**AdvantageScope**, **PathPlanner** and **Preview** tabs to switch the tool
+beside the editor. AdvantageScope opens by default, and switching tabs does not
+reload any of them.
+
+Drag the dividers to resize panes. Use the caret buttons or **User menu → Layout**
+to change the layout.
 
 ## PathPlanner
 
@@ -61,12 +65,23 @@ project reloads PathPlanner with the new project's files.
 PathPlanner robot telemetry and hot reload are not connected. Use AdvantageScope
 for simulated robot telemetry.
 
+## Preview
+
+Use **Preview** to read project Markdown and generated HTML reports beside the
+editor. Choose a file from the searchable picker, then click **Refresh** after a
+build or edit. Preview uses local files, so external images and CDN assets will
+not load.
+
+See [Reading Documents](./lessons/preview.md) for the full details.
+
 ## Console lessons
 
 `Console` type lessons are pure Java exercises, not robot projects. Because they
-do not run a robot simulation, the entire simulation and tool pane is hidden.
-The VS Code editor expands to fill the full screen. Use the editor's **Run**
-button to run them.
+do not run a robot simulation, the simulation tools and Driver Station are
+hidden and the VS Code editor expands to fill the screen. Use the editor's
+**Run** button to run them.
+
+The top bar still offers a **Preview** button for instructions and reports.
 
 ## Explore more
 

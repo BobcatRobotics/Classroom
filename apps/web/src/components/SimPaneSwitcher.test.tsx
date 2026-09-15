@@ -1,19 +1,20 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
 	SimPanePanels,
 	SimPaneTabSelector,
 	SimPaneTabs,
 } from "./SimPaneSwitcher";
 
-function renderSwitcher() {
+function renderSwitcher(onPreviewActivated?: () => void) {
 	return render(
-		<SimPaneTabs>
+		<SimPaneTabs onPreviewActivated={onPreviewActivated}>
 			<SimPaneTabSelector />
 			<SimPanePanels
 				scope={<div>scope-pane</div>}
 				pathplanner={<div>pathplanner-pane</div>}
+				preview={<div>preview-pane</div>}
 			/>
 		</SimPaneTabs>,
 	);
@@ -24,12 +25,13 @@ describe("SimPaneSwitcher", () => {
 		sessionStorage.clear();
 	});
 
-	test("defaults to the AdvantageScope tab with both panes mounted", () => {
+	test("defaults to the AdvantageScope tab with all panes mounted", () => {
 		renderSwitcher();
 
-		// Both stay mounted so the hidden iframe keeps its state.
+		// All stay mounted so the hidden iframes keep their state.
 		expect(screen.getByText("scope-pane")).toBeInTheDocument();
 		expect(screen.getByText("pathplanner-pane")).toBeInTheDocument();
+		expect(screen.getByText("preview-pane")).toBeInTheDocument();
 
 		expect(screen.getByRole("tab", { name: "AdvantageScope" })).toHaveAttribute(
 			"aria-selected",
@@ -73,14 +75,81 @@ describe("SimPaneSwitcher", () => {
 		);
 	});
 
+	test("switches to Preview and persists it, leaving AS/PP mounted", () => {
+		renderSwitcher();
+
+		fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
+
+		expect(screen.getByRole("tab", { name: "Preview" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+		expect(screen.getByText("preview-pane").parentElement).toHaveProperty(
+			"hidden",
+			false,
+		);
+		// The AdvantageScope session and PathPlanner working copy survive the
+		// switch — they are hidden, not unmounted.
+		expect(screen.getByText("scope-pane")).toBeInTheDocument();
+		expect(screen.getByText("pathplanner-pane")).toBeInTheDocument();
+		expect(screen.getByText("scope-pane").parentElement).toHaveProperty(
+			"hidden",
+			true,
+		);
+		expect(sessionStorage.getItem("coderunner:sim-pane-tab")).toBe("preview");
+	});
+
+	test("restores a persisted Preview tab", () => {
+		sessionStorage.setItem("coderunner:sim-pane-tab", "preview");
+		renderSwitcher();
+
+		expect(screen.getByRole("tab", { name: "Preview" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+	});
+
+	test("falls back to AdvantageScope for an unrecognised stored value", () => {
+		sessionStorage.setItem("coderunner:sim-pane-tab", "not-a-pane");
+		renderSwitcher();
+
+		expect(screen.getByRole("tab", { name: "AdvantageScope" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+	});
+
+	test("announces activation when Preview is selected", () => {
+		const onPreviewActivated = vi.fn();
+		renderSwitcher(onPreviewActivated);
+
+		expect(onPreviewActivated).not.toHaveBeenCalled();
+
+		fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
+
+		expect(onPreviewActivated).toHaveBeenCalled();
+	});
+
+	test("announces activation for a session that starts on Preview", () => {
+		// The restored tab never fires a change event, so activation has to be
+		// keyed on the tab itself or the first fetch would never happen.
+		sessionStorage.setItem("coderunner:sim-pane-tab", "preview");
+		const onPreviewActivated = vi.fn();
+		renderSwitcher(onPreviewActivated);
+
+		expect(onPreviewActivated).toHaveBeenCalled();
+	});
+
 	test("wires each tab to its panel via aria-controls/aria-labelledby", () => {
 		renderSwitcher();
 
 		const scopeTab = screen.getByRole("tab", { name: "AdvantageScope" });
 		const pathplannerTab = screen.getByRole("tab", { name: "PathPlanner" });
-		const [scopePanel, pathplannerPanel] = screen.getAllByRole("tabpanel", {
-			hidden: true,
-		});
+		const previewTab = screen.getByRole("tab", { name: "Preview" });
+		const [scopePanel, pathplannerPanel, previewPanel] = screen.getAllByRole(
+			"tabpanel",
+			{ hidden: true },
+		);
 
 		expect(scopeTab).toHaveAttribute("aria-controls", scopePanel.id);
 		expect(scopePanel).toHaveAttribute("aria-labelledby", scopeTab.id);
@@ -92,6 +161,22 @@ describe("SimPaneSwitcher", () => {
 			"aria-labelledby",
 			pathplannerTab.id,
 		);
+		expect(previewTab).toHaveAttribute("aria-controls", previewPanel?.id);
+		expect(previewPanel).toHaveAttribute("aria-labelledby", previewTab.id);
+	});
+
+	test("ArrowRight reaches Preview as the third tab", async () => {
+		renderSwitcher();
+
+		const user = userEvent.setup();
+		screen.getByRole("tab", { name: "AdvantageScope" }).focus();
+		await user.keyboard("{ArrowRight}{ArrowRight}");
+
+		const previewTab = screen.getByRole("tab", { name: "Preview" });
+		await waitFor(() => expect(previewTab).toHaveFocus());
+
+		await user.keyboard("{Enter}");
+		expect(previewTab).toHaveAttribute("aria-selected", "true");
 	});
 
 	test("ArrowRight moves focus and Enter activates PathPlanner", async () => {
