@@ -1,10 +1,4 @@
-import {
-	ChevronDown,
-	ChevronLeft,
-	ChevronRight,
-	ChevronUp,
-	Play,
-} from "lucide-react";
+import { ChevronFirst, ChevronLast, Play } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef } from "react";
 import type { GroupImperativeHandle } from "react-resizable-panels";
 import {
@@ -131,7 +125,7 @@ function PaneButton({
 					target?.focus();
 				});
 			}}
-			className={`flex size-7 shrink-0 items-center justify-center rounded border border-border bg-card text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring ${className}`}
+			className={`flex size-5 shrink-0 items-center justify-center rounded-sm border border-border bg-card text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring ${className}`}
 		>
 			{children}
 		</button>
@@ -203,7 +197,7 @@ export function IDELayout({
 									label="Show editor"
 									onClick={() => layout.setEditorVisible(true)}
 								>
-									<ChevronRight className="size-4" />
+									<ChevronLast className="size-3.5" />
 								</PaneButton>
 							</div>
 						)}
@@ -235,7 +229,7 @@ export function IDELayout({
 													label="Hide editor"
 													onClick={() => layout.setEditorVisible(false)}
 												>
-													<ChevronLeft className="size-4" />
+													<ChevronFirst className="size-3.5" />
 												</PaneButton>
 											</div>
 										)}
@@ -272,7 +266,7 @@ export function IDELayout({
 													label="Hide right pane"
 													onClick={() => layout.setRightVisible(false)}
 												>
-													<ChevronRight className="size-4" />
+													<ChevronLast className="size-3.5" />
 												</PaneButton>
 											</div>
 										)}
@@ -291,7 +285,7 @@ export function IDELayout({
 									label={showDriverStation ? "Show right pane" : "Show Preview"}
 									onClick={() => layout.setRightVisible(true)}
 								>
-									<ChevronLeft className="size-4" />
+									<ChevronFirst className="size-3.5" />
 								</PaneButton>
 							</div>
 						)}
@@ -325,7 +319,7 @@ export function IDELayout({
 										label="Hide Driver Station"
 										onClick={() => layout.setBottomVisible(false)}
 									>
-										<ChevronDown className="size-4" />
+										<ChevronLast className="size-3.5 rotate-90" />
 									</PaneButton>
 								</div>
 							)}
@@ -346,7 +340,7 @@ export function IDELayout({
 						onClick={() => layout.setBottomVisible(true)}
 						className="absolute bottom-0 left-1/2 h-5 w-10 -translate-x-1/2 rounded-b-none rounded-t-full border-b-0"
 					>
-						<ChevronUp className="size-4" />
+						<ChevronFirst className="size-3.5 rotate-90" />
 					</PaneButton>
 					{compactDriverStation}
 				</div>
