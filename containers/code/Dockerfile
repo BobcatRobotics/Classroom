@@ -108,7 +108,7 @@ RUN chmod +x /etc/s6-overlay/s6-rc.d/init-frc-setup/run \
 
 # ── Download and install VS Code extensions ────────────────────────────
 ARG REDHAT_JAVA_VERSION=1.55.0
-ARG WPILIB_EXT_VERSION=2027.0.0-alpha-6
+ARG WPILIB_EXT_VERSION=2027.0.0-alpha-7
 ARG JAVA_DEBUG_VERSION=0.59.0
 ARG JAVA_TEST_VERSION=0.46.0
 ARG MAVEN_VERSION=0.45.3

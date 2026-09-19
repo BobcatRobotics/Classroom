@@ -4,55 +4,17 @@
 
 package first.robot;
 
-import org.littletonrobotics.junction.LogFileUtil;
-import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
-import org.littletonrobotics.junction.networktables.NT4Publisher;
-import org.littletonrobotics.junction.wpilog.WPILOGReader;
-import org.littletonrobotics.junction.wpilog.WPILOGWriter;
-import org.wpilib.command3.*;;
+import org.wpilib.command3.Scheduler;
+import org.wpilib.epilogue.Epilogue;
+import org.wpilib.epilogue.Logged;
+import org.wpilib.framework.OpModeRobot;
 
-public class Robot extends LoggedRobot {
-  private Command autonomousCommand;
-
+@Logged
+public class Robot extends OpModeRobot {
   private final RobotContainer robotContainer;
 
   public Robot() {
-    // Record metadata
-    Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
-    Logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
-    Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
-    Logger.recordMetadata("GitDate", BuildConstants.GIT_DATE);
-    Logger.recordMetadata("GitBranch", BuildConstants.GIT_BRANCH);
-    Logger.recordMetadata(
-        "GitDirty",
-        switch (BuildConstants.DIRTY) {
-          case 0 -> "All changes committed";
-          case 1 -> "Uncommitted changes";
-          default -> "Unknown";
-        });
-
-    // Set up data receivers & replay source
-    switch (Constants.currentMode) {
-      case REAL:
-        // Running on a real robot, log to a USB stick ("/U/logs")
-        Logger.addDataReceiver(new WPILOGWriter());
-        Logger.addDataReceiver(new NT4Publisher());
-        break;
-
-      case SIM:
-        // Running a physics simulator, log to NT
-        Logger.addDataReceiver(new NT4Publisher());
-        break;
-
-      case REPLAY:
-        String logPath = LogFileUtil.findReplayLog();
-        Logger.setReplaySource(new WPILOGReader(logPath));
-        Logger.addDataReceiver(new WPILOGWriter(LogFileUtil.addPathSuffix(logPath, "_sim")));
-        break;
-    }
-
-    // Start AdvantageKit logger
     Logger.start();
 
     robotContainer = new RobotContainer();
@@ -60,54 +22,8 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void robotPeriodic() {
+    Scheduler.getDefault().run();
+    Epilogue.update(this);
     robotContainer.robotPeriodic();
   }
-
-  @Override
-  public void disabledInit() {}
-
-  @Override
-  public void disabledPeriodic() {}
-
-  @Override
-  public void disabledExit() {}
-
-  @Override
-  public void autonomousInit() {
-    autonomousCommand = robotContainer.getAutonomousCommand();
-
-    if (autonomousCommand != null) {
-      Scheduler.getDefault().schedule(autonomousCommand);
-    }
-  }
-
-  @Override
-  public void autonomousPeriodic() {}
-
-  @Override
-  public void autonomousExit() {}
-
-  @Override
-  public void teleopInit() {
-    if (autonomousCommand != null) {
-      Scheduler.getDefault().cancel(autonomousCommand);
-    }
-  }
-
-  @Override
-  public void teleopPeriodic() {}
-
-  @Override
-  public void teleopExit() {}
-
-  @Override
-  public void utilityInit() {
-    Scheduler.getDefault().cancelAll();
-  }
-
-  @Override
-  public void utilityPeriodic() {}
-
-  @Override
-  public void utilityExit() {}
 }
