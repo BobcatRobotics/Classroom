@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Two-phase simulation runner. Invoked by start-sim.sh under setsid.
 #
-# Phase 1: run `./gradlew simulateExternalJavaRelease`. GradleRIO builds the
+# Phase 1: run `./gradlew simulateExternalJava`. GradleRIO builds the
 # project, extracts JNI natives into build/jni/release, and writes
-# build/sim/release_java.json describing the runnable simulation. Because the
+# build/sim/java.json describing the runnable simulation. Because the
 # task is not a JavaExec, Gradle exits cleanly once it finishes.
 #
 # Phase 2: read the descriptor, set HALSim env vars and library paths, then
-# `exec java -jar` so this shell becomes the robot JVM. Because the PID
+# `exec java -cp` so this shell becomes the robot JVM. Because the PID
 # survives exec, the caller's pid_file remains valid for the entire sim
 # lifetime — Gradle is no longer in memory while the simulation runs.
 #
@@ -42,9 +42,9 @@ fi
   --project-cache-dir "$gradle_cache" \
   "-Dorg.gradle.jvmargs=$gradle_jvmargs" \
   "${init_args[@]}" \
-  simulateExternalJavaRelease
+  simulateExternalJava installDist
 
-descriptor="$project_root/build/sim/release_java.json"
+descriptor="$project_root/build/sim/java.json"
 if [[ ! -f "$descriptor" ]]; then
   echo "BUILD FAILED: sim descriptor was not produced at $descriptor" >&2
   exit 1
@@ -81,9 +81,33 @@ if [[ -n "$halsim_extensions" ]]; then
 fi
 
 read -r -a robot_jvmargs_array <<<"$robot_jvmargs"
-java_args=("${robot_jvmargs_array[@]}")
+java_args=(
+  "${robot_jvmargs_array[@]}"
+  "--add-opens"
+  "java.base/jdk.internal.vm=ALL-UNNAMED"
+  "--add-opens"
+  "java.base/java.lang=ALL-UNNAMED"
+  "--enable-native-access=ALL-UNNAMED"
+  )
 if [[ -n "$lib_dir" ]]; then
   java_args+=("-Djava.library.path=$lib_dir")
 fi
 
-exec java "${java_args[@]}" -jar "$robot_jar"
+install_lib_dir="$(find "$project_root/build/install" \
+  -mindepth 2 -maxdepth 2 -type d -name lib -print -quit)"
+
+if [[ -z "$install_lib_dir" ]]; then
+  echo "BUILD FAILED: application distribution was not produced" >&2
+  exit 1
+fi
+
+main_class="$(jq -r '.[0].mainClassName // empty' "$descriptor")"
+
+if [[ -z "$main_class" ]]; then
+  echo "BUILD FAILED: simulation descriptor has no mainClassName" >&2
+  exit 1
+fi
+
+exec java "${java_args[@]}" \
+  -cp "$robot_jar:$install_lib_dir/*" \
+  "$main_class"

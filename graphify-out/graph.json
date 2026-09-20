@@ -25005,7 +25005,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "rationale": "Phase 1 runs ./gradlew simulateExternalJavaRelease to build, extract JNI natives, and write build/sim/release_java.json, then exits; Phase 2 parses the descriptor and execs java -jar so the same PID becomes the robot JVM and Gradle is no longer resident in memory during simulation. See decision 025.",
+      "rationale": "Phase 1 runs ./gradlew simulateExternalJava to build, extract JNI natives, and write build/sim/java.json, then exits; Phase 2 parses the descriptor and execs java -jar so the same PID becomes the robot JVM and Gradle is no longer resident in memory during simulation. See decision 025.",
       "id": "run_sim_two_phase_rationale",
       "community": 57,
       "norm_label": "run-sim.sh two-phase gradle-build-then-exec design"

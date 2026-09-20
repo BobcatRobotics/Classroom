@@ -4,14 +4,15 @@
 
 package first.robot;
 
+import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.wpilib.command3.Scheduler;
 import org.wpilib.epilogue.Epilogue;
 import org.wpilib.epilogue.Logged;
-import org.wpilib.framework.OpModeRobot;
+//import org.wpilib.framework.OpModeRobot;
 
 @Logged
-public class Robot extends OpModeRobot {
+public class Robot extends LoggedRobot {
   private final RobotContainer robotContainer;
 
   public Robot() {

@@ -141,7 +141,7 @@ settings and from projects where they still have CodeRunner-provided values.
 ## Sim Scripts
 
 - `/usr/local/bin/start-sim.sh` — Thin launcher invoked by the run queue via `docker exec`. Validates the mount, then `setsid`s `run-sim.sh` and records the subshell PID.
-- `/usr/local/bin/run-sim.sh` — Two-phase runner. Phase 1: `./gradlew simulateExternalJavaRelease`, which builds the project, extracts JNI natives, writes `build/sim/release_java.json`, and exits. Phase 2: parse the descriptor and `exec java -jar` so this PID becomes the robot JVM. Gradle is no longer in memory while the simulation runs. See decision 025.
+- `/usr/local/bin/run-sim.sh` — Two-phase runner. Phase 1: `./gradlew simulateExternalJava`, which builds the project, extracts JNI natives, writes `build/sim/java.json`, and exits. Phase 2: parse the descriptor and `mainClassName` and launch the robot with `java cp` so this PID becomes the robot JVM. Gradle is no longer in memory while the simulation runs. See decision 025.
 - `/usr/local/bin/stop-sim.sh` — Stops the sim process tree gracefully (SIGTERM, then SIGKILL after 10s).
 
 ## Image Size

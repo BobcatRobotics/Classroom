@@ -26,7 +26,8 @@ RUN apt-get update -qq \
 # Base already provides: codium-server (VSCodium reh-web), s6-overlay, abc user,
 # PUID/PGID support. See docs/decisions/017-linuxserver-base-migration.md and
 # docs/decisions/036-vscodium-web-migration.md
-FROM linuxserver/vscodium-web:1.126.04524-ls35
+FROM docker.io/bobcatrobotics/vscodium-web:v1.0.0
+
 
 # LinuxServer's VSCodium build points webviews at a stale VS Code CDN bundle.
 # Keep the isolated-origin bootstrap on the upstream commit used by VSCodium

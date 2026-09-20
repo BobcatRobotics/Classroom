@@ -19,7 +19,7 @@ After [decision 024](024-container-memory-budget.md) bounded the JVM envelopes i
 
 Replace the long-lived `simulateJava` invocation with a two-phase flow inside `start-sim.sh`:
 
-1. **Build phase.** Run `./gradlew simulateExternalJavaRelease` (a `JavaExternalSimulationTask` provided by GradleRIO). It builds the project JAR, extracts JNI natives into `build/jni/release`, writes a descriptor at `build/sim/release_java.json`, and exits. Gradle is no longer in memory.
+1. **Build phase.** Run `./gradlew simulateExternalJava` (a `JavaExternalSimulationTask` provided by GradleRIO). It builds the project JAR, extracts JNI natives into `build/jni/release`, writes a descriptor at `build/sim/java.json`, and exits. Gradle is no longer in memory.
 2. **Run phase.** Parse the descriptor, filter the HALSim extensions to the subset whose libraries actually exist on disk (the init script removes `halsim_gui` and `halsim_ds_socket` from the `simulationRelease` config), set `LD_LIBRARY_PATH` / `HALSIM_EXTENSIONS` / `-Djava.library.path`, then `exec java -jar build/libs/*.jar`. Because the shell `exec`s into the JVM, the original subshell PID survives, so the value written to `sim.pid` is valid for the entire simulation.
 
 The work is split: `start-sim.sh` stays a thin launcher (validate the mount, `setsid` the runner, write `sim.pid`); `run-sim.sh` owns the two phases. The Gradle invocation keeps the same bounded JVM args, `--no-daemon`, `--no-watch-fs`, `--max-workers=2`, and the headless init script from decision 024.
@@ -34,4 +34,4 @@ Trade-offs:
 
 - A fresh `BUILD FAILED` path is added: if the descriptor file is missing or no JAR exists under `build/libs`, `run-sim.sh` writes `BUILD FAILED: …` to the log and exits. The run-queue wrapper already greps for `BUILD FAILED` in the log, so this slots in cleanly.
 - The bounded-heap `JavaExec` modifier in `sim-headless.init.gradle` no longer applies to our run path, since we never call `simulateJava`. It is retained as defense in depth for users who run `simulateJava` directly from the IDE. The JVM args for our path are passed by `run-sim.sh` from the `ROBOT_SIM_JVMARGS` env var with the same defaults.
-- `simulateExternalJavaRelease`'s descriptor lists every HALSim extension that was ever requested, not just the ones whose native libs were extracted. `run-sim.sh` filters by file existence, so the init script's `halsim_gui`/`halsim_ds_socket` removal continues to take effect without needing matching changes in the descriptor.
+- `simulateExternalJava`'s descriptor lists every HALSim extension that was ever requested, not just the ones whose native libs were extracted. `run-sim.sh` filters by file existence, so the init script's `halsim_gui`/`halsim_ds_socket` removal continues to take effect without needing matching changes in the descriptor.
