@@ -6,27 +6,21 @@ import {
 	ResizablePanelGroup,
 	useResizableLayout,
 } from "@/components/ui/resizable";
-import type { ActiveTool } from "./SimPaneSwitcher";
 
 interface IDELayoutProps {
 	editor: ReactNode;
 	scope: ReactNode;
 	driverStation: ReactNode;
-	/**
-	 * When false (a `plain-java` console lesson), the AdvantageScope and Driver
-	 * Station panels are hidden and the editor fills the workspace, with a hint
-	 * to run from the editor's Run button.
-	 */
-	showSimPanels?: boolean;
-	activeTool: ActiveTool;
+	showRightPane?: boolean;
+	showDriverStation?: boolean;
 }
 
 export function IDELayout({
 	editor,
 	scope,
 	driverStation,
-	showSimPanels = true,
-	activeTool,
+	showRightPane = true,
+	showDriverStation = true,
 }: IDELayoutProps) {
 	// Pane sizes survive a refresh but not a new tab/session.
 	const rows = useResizableLayout({
@@ -38,10 +32,44 @@ export function IDELayout({
 		storage: sessionStorage,
 	});
 
-	if (!showSimPanels) {
+	const workbench = (
+		<ResizablePanelGroup
+			orientation="horizontal"
+			className="min-h-0 flex-1"
+			defaultLayout={columns.defaultLayout}
+			onLayoutChanged={columns.onLayoutChanged}
+		>
+			<ResizablePanel
+				id="ide-editor"
+				defaultSize={showRightPane ? 50 : 100}
+				minSize={showRightPane ? 25 : 100}
+				data-pane="editor"
+				className="min-h-0"
+			>
+				<div className="h-full min-h-0 min-w-0 bg-card">{editor}</div>
+			</ResizablePanel>
+
+			{showRightPane && (
+				<>
+					<ResizableHandle withHandle data-pane="scope-handle" />
+					<ResizablePanel
+						id="ide-scope"
+						defaultSize={50}
+						minSize={25}
+						data-pane="tool"
+						className="min-h-0"
+					>
+						{scope}
+					</ResizablePanel>
+				</>
+			)}
+		</ResizablePanelGroup>
+	);
+
+	if (!showDriverStation) {
 		return (
 			<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-				<div className="min-h-0 min-w-0 flex-1 bg-card">{editor}</div>
+				{workbench}
 				<div
 					data-pane="console-hint"
 					className="flex shrink-0 items-center gap-2 border-t border-border bg-card px-4 py-2 text-[12px] text-muted-foreground"
@@ -67,37 +95,7 @@ export function IDELayout({
 				minSize={20}
 				className="min-h-0"
 			>
-				<ResizablePanelGroup
-					orientation="horizontal"
-					className="min-h-0"
-					defaultLayout={columns.defaultLayout}
-					onLayoutChanged={columns.onLayoutChanged}
-				>
-					<ResizablePanel
-						id="ide-editor"
-						defaultSize={activeTool === null ? 100 : 50}
-						minSize={activeTool === null ? 100 : 25}
-						data-pane="editor"
-						className="min-h-0"
-					>
-						<div className="h-full min-h-0 min-w-0 bg-card">{editor}</div>
-					</ResizablePanel>
-
-					{activeTool !== null && (
-						<>
-							<ResizableHandle withHandle data-pane="scope-handle" />
-							<ResizablePanel
-								id="ide-scope"
-								defaultSize={50}
-								minSize={25}
-								data-pane="tool"
-								className="min-h-0"
-							>
-								{scope}
-							</ResizablePanel>
-						</>
-					)}
-				</ResizablePanelGroup>
+				{workbench}
 			</ResizablePanel>
 			<ResizableHandle withHandle />
 			<ResizablePanel

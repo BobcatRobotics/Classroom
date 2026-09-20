@@ -47,7 +47,7 @@ describe("IDELayout", () => {
 		);
 
 		expect(screen.getByText("Editor")).toBeInTheDocument();
-		expect(screen.getByText("Scope")).not.toBeVisible();
+		expect(screen.queryByText("Scope")).toBeNull();
 		expect(screen.queryByText("Driver Station")).toBeNull();
 		expect(
 			screen.getByText(/Run this lesson from the editor/),

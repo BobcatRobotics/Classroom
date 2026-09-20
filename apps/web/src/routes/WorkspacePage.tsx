@@ -245,8 +245,8 @@ export function WorkspacePage() {
 				showTools={!isConsoleModule}
 			/>
 			<IDELayout
-				activeTool={activeTool}
-				showSimPanels={!isConsoleModule}
+				showRightPane={!isConsoleModule && activeTool !== null}
+				showDriverStation={!isConsoleModule}
 				editor={
 					<EditorPane
 						key={reloadNonce}
