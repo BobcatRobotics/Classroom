@@ -29,6 +29,11 @@ import {
 	parseDeployFilePath,
 } from "./deploy-files";
 import {
+	PREVIEW_FILES_PREFIX,
+	previewDocumentsResponse,
+	previewFileResponse,
+} from "./preview";
+import {
 	halsimWebSocketResponse,
 	nt4AliveResponse,
 	nt4WebSocketResponse,
@@ -134,6 +139,32 @@ export async function handleWorkspaceRoute(
 		request.method === "GET"
 	) {
 		return webAssetResponse(storage, "coderunner-icon.png");
+	}
+
+	// --- Preview resources: token-authenticated, ahead of the cookie check ---
+	//
+	// This is the one workspace route that cannot use `requireWorkspaceOwnership`,
+	// and it is deliberate rather than an oversight. Preview frames are sandboxed
+	// without `allow-same-origin`, so the framed document has an opaque origin and
+	// the browser drops the SameSite=Lax session cookie from every subresource and
+	// in-frame navigation it makes; the cookie check would 401 every stylesheet,
+	// script and report page link. The grant travels in the URL path instead — see
+	// `preview-token.ts`. Read-only, GET-only, and the token is signed over the
+	// workspace id, so it authorises exactly the tree its owner could already read.
+	if (suffix.startsWith(PREVIEW_FILES_PREFIX)) {
+		if (request.method !== "GET") {
+			return jsonResponse({ error: "Method not allowed." }, { status: 405 });
+		}
+		const workspace = storage.findWorkspaceBySlug(slug);
+		if (!workspace) {
+			return jsonResponse({ error: "Not found." }, { status: 404 });
+		}
+		return previewFileResponse(
+			storage.config.sessionSecret,
+			workspace,
+			url,
+			suffix.slice(PREVIEW_FILES_PREFIX.length),
+		);
 	}
 
 	const isApiRequest = suffix.startsWith("/api/");
@@ -490,6 +521,16 @@ export async function handleWorkspaceRoute(
 			workspace: auth.workspace,
 			userId: auth.user.id,
 		} satisfies LessonLoadSocketData);
+	}
+
+	// --- Preview (project Markdown / HTML reader) ---
+	// The document list is an ordinary same-origin fetch from the shell, so it
+	// keeps the cookie check. Only `/api/preview/files/` needs the path token.
+	if (suffix === "/api/preview/documents" && request.method === "GET") {
+		return previewDocumentsResponse(
+			storage.config.sessionSecret,
+			auth.workspace,
+		);
 	}
 
 	// --- Deploy files (PathPlanner) endpoints ---

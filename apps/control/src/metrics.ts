@@ -134,6 +134,7 @@ const KNOWN_WORKSPACE_SUFFIXES: ReadonlySet<string> = new Set([
 	"/ws/lesson-load",
 	"/api/session",
 	"/api/deploy-files/snapshot",
+	"/api/preview/documents",
 	"/api/containers/status",
 	"/api/sim/status",
 	"/api/sim/auto-choosers",
@@ -168,6 +169,10 @@ export function templateRoute(path: string): string {
 		if (KNOWN_WORKSPACE_SUFFIXES.has(suffix)) return `/u/:slug${suffix}`;
 		if (suffix.startsWith("/api/deploy-files/"))
 			return "/u/:slug/api/deploy-files/*";
+		// Collapses the token *and* the project path: neither belongs in a
+		// metric label, and both are unbounded.
+		if (suffix.startsWith("/api/preview/files/"))
+			return "/u/:slug/api/preview/files/*";
 		return "/u/:slug/*";
 	}
 
