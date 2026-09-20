@@ -425,6 +425,39 @@ export type LessonCatalog = z.infer<typeof lessonCatalogSchema>;
 export type LessonCatalogResponse = z.infer<typeof lessonCatalogResponseSchema>;
 export type LessonLoadRequest = z.infer<typeof lessonLoadRequestSchema>;
 
+// --- Lesson completion schemas ---
+
+export const lessonCompletionStatusResponseSchema = z.object({
+	ok: z.literal(true),
+	eligible: z.boolean(),
+	reason: z.string().nullable(),
+	run: z
+		.object({
+			id: z.string().min(1),
+			testsTotal: z.number().int().min(0),
+			testsPassed: z.number().int().min(0),
+			testsFailed: z.number().int().min(0),
+			testsSkipped: z.number().int().min(0),
+		})
+		.nullable(),
+});
+
+export const lessonCompletionResponseSchema = z.object({
+	ok: z.literal(true),
+	completion: z.object({
+		id: z.string().min(1),
+		completedAt: z.string(),
+		moduleId: z.string().min(1),
+	}),
+});
+
+export type LessonCompletionStatusResponse = z.infer<
+	typeof lessonCompletionStatusResponseSchema
+>;
+export type LessonCompletionResponse = z.infer<
+	typeof lessonCompletionResponseSchema
+>;
+
 // --- Deploy files (PathPlanner) schemas ---
 
 /** Only files under this project-relative root may be written or deleted. */

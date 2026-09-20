@@ -6,6 +6,7 @@ import {
 	lessonLoadRequestSchema,
 	type SimRunCommandResponse,
 	simRunCommandRequestSchema,
+	type UserId,
 	workspaceSlugSchema,
 } from "@frc-coderunner/contracts";
 import {
@@ -512,6 +513,96 @@ export async function handleWorkspaceRoute(
 			const message =
 				error instanceof Error ? error.message : "Invalid lesson load request.";
 			return jsonResponse({ error: message }, { status: 400 });
+		}
+	}
+
+	if (suffix === "/api/completion/status" && request.method === "GET") {
+		if (
+			auth.workspace.current_module === null ||
+			auth.workspace.current_module_kind !== "robot"
+		) {
+			return jsonResponse({
+				ok: true,
+				eligible: false,
+				reason: "Completion is available for catalog robot lessons only.",
+				run: null,
+			});
+		}
+		try {
+			await catalogSource.resolveModule(auth.workspace.current_module);
+		} catch {
+			return jsonResponse({
+				ok: true,
+				eligible: false,
+				reason: "The current project is not a catalog lesson.",
+				run: null,
+			});
+		}
+		const run = storage.getLatestQualifyingRun({
+			workspaceId: auth.workspace.id,
+			moduleId: auth.workspace.current_module,
+		});
+		return jsonResponse({
+			ok: true,
+			eligible: run !== null,
+			reason: run
+				? null
+				: "Start the robot and pass all tests before marking this lesson complete.",
+			run: run
+				? {
+						id: run.id,
+						testsTotal: run.tests_total,
+						testsPassed: run.tests_passed,
+						testsFailed: run.tests_failed,
+						testsSkipped: run.tests_skipped,
+					}
+				: null,
+		});
+	}
+
+	if (suffix === "/api/completion/mark" && request.method === "POST") {
+		if (
+			auth.workspace.current_module === null ||
+			auth.workspace.current_module_kind !== "robot"
+		) {
+			return jsonResponse(
+				{ error: "Completion is available for catalog robot lessons only." },
+				{ status: 409 },
+			);
+		}
+		try {
+			const module = await catalogSource.resolveModule(
+				auth.workspace.current_module,
+			);
+			if (module.kind !== "robot") {
+				throw new Error("The current project is not a robot lesson.");
+			}
+			const completion = storage.createLessonCompletion({
+				studentId: auth.user.id as UserId,
+				workspaceId: auth.workspace.id,
+				moduleId: module.id,
+				lessonTitle: module.title,
+			});
+			if (!completion) {
+				return jsonResponse(
+					{ error: "A successful Start with passing tests is required." },
+					{ status: 409 },
+				);
+			}
+			return jsonResponse({
+				ok: true,
+				completion: {
+					id: completion.id,
+					completedAt: completion.completed_at,
+					moduleId: completion.module_id,
+				},
+			});
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Unable to mark this lesson complete.";
+			return jsonResponse({ error: message }, { status: 409 });
 		}
 	}
 

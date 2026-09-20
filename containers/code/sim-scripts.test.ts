@@ -89,6 +89,7 @@ describe("sim container scripts", () => {
 			expect(args).toContain(
 				"-Dorg.gradle.jvmargs=-Xms64m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=96m -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=2 -Dfile.encoding=UTF-8",
 			);
+			expect(args).toContain("test");
 			expect(args).toContain("simulateExternalJava");
 			expect(args).toContain("installDist");
 			expect(await readFile(userHomePath, "utf8")).toBe(

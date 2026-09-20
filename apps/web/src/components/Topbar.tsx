@@ -13,6 +13,7 @@ interface TopbarProps {
 	onSelectTool: (tool: WorkspaceTool) => void;
 	onCloseTool: () => void;
 	showTools?: boolean;
+	completion?: React.ComponentProps<typeof ProjectMenu>["completion"];
 }
 
 export function Topbar({
@@ -24,6 +25,7 @@ export function Topbar({
 	onSelectTool,
 	onCloseTool,
 	showTools,
+	completion,
 }: TopbarProps) {
 	return (
 		<header className="flex h-[48px] shrink-0 items-center border-b border-border px-4">
@@ -37,7 +39,10 @@ export function Topbar({
 				{showTools && (
 					<ToolsMenu onSelectTool={onSelectTool} onCloseTool={onCloseTool} />
 				)}
-				<ProjectMenu onSwitchProject={onSwitchProject} />
+				<ProjectMenu
+					onSwitchProject={onSwitchProject}
+					completion={completion}
+				/>
 				<UserMenu
 					displayName={displayName}
 					email={email}

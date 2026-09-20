@@ -20,6 +20,7 @@ import { useContainerStatus } from "@/hooks/useContainerStatus";
 import { useEditorReachability } from "@/hooks/useEditorReachability";
 import { type GamepadInfo, useGamepad } from "@/hooks/useGamepad";
 import { useGamepadChannel } from "@/hooks/useGamepadChannel";
+import { useLessonCompletion } from "@/hooks/useLessonCompletion";
 import { useRunChannel } from "@/hooks/useRunChannel";
 import { useScopeHandshake } from "@/hooks/useScopeHandshake";
 import { useSession } from "@/hooks/useSession";
@@ -67,6 +68,11 @@ export function WorkspacePage() {
 	const { connection: runConnection, consoleLines } = useRunChannel(simSlug);
 	const simulation = useSimulationState(simSlug);
 	const autoChoosers = useAutoChoosers(simSlug);
+	const completion = useLessonCompletion(
+		workspaceSlug,
+		currentModuleKind === "robot",
+		`${reloadNonce}:${simulation.runStatus}`,
+	);
 	const editorUrl = workspaceSlug
 		? `/u/${workspaceSlug}/vscode/?folder=/workspace/project`
 		: null;
@@ -243,6 +249,18 @@ export function WorkspacePage() {
 				onSelectTool={onSelectTool}
 				onCloseTool={onCloseTool}
 				showTools={!isConsoleModule}
+				completion={
+					currentModuleKind === "robot"
+						? {
+								eligible: completion.status?.eligible ?? false,
+								loading: completion.loading,
+								marking: completion.marking,
+								message:
+									completion.message ?? completion.status?.reason ?? null,
+								onMark: () => void completion.mark(),
+							}
+						: undefined
+				}
 			/>
 			<IDELayout
 				showRightPane={!isConsoleModule && activeTool !== null}

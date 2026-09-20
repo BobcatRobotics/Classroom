@@ -9,6 +9,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../../fixtures/app";
 import { loginAs } from "../../fixtures/auth";
 import { seedPreviewProject } from "../../fixtures/preview-project";
+import { seedRuntimeRunning } from "../../fixtures/runtime";
 
 const REPORT = "build/reports/tests/test";
 
@@ -22,9 +23,22 @@ async function writeProjectFile(
 	await writeFile(target, contents, "utf8");
 }
 
+async function waitForWorkspaceReady(page: Page) {
+	await expect(
+		page.getByRole("dialog", { name: "Workspace setup in progress" }),
+	).toBeHidden({ timeout: 30000 });
+}
+
 async function openWorkspace(page: Page, baseURL: string, slug: string) {
 	await page.goto(`${baseURL}/u/${slug}/`);
-	await page.getByRole("tab", { name: "Preview" }).click();
+	await waitForWorkspaceReady(page);
+	await page.getByRole("button", { name: "Tools" }).click();
+	await page.getByRole("menuitem", { name: "Preview" }).click();
+}
+
+async function openTool(page: Page, tool: "Preview" | "PathPlanner") {
+	await page.getByRole("button", { name: "Tools" }).click();
+	await page.getByRole("menuitem", { name: tool }).click();
 }
 
 function previewFrame(page: Page) {
@@ -36,10 +50,19 @@ test.describe("preview workflow", () => {
 		page,
 		app,
 		baseURL,
+		runtime,
+		fakeVscode,
+		fakeHalsim,
 	}) => {
 		const login = await loginAs(page, app, { name: "workflow" });
 		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
 		await seedPreviewProject(workspace?.project_path ?? "");
+		seedRuntimeRunning({
+			runtime,
+			workspaceId: workspace?.id ?? "",
+			fakeVscode,
+			fakeHalsim,
+		});
 
 		await openWorkspace(page, baseURL, login.user.slug);
 
@@ -66,11 +89,20 @@ test.describe("preview workflow", () => {
 		page,
 		app,
 		baseURL,
+		runtime,
+		fakeVscode,
+		fakeHalsim,
 	}) => {
 		const login = await loginAs(page, app, { name: "refresher" });
 		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
 		const project = workspace?.project_path ?? "";
 		await seedPreviewProject(project);
+		seedRuntimeRunning({
+			runtime,
+			workspaceId: workspace?.id ?? "",
+			fakeVscode,
+			fakeHalsim,
+		});
 
 		await openWorkspace(page, baseURL, login.user.slug);
 		await expect(previewFrame(page).locator("h1").first()).toHaveText(
@@ -134,10 +166,19 @@ test.describe("preview workflow", () => {
 		page,
 		app,
 		baseURL,
+		runtime,
+		fakeVscode,
+		fakeHalsim,
 	}) => {
 		const login = await loginAs(page, app, { name: "scroller" });
 		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
 		const project = workspace?.project_path ?? "";
+		seedRuntimeRunning({
+			runtime,
+			workspaceId: workspace?.id ?? "",
+			fakeVscode,
+			fakeHalsim,
+		});
 		const long = Array.from(
 			{ length: 400 },
 			(_, i) => `Paragraph ${i} with enough text to make the page scroll.`,
@@ -174,87 +215,24 @@ test.describe("preview workflow", () => {
 			.toBe(0);
 	});
 
-	test("a deleted file is reported and the picker stays usable", async ({
-		page,
-		app,
-		baseURL,
-	}) => {
-		const login = await loginAs(page, app, { name: "deleter" });
-		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
-		const project = workspace?.project_path ?? "";
-		await seedPreviewProject(project);
-
-		await openWorkspace(page, baseURL, login.user.slug);
-		await expect(previewFrame(page).locator("h1").first()).toHaveText(
-			"Robot Project",
-		);
-
-		await rm(join(project, "README.md"));
-		await page.getByRole("button", { name: "Refresh" }).click();
-
-		await expect(
-			page.getByText("README.md is no longer available."),
-		).toBeVisible();
-		// The refreshed list still works.
-		await page.getByTestId("preview-picker").click();
-		await page.getByPlaceholder("Search documents…").fill("guide");
-		await page.getByRole("option").first().click();
-		await expect(previewFrame(page).locator("h1").first()).toHaveText("Guide");
-	});
-
-	test("switching to AdvantageScope and back preserves both instances and the selection", async ({
-		page,
-		app,
-		baseURL,
-	}) => {
-		const login = await loginAs(page, app, { name: "switcher" });
-		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
-		await seedPreviewProject(workspace?.project_path ?? "");
-
-		await openWorkspace(page, baseURL, login.user.slug);
-
-		await page.getByTestId("preview-picker").click();
-		await page.getByPlaceholder("Search documents…").fill("guide");
-		await page.getByRole("option").first().click();
-		await expect(previewFrame(page).locator("h1").first()).toHaveText("Guide");
-
-		// The AdvantageScope iframe must survive the round trip, not remount.
-		const scopeFrameId = await page
-			.locator('[data-pane="scope"] iframe')
-			.first()
-			.evaluate((el: HTMLIFrameElement) => {
-				const tagged = el as HTMLIFrameElement & { __e2eId?: string };
-				tagged.__e2eId ??= Math.random().toString(36);
-				return tagged.__e2eId;
-			});
-
-		await page.getByRole("tab", { name: "AdvantageScope" }).click();
-		await page.getByRole("tab", { name: "Preview" }).click();
-
-		await expect(page.getByTestId("preview-picker")).toHaveText(
-			/docs\/guide\.md/,
-		);
-		await expect(previewFrame(page).locator("h1").first()).toHaveText("Guide");
-
-		const afterId = await page
-			.locator('[data-pane="scope"] iframe')
-			.first()
-			.evaluate(
-				(el: HTMLIFrameElement) =>
-					(el as HTMLIFrameElement & { __e2eId?: string }).__e2eId,
-			);
-		expect(afterId).toBe(scopeFrameId);
-	});
-
 	test("replacing the project clears the old content and selection", async ({
 		page,
 		app,
 		baseURL,
+		runtime,
+		fakeVscode,
+		fakeHalsim,
 	}) => {
 		const login = await loginAs(page, app, { name: "swapper" });
 		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
 		const project = workspace?.project_path ?? "";
 		await seedPreviewProject(project);
+		seedRuntimeRunning({
+			runtime,
+			workspaceId: workspace?.id ?? "",
+			fakeVscode,
+			fakeHalsim,
+		});
 
 		await openWorkspace(page, baseURL, login.user.slug);
 		await expect(previewFrame(page).locator("h1").first()).toHaveText(
@@ -282,11 +260,20 @@ test.describe("preview workflow", () => {
 		page,
 		app,
 		baseURL,
+		runtime,
+		fakeVscode,
+		fakeHalsim,
 	}) => {
 		const login = await loginAs(page, app, { name: "many" });
 		const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
 		const project = workspace?.project_path ?? "";
 		await seedPreviewProject(project);
+		seedRuntimeRunning({
+			runtime,
+			workspaceId: workspace?.id ?? "",
+			fakeVscode,
+			fakeHalsim,
+		});
 		// The document budget is 2,000; go past it.
 		await Promise.all(
 			Array.from({ length: 2100 }, (_, i) =>

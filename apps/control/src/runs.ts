@@ -15,6 +15,7 @@ import type {
 	WorkspaceRuntimeProvider,
 } from "./runtime";
 import type { AppStorage, WorkspaceRow } from "./storage";
+import { readGradleTestResults } from "./test-results";
 
 const log = getLogger("runs");
 
@@ -292,6 +293,7 @@ export class RunManager {
 			id: runId,
 			workspaceId: workspace.id,
 			logPath,
+			moduleId: workspace.current_module,
 		});
 		this.jobsByWorkspace.set(workspace.id, job);
 		this.rememberStatus(job, "building");
@@ -507,6 +509,8 @@ export class RunManager {
 			if (job.buildStartedAtMs !== null) {
 				runBuildDuration.observe((now - job.buildStartedAtMs) / 1000);
 			}
+			const results = await readGradleTestResults(job.workspace.project_path);
+			this.storage.setRunTestResults(job.id, results);
 			this.setJobState(job, "running");
 			log.info("sim started", { workspaceId: job.workspace.id, runId: job.id });
 			this.broadcast(job, { type: "status", status: "running" });

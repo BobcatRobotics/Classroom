@@ -36,6 +36,10 @@ want to compile and check your code.
 1. Click **Start** in the Driver Station.
 2. Wait for **Comms** and **Robot Code** to turn green.
 
+For a catalog robot lesson, **Start** also runs its tests. Once the robot has
+started and all tests pass, open **Projects** and choose **Mark lesson
+completed**.
+
 ![The Driver Station ready to enable, with Comms and Robot Code green](../website/static/img/screenshots/using-coderunner-ready.png)
 
 3. Select **Teleop**, **Auto**, or **Test**, then click **Enable**.

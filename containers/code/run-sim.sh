@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Two-phase simulation runner. Invoked by start-sim.sh under setsid.
 #
-# Phase 1: run `./gradlew simulateExternalJava`. GradleRIO builds the
-# project, extracts JNI natives into build/jni/release, and writes
+# Phase 1: run `./gradlew test simulateExternalJava`. GradleRIO tests and builds
+# the project, extracts JNI natives into build/jni/release, and writes
 # build/sim/java.json describing the runnable simulation. Because the
 # task is not a JavaExec, Gradle exits cleanly once it finishes.
 #
@@ -42,6 +42,7 @@ fi
   --project-cache-dir "$gradle_cache" \
   "-Dorg.gradle.jvmargs=$gradle_jvmargs" \
   "${init_args[@]}" \
+  test \
   simulateExternalJava installDist
 
 descriptor="$project_root/build/sim/java.json"

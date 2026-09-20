@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import type {
 	ContainerRole,
 	ContainerState,
+	UserId,
 	WorkspaceId,
 	WorkspaceSlug,
 } from "@frc-coderunner/contracts";
@@ -55,6 +56,28 @@ export type RunJobRow = {
 	finished_at: string | null;
 	exit_code: number | null;
 	log_path: string | null;
+	build_succeeded: 0 | 1;
+	module_id: string | null;
+	tests_total: number;
+	tests_passed: number;
+	tests_failed: number;
+	tests_skipped: number;
+};
+
+export type LessonCompletionRow = {
+	id: string;
+	run_job_id: string;
+	student_id: UserId;
+	workspace_id: WorkspaceId;
+	module_id: string;
+	lesson_title: string;
+	completed_at: string;
+	build_succeeded: 1;
+	test_passed: 1;
+	tests_total: number;
+	tests_passed: number;
+	tests_failed: number;
+	tests_skipped: number;
 };
 
 /** Context returned by Better Auth session resolution + workspace lookup. */
@@ -77,7 +100,7 @@ export class SlugTakenError extends Error {
 	}
 }
 
-function randomId(prefix: "ws" | "run"): string {
+function randomId(prefix: "ws" | "run" | "completion"): string {
 	return `${prefix}_${randomBytes(16).toString("hex")}`;
 }
 
@@ -669,6 +692,7 @@ export class AppStorage {
 	createRunJob(input: {
 		workspaceId: WorkspaceId;
 		logPath: string;
+		moduleId?: string | null;
 		id?: string;
 	}): RunJobRow {
 		const id = input.id ?? randomId("run");
@@ -679,14 +703,22 @@ export class AppStorage {
           INSERT INTO run_jobs (
             id,
             workspace_id,
+						module_id,
             state,
             requested_at,
             log_path
           )
-          VALUES (?, ?, ?, ?, ?)
+					VALUES (?, ?, ?, ?, ?, ?)
         `,
 			)
-			.run(id, input.workspaceId, "building", timestamp, input.logPath);
+			.run(
+				id,
+				input.workspaceId,
+				input.moduleId ?? null,
+				"building",
+				timestamp,
+				input.logPath,
+			);
 
 		const row = this.getRunJob(id);
 		if (!row) {
@@ -775,6 +807,104 @@ export class AppStorage {
 			throw new Error(`Failed to reload run job ${input.id}.`);
 		}
 		return row;
+	}
+
+	setRunTestResults(
+		runId: string,
+		results: {
+			total: number;
+			passed: number;
+			failed: number;
+			skipped: number;
+		},
+	): void {
+		this.db
+			.query(
+				`
+          UPDATE run_jobs
+          SET build_succeeded = 1, tests_total = ?, tests_passed = ?,
+              tests_failed = ?, tests_skipped = ?
+          WHERE id = ?
+        `,
+			)
+			.run(
+				results.total,
+				results.passed,
+				results.failed,
+				results.skipped,
+				runId,
+			);
+	}
+
+	getLatestQualifyingRun(input: {
+		workspaceId: WorkspaceId;
+		moduleId: string;
+	}): RunJobRow | null {
+		return (
+			(this.db
+				.query(
+					`
+              SELECT r.*
+              FROM run_jobs r
+              LEFT JOIN lesson_completions c ON c.run_job_id = r.id
+              WHERE r.workspace_id = ? AND r.module_id = ?
+                AND r.build_succeeded = 1
+                AND r.tests_failed = 0 AND r.tests_skipped = 0
+                AND r.tests_passed = r.tests_total
+                AND r.state IN ('running', 'stopped')
+                AND c.id IS NULL
+              ORDER BY r.started_at DESC
+              LIMIT 1
+            `,
+				)
+				.get(input.workspaceId, input.moduleId) as RunJobRow | null) ?? null
+		);
+	}
+
+	createLessonCompletion(input: {
+		studentId: UserId;
+		workspaceId: WorkspaceId;
+		moduleId: string;
+		lessonTitle: string;
+	}): LessonCompletionRow | null {
+		const completedAt = nowIso();
+		const create = this.db.transaction(() => {
+			const run = this.getLatestQualifyingRun({
+				workspaceId: input.workspaceId,
+				moduleId: input.moduleId,
+			});
+			if (!run) return null;
+
+			const id = randomId("completion");
+			this.db
+				.query(
+					`
+              INSERT INTO lesson_completions (
+                id, run_job_id, student_id, workspace_id, module_id,
+                lesson_title, completed_at, build_succeeded, test_passed,
+                tests_total, tests_passed, tests_failed, tests_skipped
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?)
+            `,
+				)
+				.run(
+					id,
+					run.id,
+					input.studentId,
+					input.workspaceId,
+					input.moduleId,
+					input.lessonTitle,
+					completedAt,
+					run.tests_total,
+					run.tests_passed,
+					run.tests_failed,
+					run.tests_skipped,
+				);
+			return this.db
+				.query("SELECT * FROM lesson_completions WHERE id = ?")
+				.get(id) as LessonCompletionRow;
+		});
+		return create();
 	}
 
 	// --- Runtime config ---
