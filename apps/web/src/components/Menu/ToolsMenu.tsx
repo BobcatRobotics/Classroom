@@ -1,4 +1,4 @@
-import { ChevronDown, SettingsIcon, X } from "lucide-react";
+import { ChevronDown, FileText, SettingsIcon, X } from "lucide-react";
 import advantagescopeLogo from "@/assets/advantagescope-logo.png";
 import pathplannerLogo from "@/assets/pathplanner-logo.png";
 // import bLineLogo from "@/assets/bline-field26-logo.png"
@@ -52,6 +52,13 @@ export function ToolsMenu({ onSelectTool, onCloseTool }: ToolsMenuProps) {
 						aria-hidden="true"
 					/>
 					<span>PathPlanner</span>
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onSelectTool("preview")}>
+					<FileText
+						className="size-5 text-muted-foreground"
+						aria-hidden="true"
+					/>
+					<span>Preview</span>
 				</DropdownMenuItem>
 				{/* <DropdownMenuItem onClick={() => onSelectTool("bline")}>
             <img

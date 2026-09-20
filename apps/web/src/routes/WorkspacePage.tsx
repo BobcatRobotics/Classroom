@@ -6,6 +6,7 @@ import { DriverStation } from "@/components/DriverStation";
 import { EditorPane } from "@/components/EditorPane";
 import { IDELayout } from "@/components/IDELayout";
 import { PathPlannerPane } from "@/components/PathPlannerPane";
+import { PreviewPane } from "@/components/PreviewPane";
 import { ScopePane } from "@/components/ScopePane";
 import {
 	type ActiveTool,
@@ -265,6 +266,13 @@ export function WorkspacePage() {
 							<PathPlannerPane key={reloadNonce} workspaceSlug={simSlug} />
 						}
 						bline={null} // TODO: When bline is ready
+						preview={
+							<PreviewPane
+								workspaceSlug={workspaceSlug}
+								active={activeTool === "preview"}
+								reloadNonce={reloadNonce}
+							/>
+						}
 					/>
 				}
 				driverStation={

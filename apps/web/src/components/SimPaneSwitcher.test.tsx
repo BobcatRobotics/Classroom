@@ -6,15 +6,19 @@ const panes = {
 	scope: <div>scope-pane</div>,
 	pathplanner: <div>pathplanner-pane</div>,
 	bline: <div>bline-pane</div>,
+	preview: <div>preview-pane</div>,
 };
 
-function renderPanels(activeTool: "scope" | "pathplanner" | "bline" | null) {
+function renderPanels(
+	activeTool: "scope" | "pathplanner" | "bline" | "preview" | null,
+) {
 	return render(
 		<SimPanePanels
 			activeTool={activeTool}
 			scope={panes.scope}
 			pathplanner={panes.pathplanner}
 			bline={panes.bline}
+			preview={panes.preview}
 		/>,
 	);
 }
@@ -25,9 +29,10 @@ describe("SimPaneSwitcher", () => {
 			scope: "scope-pane",
 			pathplanner: "pathplanner-pane",
 			bline: "bline-pane",
+			preview: "preview-pane",
 		})) {
 			const { unmount } = renderPanels(
-				activeTool as "scope" | "pathplanner" | "bline",
+				activeTool as "scope" | "pathplanner" | "bline" | "preview",
 			);
 
 			expect(screen.getByText(paneText)).toBeTruthy();
@@ -41,5 +46,6 @@ describe("SimPaneSwitcher", () => {
 		expect(screen.queryByText("scope-pane")).toBeNull();
 		expect(screen.queryByText("pathplanner-pane")).toBeNull();
 		expect(screen.queryByText("bline-pane")).toBeNull();
+		expect(screen.queryByText("preview-pane")).toBeNull();
 	});
 });
