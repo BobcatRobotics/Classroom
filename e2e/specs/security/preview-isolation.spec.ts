@@ -13,6 +13,7 @@ import type { PreviewDocumentsResponse } from "@frc-coderunner/contracts";
 import { expect, test } from "../../fixtures/app";
 import { loginAs } from "../../fixtures/auth";
 import { seedPreviewProject } from "../../fixtures/preview-project";
+import { seedRuntimeRunning } from "../../fixtures/runtime";
 
 /** A report that actively tries to escape, rather than a benign one. */
 const HOSTILE_REPORT = `<!doctype html>
@@ -55,17 +56,29 @@ test("a hostile report cannot reach the shell, its storage, or its cookies", asy
 	page,
 	app,
 	baseURL,
+	runtime,
+	fakeVscode,
+	fakeHalsim,
 }) => {
 	const login = await loginAs(page, app, { name: "hostile" });
 	const workspace = app.storage.findWorkspaceBySlug(login.user.slug);
 	const project = workspace?.project_path ?? "";
 	await seedPreviewProject(project);
 	await writeFile(join(project, "hostile.html"), HOSTILE_REPORT, "utf8");
+	seedRuntimeRunning({
+		runtime,
+		workspaceId: workspace?.id ?? "",
+		fakeVscode,
+		fakeHalsim,
+	});
 
-	// Driven through the real pane, so the frame is configured exactly as a
-	// student would see it rather than by the test.
+	// Open the real Preview pane through the shell the student uses.
 	await page.goto(`${baseURL}/u/${login.user.slug}/`);
-	await page.getByRole("tab", { name: "Preview" }).click();
+	await expect(
+		page.getByRole("dialog", { name: "Workspace setup in progress" }),
+	).toBeHidden({ timeout: 30000 });
+	await page.getByRole("button", { name: "Tools" }).click();
+	await page.getByRole("menuitem", { name: "Preview" }).click();
 	await page.getByTestId("preview-picker").click();
 	await page.getByPlaceholder("Search documents…").fill("hostile");
 	await page.getByRole("option").first().click();
