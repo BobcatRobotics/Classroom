@@ -51,7 +51,7 @@
 		"verify": "biome ci . && bun run typecheck && bun run test && bun run test:web && bun run e2e && bun run e2e:security",
 		"test": "bun test apps/control packages scripts apps/web/src/lib/keyboard-mapping.test.ts apps/web/src/lib/keyboard-mapping.property.test.ts",
 		"test:web": "bun run --cwd apps/web test",
-		"e2e": "E2E_TEST=1 bun --bun playwright test --project=mocked",
+		"e2e": "E2E_TEST=1 bun --bun playwright test --project=mocked --workers=4",
 		"e2e:ui": "E2E_TEST=1 bun --bun playwright test --project=mocked --ui",
 		"e2e:debug": "E2E_TEST=1 PWDEBUG=1 playwright test --project=mocked",
 		"e2e:security": "E2E_TEST=1 bun --bun playwright test --project=security",
