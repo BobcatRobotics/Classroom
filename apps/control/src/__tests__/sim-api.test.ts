@@ -481,6 +481,74 @@ describe("simulation HTTP API", () => {
 		);
 	});
 
+	test("auto chooser bridge accepts a singleton NT4 announce message", async () => {
+		const fakeDocker = createFakeDocker();
+		const controlled = createControlledRunCommands();
+		const sockets: FakeWebSocket[] = [];
+
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const cookie = cookieFrom(loginResponse);
+				const workspace = workspaceBySlug(app, "alice");
+				app.runs.start(workspace);
+				await waitFor(() => controlled.commands.length === 1);
+				controlled.commands[0]?.writeStdout("NT4 listening on 5810");
+				await waitFor(
+					() =>
+						app.runs.getWorkspaceSnapshot(workspace.id).status === "running",
+				);
+
+				const response = await app.fetch(
+					new Request("http://localhost/u/alice/api/sim/auto-choosers", {
+						headers: { cookie },
+					}),
+				);
+				await waitFor(
+					() =>
+						sockets.length === 1 && sockets[0]?.readyState === WebSocket.OPEN,
+				);
+
+				sockets[0]?.message({
+					method: "announce",
+					params: {
+						id: 1,
+						name: "/SmartDashboard/Auto Choices/.type",
+						type: "string",
+					},
+				});
+				sockets[0]?.binary(encodeMsgPack([1, 0, 4, "String Chooser"]));
+
+				expect(response.status).toBe(200);
+				const refreshed = await app.fetch(
+					new Request("http://localhost/u/alice/api/sim/auto-choosers", {
+						headers: { cookie },
+					}),
+				);
+				expect(refreshed.status).toBe(200);
+				expect(await refreshed.json()).toMatchObject({
+					ok: true,
+					nt4: { connected: true },
+				});
+				app.runs.stopWorkspace(workspace.id);
+			},
+			{
+				dockerRunner: fakeDocker.runner,
+				runCommandFactory: controlled.commandFactory,
+				nt4AutoWebSocketFactory: () => {
+					const socket = new FakeWebSocket();
+					sockets.push(socket);
+					queueMicrotask(() => socket.open());
+					return socket as unknown as WebSocket;
+				},
+				codeImage: "coderunner-workspace:test",
+				simPortRange: { start: 26070, end: 26079 },
+				vscodePortRange: { start: 33370, end: 33379 },
+				halsimPortRange: { start: 34370, end: 34379 },
+			},
+		);
+	});
+
 	test("auto chooser bridge ignores malformed NT4 binary frames instead of crashing", async () => {
 		const fakeDocker = createFakeDocker();
 		const controlled = createControlledRunCommands();

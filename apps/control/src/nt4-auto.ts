@@ -514,15 +514,16 @@ export class Nt4AutoChooserBridge extends ReconnectingWsBridge<
 		entry.stale = false;
 		entry.error = null;
 		if (typeof raw === "string") {
-			const messages = JSON.parse(raw) as Array<{
-				method: string;
-				params: Record<string, unknown>;
-			}>;
+			const parsed = JSON.parse(raw) as
+				| Array<{ method: string; params: Record<string, unknown> }>
+				| { method?: string; params?: Record<string, unknown> };
+			const messages = Array.isArray(parsed) ? parsed : [parsed];
 			for (const message of messages) {
+				if (!message || typeof message !== "object") continue;
 				if (message.method === "announce") {
-					const id = message.params.id;
-					const name = message.params.name;
-					const type = message.params.type;
+					const id = message.params?.id;
+					const name = message.params?.name;
+					const type = message.params?.type;
 					if (
 						typeof id === "number" &&
 						typeof name === "string" &&
@@ -533,7 +534,7 @@ export class Nt4AutoChooserBridge extends ReconnectingWsBridge<
 						entry.topicsByName.set(topic.name, topic);
 					}
 				} else if (message.method === "unannounce") {
-					const name = message.params.name;
+					const name = message.params?.name;
 					if (typeof name === "string") {
 						const topic = entry.topicsByName.get(normalizeTopicName(name));
 						if (topic) entry.topicsById.delete(topic.id);
