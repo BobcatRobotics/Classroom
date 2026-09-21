@@ -6,7 +6,6 @@
  * so Preview gets a show/hide button in the topbar's selector slot — and
  * revealing it must not drag any simulation chrome back in with it.
  */
-import type { Page } from "@playwright/test";
 import type { ControlApp } from "../../../apps/control/src/app";
 import { expect, test } from "../../fixtures/app";
 import { loginAs } from "../../fixtures/auth";
@@ -18,20 +17,6 @@ function makeConsoleLesson(app: ControlApp, workspaceId: string): void {
 			"UPDATE workspaces SET current_module = ?, current_module_kind = ? WHERE id = ?",
 		)
 		.run("hello-world", "plain-java", workspaceId);
-}
-
-function previewFrame(page: Page) {
-	return page.frameLocator('[data-testid="preview-frame"]');
-}
-
-async function openTool(page: Page, tool: "Preview" | "PathPlanner") {
-	await page.getByRole("button", { name: "Tools" }).click();
-	await page.getByRole("menuitem", { name: tool }).click();
-}
-
-async function closeTools(page: Page) {
-	await page.getByRole("button", { name: "Tools" }).click();
-	await page.getByRole("menuitem", { name: "Close tool(s)" }).click();
 }
 
 test("a console lesson hides sim chrome and never exposes tools", async ({

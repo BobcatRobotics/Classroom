@@ -1,7 +1,6 @@
 /**
  * Pane sizing persists across a reload (sessionStorage), and resets in a new session.
  */
-import type { Page } from "@playwright/test";
 import { expect, test } from "../../fixtures/app";
 import { loginAs } from "../../fixtures/auth";
 import {
@@ -73,8 +72,3 @@ test("resized pane sizes survive a reload and reset in a new session", async ({
 
 	await freshContext.close();
 });
-
-async function openTool(page: Page, tool: "PathPlanner" | "Preview") {
-	await page.getByRole("button", { name: "Tools" }).click();
-	await page.getByRole("menuitem", { name: tool }).click();
-}

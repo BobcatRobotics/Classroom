@@ -36,11 +36,6 @@ async function openWorkspace(page: Page, baseURL: string, slug: string) {
 	await page.getByRole("menuitem", { name: "Preview" }).click();
 }
 
-async function openTool(page: Page, tool: "Preview" | "PathPlanner") {
-	await page.getByRole("button", { name: "Tools" }).click();
-	await page.getByRole("menuitem", { name: tool }).click();
-}
-
 function previewFrame(page: Page) {
 	return page.frameLocator('[data-testid="preview-frame"]');
 }

@@ -8,7 +8,7 @@ ALTER TABLE run_jobs ADD COLUMN tests_skipped INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE lesson_completions (
   id TEXT PRIMARY KEY,
   run_job_id TEXT NOT NULL UNIQUE REFERENCES run_jobs(id),
-  student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   module_id TEXT NOT NULL,
   lesson_title TEXT NOT NULL,
