@@ -1,4 +1,4 @@
-import { mkdir, rm, stat } from "node:fs/promises";
+import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type {
 	AdminActionResponse,
@@ -27,6 +27,103 @@ export type AdminRouteContext = {
 	runtimeProvider: WorkspaceRuntimeProvider;
 };
 
+type LessonCompletionReportRow = {
+	student_id: string;
+	user_name: string;
+	user_slug: string | null;
+	lesson_title: string;
+	completed_at: string;
+	build_succeeded: number;
+	test_passed: number;
+	tests_total: number;
+	tests_passed: number;
+	tests_failed: number;
+	tests_skipped: number;
+	run_job_id: string;
+	log_path: string | null;
+};
+
+const reportSortColumns: Record<string, string> = {
+	user_name: "u.name",
+	user_slug: "u.slug",
+	lesson_title: "c.lesson_title",
+	completed_at: "c.completed_at",
+	build_succeeded: "c.build_succeeded",
+	test_passed: "c.test_passed",
+	tests_total: "c.tests_total",
+	tests_passed: "c.tests_passed",
+	tests_failed: "c.tests_failed",
+	tests_skipped: "c.tests_skipped",
+	log_path: "r.log_path",
+};
+
+function isValidDateOnly(value: string): boolean {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+	try {
+		return (
+			new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value
+		);
+	} catch {
+		return false;
+	}
+}
+
+function csvCell(value: string | number | null): string {
+	const text = String(value ?? "");
+	const safeText = /^[\s]*[=+\-@]/u.test(text) ? `'${text}` : text;
+	return `"${safeText.replaceAll('"', '""')}"`;
+}
+
+function lessonCompletionReportQuery(filters: {
+	studentId: string | null;
+	moduleId: string | null;
+	from: string | null;
+	to: string | null;
+	latestOnly: boolean;
+}): { where: string; values: string[] } {
+	const conditions: string[] = [];
+	const values: string[] = [];
+	if (filters.studentId) {
+		conditions.push("c.student_id = ?");
+		values.push(filters.studentId);
+	}
+	if (filters.moduleId) {
+		conditions.push("c.module_id = ?");
+		values.push(filters.moduleId);
+	}
+	if (filters.from) {
+		conditions.push("c.completed_at >= ?");
+		values.push(`${filters.from}T00:00:00.000Z`);
+	}
+	if (filters.to) {
+		conditions.push("c.completed_at < date(?, '+1 day')");
+		values.push(filters.to);
+	}
+	if (filters.latestOnly) {
+		conditions.push(`NOT EXISTS (
+			SELECT 1 FROM lesson_completions newer
+			WHERE newer.student_id = c.student_id
+			  AND newer.module_id = c.module_id
+			  AND (newer.completed_at > c.completed_at
+			    OR (newer.completed_at = c.completed_at AND newer.id > c.id))
+		)`);
+	}
+	return {
+		where: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "",
+		values,
+	};
+}
+
+const lessonCompletionReportSelect = `
+	SELECT c.student_id, u.name AS user_name, u.slug AS user_slug,
+		c.lesson_title, c.completed_at, c.build_succeeded, c.test_passed,
+		c.tests_total, c.tests_passed, c.tests_failed, c.tests_skipped,
+		r.id AS run_job_id, r.log_path
+	FROM lesson_completions c
+	JOIN user u ON u.id = c.student_id
+	JOIN run_jobs r ON r.id = c.run_job_id
+`;
+
 export async function handleAdminRoute(
 	ctx: AdminRouteContext,
 	url: URL,
@@ -53,6 +150,190 @@ export async function handleAdminRoute(
 
 	if (url.pathname === "/admin/status" && request.method === "GET") {
 		return jsonResponse(adminStatusResponse(storage, runs));
+	}
+
+	if (
+		url.pathname === "/admin/lesson-completions/options" &&
+		request.method === "GET"
+	) {
+		const users = storage.db
+			.query(
+				`SELECT DISTINCT u.id, u.name, u.slug
+				 FROM lesson_completions c
+				 JOIN user u ON u.id = c.student_id
+				 ORDER BY u.name, u.slug`,
+			)
+			.all();
+		const lessons = storage.db
+			.query(
+				`SELECT DISTINCT module_id, lesson_title
+				 FROM lesson_completions
+				 ORDER BY lesson_title, module_id`,
+			)
+			.all();
+		return jsonResponse({ ok: true, users, lessons });
+	}
+
+	if (
+		url.pathname === "/admin/lesson-completions" &&
+		request.method === "GET"
+	) {
+		const studentId = url.searchParams.get("studentId")?.trim() || null;
+		const moduleId = url.searchParams.get("moduleId")?.trim() || null;
+		const from = url.searchParams.get("from") || null;
+		const to = url.searchParams.get("to") || null;
+		const latestOnly = url.searchParams.get("latest") === "true";
+		if (
+			(from !== null && !isValidDateOnly(from)) ||
+			(to !== null && !isValidDateOnly(to)) ||
+			(from !== null && to !== null && from > to)
+		) {
+			return jsonResponse(
+				{ error: "Invalid completion date range." },
+				{ status: 400 },
+			);
+		}
+
+		const sort = url.searchParams.get("sort") ?? "completed_at";
+		const direction =
+			url.searchParams.get("direction") === "desc" ? "DESC" : "ASC";
+		const sortColumn = reportSortColumns[sort];
+		if (!sortColumn) {
+			return jsonResponse(
+				{ error: "Invalid report sort column." },
+				{ status: 400 },
+			);
+		}
+		const filters = { studentId, moduleId, from, to, latestOnly };
+		const { where, values } = lessonCompletionReportQuery(filters);
+		const orderBy = `ORDER BY ${sortColumn} ${direction}, c.completed_at ASC, c.id ASC`;
+		const exportCsv = url.searchParams.get("format") === "csv";
+		const reportQuery = `${lessonCompletionReportSelect} ${where} ${orderBy}`;
+		if (exportCsv) {
+			const rows = storage.db
+				.query(reportQuery)
+				.all(...values) as LessonCompletionReportRow[];
+			const headers = [
+				"user_name",
+				"user_slug",
+				"lesson_title",
+				"completed_at",
+				"build_succeeded",
+				"test_passed",
+				"tests_total",
+				"tests_passed",
+				"tests_failed",
+				"tests_skipped",
+				"log_path",
+			];
+			const lines = [headers.map((header) => csvCell(header)).join(",")];
+			for (const row of rows) {
+				lines.push(
+					[
+						row.user_name,
+						row.user_slug,
+						row.lesson_title,
+						row.completed_at,
+						row.build_succeeded,
+						row.test_passed,
+						row.tests_total,
+						row.tests_passed,
+						row.tests_failed,
+						row.tests_skipped,
+						row.log_path
+							? `/admin/run-logs/${encodeURIComponent(row.run_job_id)}`
+							: null,
+					]
+						.map((value) => csvCell(value))
+						.join(","),
+				);
+			}
+			return new Response(`${lines.join("\r\n")}\r\n`, {
+				headers: {
+					"Content-Type": "text/csv; charset=utf-8",
+					"Content-Disposition":
+						'attachment; filename="lesson-completion-report.csv"',
+					"Cache-Control": "no-store",
+				},
+			});
+		}
+		const count = storage.db
+			.query(
+				`SELECT COUNT(*) AS total
+				 FROM lesson_completions c
+				 JOIN user u ON u.id = c.student_id
+				 ${where}`,
+			)
+			.get(...values) as { total: number };
+
+		const rawPage = Number(url.searchParams.get("page") ?? 1);
+		const rawPageSize = Number(url.searchParams.get("pageSize") ?? 20);
+		if (
+			!Number.isInteger(rawPage) ||
+			rawPage < 1 ||
+			!([20, 50, 100] as const).includes(rawPageSize as 20 | 50 | 100)
+		) {
+			return jsonResponse(
+				{ error: "Invalid report pagination." },
+				{ status: 400 },
+			);
+		}
+		const rows = storage.db
+			.query(`${reportQuery} LIMIT ? OFFSET ?`)
+			.all(
+				...values,
+				rawPageSize,
+				(rawPage - 1) * rawPageSize,
+			) as LessonCompletionReportRow[];
+		return jsonResponse({
+			ok: true,
+			rows: rows.map((row) => ({
+				...row,
+				log_url: row.log_path
+					? `/admin/run-logs/${encodeURIComponent(row.run_job_id)}`
+					: null,
+			})),
+			total: count.total,
+			page: rawPage,
+			pageSize: rawPageSize,
+		});
+	}
+
+	const runLogMatch = /^\/admin\/run-logs\/([^/]+)$/.exec(url.pathname);
+	if (runLogMatch && request.method === "GET") {
+		const runJobId = runLogMatch[1] ?? "";
+		const run = storage.db
+			.query("SELECT id, workspace_id, log_path FROM run_jobs WHERE id = ?")
+			.get(runJobId) as {
+			id: string;
+			workspace_id: string;
+			log_path: string | null;
+		} | null;
+		if (!run?.log_path) return notFound();
+		const logPath = resolve(
+			storage.config.dataDir,
+			"users",
+			run.workspace_id,
+			"logs",
+			"runs",
+			`${run.id}.log`,
+		);
+		if (!isInsideDirectory(resolve(storage.config.dataDir), logPath)) {
+			return jsonResponse({ error: "Log path is invalid." }, { status: 403 });
+		}
+		try {
+			const contents = await readFile(logPath);
+			return new Response(contents, {
+				headers: {
+					"Content-Type": "text/plain; charset=utf-8",
+					"Content-Disposition": `inline; filename="${run.id}.log"`,
+					"X-Content-Type-Options": "nosniff",
+					"Cache-Control": "no-store",
+				},
+			});
+		} catch {
+			return notFound();
+		}
 	}
 
 	if (url.pathname === "/admin/containers/stats" && request.method === "GET") {
