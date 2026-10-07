@@ -43,6 +43,7 @@ const GATED_PATHS: Array<{
 	{ path: "/admin/users/anyuser/disable", method: "POST", expect: "deny" },
 	{ path: "/admin/users/anyuser/enable", method: "POST", expect: "deny" },
 	{ path: "/api/launcher/validate-launch", method: "POST", expect: "deny" },
+	{ path: "/api/launcher/catalog-config", expect: "deny" },
 	{ path: "/admin/users/anyuser", method: "DELETE", expect: "deny" },
 	{ path: "/admin/allowlist/reload", method: "POST", expect: "deny" },
 	{ path: "/u/alice/", expect: "deny" },

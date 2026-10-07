@@ -1,5 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { launcherIdentitySchema } from "@frc-coderunner/contracts";
+import {
+	type LauncherIdentity,
+	launcherIdentitySchema,
+} from "@frc-coderunner/contracts";
 import { getSessionFromRequest } from "../auth/middleware";
 import type { AppStorage } from "../storage";
 import { jsonResponse } from "./responses";
@@ -48,6 +51,45 @@ function invalidLaunchGrant(): Response {
 		{ error: "Launch authorization is invalid or expired." },
 		{ status: 401, headers: { "Cache-Control": "no-store" } },
 	);
+}
+
+function launcherIdentityForTicket(
+	storage: AppStorage,
+	runtimeTicket: string,
+): LauncherIdentity | null {
+	if (!BASE64URL_32_BYTE_PATTERN.test(runtimeTicket)) return null;
+	const grant = storage.db
+		.query(
+			"SELECT user_id FROM launcher_runtime_grants WHERE token_hash = ? AND expires_at > ?",
+		)
+		.get(sha256Base64Url(runtimeTicket), new Date().toISOString()) as {
+		user_id: string;
+	} | null;
+	if (!grant || storage.isAccountDisabled(grant.user_id)) return null;
+	const githubAccount = storage.db
+		.query(
+			"SELECT 1 FROM account WHERE userId = ? AND providerId = 'github' LIMIT 1",
+		)
+		.get(grant.user_id);
+	if (!githubAccount) return null;
+	const user = storage.db
+		.query("SELECT id, name, email, image, role FROM user WHERE id = ?")
+		.get(grant.user_id) as {
+		id: string;
+		name: string;
+		email: string;
+		image: string | null;
+		role: string | null;
+	} | null;
+	if (!user) return null;
+	const identity = launcherIdentitySchema.safeParse({
+		userId: user.id,
+		displayName: user.name,
+		email: user.email,
+		avatarUrl: user.image,
+		role: user.role === "admin" ? "admin" : "student",
+	});
+	return identity.success ? identity.data : null;
 }
 
 export async function handleLauncherAuthRoute(
@@ -221,10 +263,7 @@ export async function handleLauncherAuthRoute(
 		}
 		const runtimeTicket = (body as { runtimeTicket?: unknown } | null)
 			?.runtimeTicket;
-		if (
-			typeof runtimeTicket !== "string" ||
-			!BASE64URL_32_BYTE_PATTERN.test(runtimeTicket)
-		) {
+		if (typeof runtimeTicket !== "string") {
 			return jsonResponse(
 				{ error: "Launch authorization is invalid." },
 				{
@@ -233,56 +272,31 @@ export async function handleLauncherAuthRoute(
 				},
 			);
 		}
-		const grant = storage.db
-			.query(
-				"SELECT user_id FROM launcher_runtime_grants WHERE token_hash = ? AND expires_at > ?",
-			)
-			.get(sha256Base64Url(runtimeTicket), new Date().toISOString()) as {
-			user_id: string;
-		} | null;
-		if (!grant || storage.isAccountDisabled(grant.user_id)) {
-			return jsonResponse(
-				{ error: "Launch authorization is invalid or expired." },
-				{
-					status: 401,
-					headers: { "Cache-Control": "no-store" },
-				},
-			);
-		}
-		const githubAccount = storage.db
-			.query(
-				"SELECT 1 FROM account WHERE userId = ? AND providerId = 'github' LIMIT 1",
-			)
-			.get(grant.user_id);
-		if (!githubAccount) {
-			return jsonResponse(
-				{ error: "Launch authorization is invalid or expired." },
-				{
-					status: 401,
-					headers: { "Cache-Control": "no-store" },
-				},
-			);
-		}
-		const user = storage.db
-			.query("SELECT id, name, email, image, role FROM user WHERE id = ?")
-			.get(grant.user_id) as {
-			id: string;
-			name: string;
-			email: string;
-			image: string | null;
-			role: string | null;
-		} | null;
-		if (!user) return invalidLaunchGrant();
-		const identity = launcherIdentitySchema.safeParse({
-			userId: user.id,
-			displayName: user.name,
-			email: user.email,
-			avatarUrl: user.image,
-			role: user.role === "admin" ? "admin" : "student",
-		});
-		if (!identity.success) return invalidLaunchGrant();
+		const identity = launcherIdentityForTicket(storage, runtimeTicket);
+		if (!identity) return invalidLaunchGrant();
 		return jsonResponse(
-			{ ok: true, identity: identity.data },
+			{ ok: true, identity },
+			{ headers: { "Cache-Control": "no-store" } },
+		);
+	}
+
+	if (
+		url.pathname === "/api/launcher/catalog-config" &&
+		request.method === "GET"
+	) {
+		const authorization = request.headers.get("authorization") ?? "";
+		const match = /^Bearer\s+([A-Za-z0-9_-]{43})$/u.exec(authorization);
+		const identity = match
+			? launcherIdentityForTicket(storage, match[1] ?? "")
+			: null;
+		if (!identity) return invalidLaunchGrant();
+		const hasRemoteCatalog = storage.config.catalogRepo !== null;
+		return jsonResponse(
+			{
+				ok: true,
+				catalogRepo: storage.config.catalogRepo,
+				catalogBranch: hasRemoteCatalog ? storage.config.catalogBranch : null,
+			},
 			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}

@@ -165,6 +165,12 @@ admins remain admins, students remain students. The local session uses the
 existing device-local workspace identity and never stores a central workspace
 ID with the project.
 
+At startup, the desktop runtime uses that grant to read the central lessons
+catalog configuration. When the central control plane has
+`LESSONS_CATALOG_REPO` configured, the desktop uses the same repository and
+`LESSONS_CATALOG_BRANCH` for its project list and lesson loads. Otherwise, it
+uses the catalog bundled with the desktop runtime.
+
 The packaged app defaults to `https://coderunner.wiredcats5885.ca`. Developers
 can override the central origin with `CODERUNNER_CENTRAL_URL` for staging or a
 local control-plane deployment. Source-checkout `dev:local` remains a demo-mode

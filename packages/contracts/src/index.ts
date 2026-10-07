@@ -30,6 +30,18 @@ export const launcherIdentitySchema = z.object({
 	role: z.enum(["student", "admin"]),
 });
 
+export const launcherCatalogConfigResponseSchema = z
+	.object({
+		ok: z.literal(true),
+		catalogRepo: z.string().nullable(),
+		catalogBranch: z.string().nullable(),
+	})
+	.refine(
+		(config) =>
+			(config.catalogRepo === null) === (config.catalogBranch === null),
+		"Remote catalog repository and branch must be configured together.",
+	);
+
 export const localUserIdentitySchema = z.object({
 	displayName: displayNameSchema,
 	email: z.string().email(),
@@ -50,6 +62,9 @@ export type UserId = z.infer<typeof userIdSchema>;
 export type WorkspaceId = z.infer<typeof workspaceIdSchema>;
 export type WorkspaceSlug = z.infer<typeof workspaceSlugSchema>;
 export type LauncherIdentity = z.infer<typeof launcherIdentitySchema>;
+export type LauncherCatalogConfigResponse = z.infer<
+	typeof launcherCatalogConfigResponseSchema
+>;
 export type LocalUserIdentity = z.infer<typeof localUserIdentitySchema>;
 
 export const heartbeatRequestSchema = z.object({

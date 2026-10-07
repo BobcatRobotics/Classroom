@@ -355,40 +355,21 @@ the pilot. Phase 4 may proceed before or without this work.
 launches, and the account holder/operator can revoke that installation without
 changing local project data. This optional phase does not block Phase 4.
 
-### Phase 4: Central Lessons and Assignment Delivery
+### Phase 4: Central Lessons 
 
-- [ ] Expose lesson and assignment catalogs with stable version identifiers.
-- [ ] Let the launcher retrieve the selected lesson/project into local storage.
-- [ ] Track centrally which student opened which assignment version.
-- [ ] Ensure changing assignments prompts before replacing existing project
-      files.
-- [ ] Define how centrally authored lesson changes reach students and whether
-      already-started assignments stay pinned to their original version.
+- [x] Expose lesson catalogs from server/control if it configured LESSONS_CATALOG_REPO and LESSONS_CATALOG_BRANCH. Otherwise return or use inbuild catalog
+- [x] As of now only no need to worry about student assignment tracking and keeping student assignment in sync with server or local. switch project should only allow to change the project. 
 
-**Exit criteria:** Students can select an assignment centrally and work on its
-project locally without losing work when lesson definitions change.
+**Exit criteria:** student should be able to load the project from central repo if configured for control docker container.
 
 ### Phase 5: Completion and Submission Sync
 
-- [ ] Add an explicit Mark Complete/Submit action.
-- [ ] Upload a versioned project snapshot and file manifest over the student's
-      authenticated connection.
-- [ ] Make uploads retryable, resumable, and safe to repeat after a timeout.
-- [ ] Show pending, synced, and failed states in the student experience.
-- [ ] Exclude editor settings, Gradle caches, extensions, and other regenerable
-      machine state.
-- [ ] Enforce archive size, file-count, path, and extraction-safety limits.
-- [ ] Record student, assignment/version, workspace-image version, timestamp,
-      and submission status.
-- [ ] Define authenticated APIs for local run events/results. Decide which
-      fields may populate `run_jobs` and how to distinguish client-reported
-      results from server-verified results.
-- [ ] Preserve the current rule that `lesson_completions` requires qualifying
-      run evidence, or explicitly redesign that rule for local execution.
-- [ ] Decide whether completion is student-declared or requires server-side
-      build/test verification.
+- [ ] Mark Lesson Completed Menu option disabled until robot start and all test pass
+- [ ] On click on Mark Lesson Completed, an entry should be made to lesson_completions table. Locally and then sync back to server side.
+- [ ] I would like to if in lesson_completion if the lesson is completed using desktop app or browser so new column in lesson_completion to track this. There will be existing entries in table, so update the column with value browser based for existing entries.
+- [ ] Browser session and local has no relationship, if student complete same lesson from client and browser then we add 2 entries (that is the case today for browser as well on multiple lesson completion clicks) and in report, the last one wins.
 
-**Exit criteria:** A student can submit reliably and staff can inspect the
+**Exit criteria:** A student can submit reliably and mentors can inspect the
 correct centrally stored submission and its status.
 
 ### Phase 6: Workspace Image and Launcher Updates

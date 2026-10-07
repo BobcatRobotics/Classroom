@@ -3,6 +3,7 @@ import {
 	launcherIdentitySchema,
 	localUserIdentitySchema,
 } from "@frc-coderunner/contracts";
+import { configureCentralCatalog } from "../runtime/central-catalog";
 import {
 	type DockerCommandResult,
 	findLocalControlPort,
@@ -120,6 +121,7 @@ async function authorizePackagedStart(): Promise<void> {
 	}
 	const result = (await response.json()) as { identity?: unknown };
 	const centralIdentity = launcherIdentitySchema.parse(result.identity);
+	await configureCentralCatalog(Bun.env);
 	const localIdentity = localUserIdentitySchema.parse({
 		displayName: centralIdentity.displayName,
 		email: centralIdentity.email,
