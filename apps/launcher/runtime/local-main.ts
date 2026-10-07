@@ -9,4 +9,4 @@ Bun.env.CODE_IMAGE = Bun.env.FRC_LOCAL_CODE_IMAGE?.trim() || LOCAL_CODE_IMAGE;
 Bun.env.CODE_MEMORY_LIMIT =
 	Bun.env.FRC_LOCAL_CODE_MEMORY_LIMIT?.trim() || "4096m";
 
-await import("./main");
+await import("../../control/src/main");

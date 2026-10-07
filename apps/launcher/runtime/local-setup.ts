@@ -1,6 +1,12 @@
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { join, win32 } from "node:path";
-import type { DockerCommandResult } from "./containers";
+import { delimiter, dirname, join, win32 } from "node:path";
+
+export type DockerCommandResult = {
+	exitCode: number;
+	stdout: string;
+	stderr: string;
+};
 
 export const LOCAL_CODE_IMAGE =
 	"docker.io/bobcatrobotics/coderunner-workspace@sha256:1e855cc6435445c14514541b1ce927bf51cc61a4f93fcf989853b7185fb64a25";
@@ -28,6 +34,42 @@ export type LocalDockerInfo = {
 	serverPlatform: string;
 	operatingSystem: string;
 };
+
+export function findLocalDockerExecutable(
+	platform: string,
+	home: string,
+	pathValue = "",
+	exists: (path: string) => boolean = existsSync,
+): string {
+	if (platform !== "darwin") return "docker";
+
+	const directories = pathValue.split(delimiter).filter(Boolean);
+	directories.push(
+		"/Applications/Docker.app/Contents/Resources/bin",
+		join(home, "Applications", "Docker.app", "Contents", "Resources", "bin"),
+		"/usr/local/bin",
+		"/opt/homebrew/bin",
+		join(home, ".docker", "bin"),
+	);
+
+	for (const directory of new Set(directories)) {
+		const executable = join(directory, "docker");
+		if (exists(executable)) return executable;
+	}
+	return "docker";
+}
+
+export function includeDockerDirectoryInPath(
+	dockerPath: string,
+	pathValue = "",
+): string {
+	const dockerDirectory = dirname(dockerPath);
+	if (dockerDirectory === ".") return pathValue;
+
+	const pathEntries = pathValue.split(delimiter).filter(Boolean);
+	if (pathEntries.includes(dockerDirectory)) return pathValue;
+	return [dockerDirectory, ...pathEntries].join(delimiter);
+}
 
 export function localDataDirectory(
 	platform: string,
@@ -93,23 +135,16 @@ function dockerFailure(result: DockerCommandResult, args: string[]): Error {
 			details,
 		)
 	) {
+		return new Error("Please start Docker and restart CodeRunner.");
+	}
+	if (args[0] === "pull") {
 		return new Error(
-			"Docker Desktop is installed but not running. Open Docker Desktop, wait until it reports that the engine is running, then retry.",
+			`Unable to download image, try again.${details ? `\nDocker pull details: ${details}` : ""}`,
 		);
 	}
 	if (/no space left|insufficient space|not enough disk/i.test(details)) {
 		return new Error(
 			"Docker Desktop does not have enough disk space for the workspace image. Free disk space in Docker Desktop, then retry.",
-		);
-	}
-	if (
-		args[0] === "pull" &&
-		/connection reset|connection refused|context canceled|i\/o timeout|network is unreachable|unexpected eof|temporary failure|tls handshake timeout/i.test(
-			details,
-		)
-	) {
-		return new Error(
-			"The workspace image download did not finish. Check the internet connection and retry; existing project files are unchanged.",
 		);
 	}
 	return new Error(
@@ -125,7 +160,7 @@ export async function inspectLocalDocker(
 		client = await docker(["version", "--format", "{{.Client.Version}}"]);
 	} catch {
 		throw new Error(
-			"Docker Desktop was not found. Install Docker Desktop from the official Docker website, then run setup again.",
+			"Docker Desktop was not found. Install Docker Desktop, then restart CodeRunner.",
 		);
 	}
 	if (client.exitCode !== 0) {
@@ -140,9 +175,7 @@ export async function inspectLocalDocker(
 			"{{.ServerVersion}}|{{.OSType}}/{{.Architecture}}|{{.OperatingSystem}}",
 		]);
 	} catch {
-		throw new Error(
-			"Docker Desktop is installed but its engine is unavailable. Open Docker Desktop and wait for the engine to start.",
-		);
+		throw new Error("Please start Docker and restart CodeRunner.");
 	}
 	if (server.exitCode !== 0) {
 		throw dockerFailure(server, ["info"]);
@@ -188,10 +221,37 @@ export async function setupLocalRuntime(
 	progress("Checking the pinned CodeRunner workspace image...");
 	let image = await options.docker(["image", "inspect", LOCAL_CODE_IMAGE]);
 	if (image.exitCode !== 0) {
-		progress(
-			"Downloading the pinned workspace image; this may take a while...",
-		);
-		image = await options.docker(["pull", LOCAL_CODE_IMAGE], progress);
+		progress("Downloading the pinned workspace image...");
+		const layers = new Map<string, string>();
+		image = await options.docker(["pull", LOCAL_CODE_IMAGE], (line) => {
+			const match = /^([a-f\d]{12,64}):\s*(.+)$/iu.exec(
+				line
+					.replace(
+						new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"),
+						"",
+					)
+					.trim(),
+			);
+			if (!match) {
+				progress("Downloading the pinned workspace image...");
+				return;
+			}
+			const layerId = match[1] ?? "";
+			const status = match[2]?.trim() ?? "";
+			if (!layerId || !status) return;
+			layers.set(layerId, status);
+			const completed = [...layers.values()].filter((status) =>
+				/^(pull complete|already exists)$/iu.test(status),
+			).length;
+			const active = [...layers.values()].filter((status) =>
+				/^(downloading|extracting|verifying checksum|download complete)/iu.test(
+					status,
+				),
+			).length;
+			progress(
+				`Downloading workspace image: ${completed} layer${completed === 1 ? "" : "s"} complete, ${active} downloading or extracting (${layers.size} layers reported)`,
+			);
+		});
 		if (image.exitCode !== 0) {
 			throw dockerFailure(image, ["pull"]);
 		}
@@ -208,9 +268,11 @@ export async function setupLocalRuntime(
 export async function localDiagnostics(
 	docker: LocalDockerRunner,
 	host: LocalHost = { platform: process.platform, arch: process.arch },
+	version = "development",
 ): Promise<string> {
 	const lines = [
 		"CodeRunner local runtime diagnostics",
+		`CodeRunner version: ${version}`,
 		`Host: ${host.platform}/${host.arch}`,
 		`Workspace image: ${LOCAL_CODE_IMAGE}`,
 	];

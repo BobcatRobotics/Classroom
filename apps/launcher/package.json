@@ -1,0 +1,27 @@
+{
+	"name": "@frc-coderunner/launcher",
+	"private": true,
+	"version": "2.0.2",
+	"license": "MIT",
+	"description": "CodeRunner desktop launcher.",
+	"type": "module",
+	"main": "main.cjs",
+	"scripts": {
+		"dev:local": "bun --watch runtime/local-main.ts",
+		"local:setup": "bun scripts/local-runtime.ts setup",
+		"local:repair": "bun scripts/local-runtime.ts repair",
+		"local:start": "bun scripts/local-runtime.ts start",
+		"local:diagnostics": "bun scripts/local-runtime.ts diagnostics",
+		"desktop:prepare": "bun run --cwd ../web build && bun ../../scripts/fetch-dist.ts --skip-web --dist-dir dist && bun scripts/build-desktop.ts",
+		"desktop:build": "bun run desktop:prepare && electron-builder --config electron-builder.yml",
+		"desktop:release": "bun run desktop:prepare && bun scripts/build-desktop.ts --check-signing && electron-builder --config electron-builder.yml",
+		"desktop:dev": "bun run desktop:prepare && electron .",
+		"test": "bun test runtime"
+	},
+	"devDependencies": {
+		"@electron/notarize": "^3.1.1",
+		"electron": "^44.5.1",
+		"electron-builder": "^26.15.3",
+		"png2icons": "^2.0.1"
+	}
+}

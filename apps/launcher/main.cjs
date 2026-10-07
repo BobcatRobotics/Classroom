@@ -11,6 +11,7 @@ const { createInterface } = require("node:readline");
 const { homedir } = require("node:os");
 const { join } = require("node:path");
 
+const appTitle = `CodeRunner v${app.getVersion()}`;
 const hasSingleInstance = app.requestSingleInstanceLock();
 if (!hasSingleInstance) {
 	app.quit();
@@ -52,6 +53,7 @@ function runtimeEnvironment() {
 		FRC_PATHPLANNER_DIST_DIR: join(runtimeDirectory, "pathplanner"),
 		LESSONS_CATALOG_DIR: join(runtimeDirectory, "catalog"),
 		FRC_MIGRATIONS_DIR: join(runtimeDirectory, "migrations"),
+		CODERUNNER_VERSION: app.getVersion(),
 	};
 }
 
@@ -78,7 +80,7 @@ function createWindow() {
 		minHeight: 620,
 		show: false,
 		backgroundColor: "#111318",
-		title: "CodeRunner",
+		title: appTitle,
 		webPreferences: {
 			contextIsolation: true,
 			nodeIntegration: false,
@@ -86,6 +88,10 @@ function createWindow() {
 		},
 	});
 
+	mainWindow.webContents.on("page-title-updated", (event) => {
+		event.preventDefault();
+		mainWindow?.setTitle(appTitle);
+	});
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
 		if (url.startsWith("http://127.0.0.1:")) return { action: "allow" };
 		void shell.openExternal(url);
@@ -107,9 +113,9 @@ function createWindow() {
 }
 
 function progressPage() {
-	const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CodeRunner</title><style>
+	const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${appTitle}</title><style>
 		:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#111318;color:#edf0f4}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center}.status{width:min(520px,calc(100vw - 48px));border-left:3px solid #e34e66;padding:8px 0 8px 24px}h1{font-size:22px;font-weight:600;margin:0 0 12px}p{margin:0;color:#aab1bc;line-height:1.5;overflow-wrap:anywhere}.bar{height:3px;background:#292d35;margin-top:24px;overflow:hidden}.bar:after{content:"";display:block;width:35%;height:100%;background:#e34e66;animation:move 1.4s ease-in-out infinite alternate}@keyframes move{to{transform:translateX(190%)}}
-		</style></head><body><main class="status"><h1>Starting CodeRunner</h1><p id="status">Checking Docker Desktop...</p><div class="bar"></div></main></body></html>`;
+		</style></head><body><main class="status"><h1>Starting ${appTitle}</h1><p id="status">Checking Docker Desktop...</p><div class="bar"></div></main></body></html>`;
 	return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
@@ -134,19 +140,27 @@ function runRuntimeCommand(command) {
 	});
 }
 
-async function showDiagnostics() {
+async function showDiagnostics(startupDetails = "") {
 	const result = await runRuntimeCommand("diagnostics");
+	const report = [
+		result.output.trim(),
+		startupDetails.trim() ? `Startup details:\n${startupDetails.trim()}` : "",
+	]
+		.filter(Boolean)
+		.join("\n\n");
+	const versionedReport = report.includes("CodeRunner version:")
+		? report
+		: `CodeRunner version: ${app.getVersion()}\n\n${report}`;
 	const response = await dialog.showMessageBox(mainWindow, {
 		type: result.code === 0 ? "info" : "warning",
 		title: "CodeRunner diagnostics",
-		message:
-			"This report excludes project files, local paths, and credentials.",
-		detail: result.output.trim() || "No diagnostic output was produced.",
+		message: "Review Docker and startup details before sharing this report.",
+		detail: versionedReport || "No diagnostic output was produced.",
 		buttons: ["Copy report", "Close"],
 		defaultId: 1,
 		cancelId: 1,
 	});
-	if (response.response === 0) clipboard.writeText(result.output.trim());
+	if (response.response === 0) clipboard.writeText(versionedReport);
 }
 
 async function repairRuntime() {
@@ -171,11 +185,20 @@ async function repairRuntime() {
 
 async function handleStartupFailure(detail) {
 	if (quitting || !mainWindow || mainWindow.isDestroyed()) return;
+	const message = /Docker Desktop was not found|spawn .*ENOENT/iu.test(detail)
+		? "Docker Desktop was not found. Install Docker Desktop, then restart CodeRunner."
+		: /Please start Docker and restart CodeRunner|cannot connect to the Docker daemon|engine is unavailable/iu.test(
+					detail,
+				)
+			? "Please start Docker and restart CodeRunner."
+			: /Unable to download image/iu.test(detail)
+				? "Unable to download image, try again."
+				: "CodeRunner could not start. Check Docker Desktop or open Diagnostics for details.";
 	const response = await dialog.showMessageBox(mainWindow, {
 		type: "error",
 		title: "CodeRunner could not start",
-		message: "Check Docker Desktop, then repair or collect diagnostics.",
-		detail: detail.slice(-6000),
+		message,
+		detail: "Choose Diagnostics for detailed Docker and startup information.",
 		buttons: ["Repair and retry", "Diagnostics", "Quit"],
 		defaultId: 0,
 		cancelId: 2,
@@ -188,7 +211,7 @@ async function handleStartupFailure(detail) {
 			await handleStartupFailure(repair.output || "Repair failed.");
 		}
 	} else if (response.response === 1) {
-		await showDiagnostics();
+		await showDiagnostics(detail.slice(-6000));
 	} else {
 		app.quit();
 	}
@@ -240,7 +263,7 @@ function installApplicationMenu() {
 	Menu.setApplicationMenu(
 		Menu.buildFromTemplate([
 			{
-				label: "CodeRunner",
+				label: appTitle,
 				submenu: [
 					{ label: "Repair runtime", click: () => void repairRuntime() },
 					{ label: "Collect diagnostics", click: () => void showDiagnostics() },
@@ -261,7 +284,7 @@ if (hasSingleInstance) {
 	});
 
 	app.whenReady().then(() => {
-		app.setName("CodeRunner");
+		app.setName(appTitle);
 		if (process.platform === "win32") {
 			app.setAppUserModelId("edu.bobcatrobotics.coderunner");
 		}

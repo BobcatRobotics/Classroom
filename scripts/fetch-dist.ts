@@ -26,11 +26,14 @@ const tag =
 		? Bun.argv[tagArgIndex + 1]
 		: (Bun.env.DEMO_RELEASE_TAG ?? "");
 
-export function distArtifacts(skipWeb: boolean) {
+export function distArtifacts(
+	skipWeb: boolean,
+	distDir = resolve(repoRoot, "dist"),
+) {
 	return [
 		{
 			asset: "ascope-dist.tar.gz",
-			destDir: resolve(repoRoot, "dist/advantagescope"),
+			destDir: resolve(distDir, "advantagescope"),
 		},
 		...(skipWeb
 			? []
@@ -52,11 +55,21 @@ function downloadUrl(asset: string): string {
 
 async function main(): Promise<void> {
 	const skipWeb = Bun.argv.includes("--skip-web");
+	const distDirIndex = Bun.argv.indexOf("--dist-dir");
+	const distDirArgument =
+		distDirIndex >= 0 ? Bun.argv[distDirIndex + 1] : undefined;
+	if (
+		distDirIndex >= 0 &&
+		(!distDirArgument || distDirArgument.startsWith("--"))
+	) {
+		throw new Error("--dist-dir requires a directory path.");
+	}
+	const distDir = resolve(distDirArgument ?? resolve(repoRoot, "dist"));
 	console.log(
 		`Fetching prebuilt dist artifacts from ${repo} (${tag || "latest release"}).`,
 	);
 	await withScratch(async (scratch) => {
-		for (const artifact of distArtifacts(skipWeb)) {
+		for (const artifact of distArtifacts(skipWeb, distDir)) {
 			await downloadAndExtract(
 				{
 					asset: artifact.asset,
@@ -68,7 +81,7 @@ async function main(): Promise<void> {
 			);
 		}
 	});
-	await fetchPathPlannerDist({ optional: true });
+	await fetchPathPlannerDist({ optional: true, distDir });
 	console.log("\nPrebuilt distribution assets are ready.");
 }
 

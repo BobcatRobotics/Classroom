@@ -1,12 +1,14 @@
 import { homedir } from "node:os";
-import type { DockerCommandResult } from "../apps/control/src/containers";
-import { portIsFree } from "../apps/control/src/containers/ports";
 import {
+	type DockerCommandResult,
 	findLocalControlPort,
+	findLocalDockerExecutable,
+	includeDockerDirectoryInPath,
 	localDataDirectory,
 	localDiagnostics,
 	setupLocalRuntime,
-} from "../apps/control/src/local-setup";
+} from "../runtime/local-setup";
+import { portIsFree } from "../runtime/ports";
 
 const command = Bun.argv[2] ?? "setup";
 const packagedDataDir =
@@ -14,12 +16,20 @@ const packagedDataDir =
 const dataDir =
 	packagedDataDir ||
 	localDataDirectory(process.platform, homedir(), Bun.env.LOCALAPPDATA);
+const dockerPath =
+	Bun.env.FRC_DOCKER_PATH?.trim() ||
+	findLocalDockerExecutable(process.platform, homedir(), Bun.env.PATH);
+const dockerSearchPath = includeDockerDirectoryInPath(dockerPath, Bun.env.PATH);
+const dockerEnvironment = { ...process.env };
+if (dockerSearchPath) dockerEnvironment.PATH = dockerSearchPath;
+Bun.env.FRC_DOCKER_PATH = dockerPath;
 
 async function runDocker(
 	args: string[],
 	onProgress?: (line: string) => void,
 ): Promise<DockerCommandResult> {
-	const subprocess = Bun.spawn(["docker", ...args], {
+	const subprocess = Bun.spawn([dockerPath, ...args], {
+		env: dockerEnvironment,
 		stdout: "pipe",
 		stderr: "pipe",
 	});
@@ -35,7 +45,7 @@ async function runDocker(
 			output += chunk;
 			if (emit && onProgress) {
 				pending += chunk;
-				const lines = pending.split(/\r?\n/u);
+				const lines = pending.split(/[\r\n]+/u);
 				pending = lines.pop() ?? "";
 				for (const line of lines) {
 					if (line.trim()) onProgress(line);
@@ -77,7 +87,7 @@ async function start(): Promise<void> {
 	Bun.env.FRC_BIND_HOST = "127.0.0.1";
 	Bun.env.FRC_LOCAL_CODE_IMAGE = "";
 	Bun.env.PORT = String(port);
-	const serverStarted = import("../apps/control/src/local-main");
+	const serverStarted = import("../runtime/local-main");
 	const baseUrl = `http://127.0.0.1:${port}`;
 	const deadline = Date.now() + 10 * 60 * 1000;
 	let ready = false;
@@ -106,7 +116,7 @@ async function start(): Promise<void> {
 		console.log(`Local CodeRunner is ready: ${baseUrl}/u/demo/`);
 	} else {
 		console.error(
-			`Workspace startup timed out. The local service is still running; inspect its output or run bun run local:diagnostics.`,
+			`Workspace startup timed out. The local service is still running; inspect its output or run bun run --cwd apps/launcher local:diagnostics.`,
 		);
 	}
 	await serverStarted;
@@ -122,11 +132,17 @@ try {
 			await start();
 			break;
 		case "diagnostics":
-			console.log(await localDiagnostics(runDocker));
+			console.log(
+				await localDiagnostics(
+					runDocker,
+					undefined,
+					Bun.env.CODERUNNER_VERSION ?? "development",
+				),
+			);
 			break;
 		default:
 			throw new Error(
-				"Usage: bun run local:setup | local:start | local:repair | local:diagnostics",
+				"Usage: bun run --cwd apps/launcher local:setup | local:repair | local:start | local:diagnostics",
 			);
 	}
 } catch (error) {

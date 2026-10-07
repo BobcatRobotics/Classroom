@@ -10,8 +10,9 @@ import {
 import { join, resolve } from "node:path";
 import { BICUBIC, createICNS, createICO } from "png2icons";
 
-const root = resolve(import.meta.dir, "..");
-const desktopDir = join(root, "dist", "desktop");
+const launcherDir = resolve(import.meta.dir, "..");
+const root = resolve(launcherDir, "../..");
+const desktopDir = join(launcherDir, "dist");
 const resourcesDir = join(desktopDir, "resources");
 const iconDir = join(desktopDir, "icons");
 
@@ -81,7 +82,8 @@ async function prepare(): Promise<void> {
 	const bunExecutable = Bun.which("bun");
 	if (!bunExecutable) throw new Error("Bun was not found on PATH.");
 
-	await rm(desktopDir, { recursive: true, force: true });
+	await rm(resourcesDir, { recursive: true, force: true });
+	await rm(iconDir, { recursive: true, force: true });
 	await mkdir(join(resourcesDir, "bin"), { recursive: true });
 	await mkdir(iconDir, { recursive: true });
 
@@ -94,7 +96,7 @@ async function prepare(): Promise<void> {
 			`--outfile=${runtimeBundle}`,
 			"scripts/local-runtime.ts",
 		],
-		{ cwd: root, stdout: "inherit", stderr: "inherit" },
+		{ cwd: launcherDir, stdout: "inherit", stderr: "inherit" },
 	);
 	if (build.exitCode !== 0) {
 		throw new Error(
@@ -108,14 +110,14 @@ async function prepare(): Promise<void> {
 	if (process.platform !== "win32") await chmod(bundledBun, 0o755);
 
 	const resourceDirectories: Array<[string, string]> = [
-		["apps/web/dist", "web"],
-		["dist/advantagescope", "advantagescope"],
-		["dist/pathplanner", "pathplanner"],
-		["catalog", "catalog"],
-		["apps/control/migrations", "migrations"],
+		[join(root, "apps", "web", "dist"), "web"],
+		[join(desktopDir, "advantagescope"), "advantagescope"],
+		[join(desktopDir, "pathplanner"), "pathplanner"],
+		[join(root, "catalog"), "catalog"],
+		[join(root, "apps", "control", "migrations"), "migrations"],
 	];
 	for (const [source, destination] of resourceDirectories) {
-		await copyDirectory(join(root, source), join(resourcesDir, destination));
+		await copyDirectory(source, join(resourcesDir, destination));
 	}
 	await buildIcons();
 	console.log(`Desktop resources staged in ${desktopDir}`);

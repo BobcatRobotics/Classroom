@@ -2,6 +2,7 @@ const projects = [
 	"packages/contracts/tsconfig.json",
 	"apps/control/tsconfig.json",
 	"apps/web/tsconfig.json",
+	"apps/launcher/tsconfig.json",
 	"scripts/tsconfig.json",
 ];
 

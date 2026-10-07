@@ -249,33 +249,51 @@ boundary before investing in signed installers.
       local shell spike. The current Mac ARM64 build produced unsigned ZIP and
       DMG artifacts; signing/notarization and Windows release builds remain
       separate validation.
-- [ ] Build and validate signed Windows x64 and signed/notarized macOS arm64/x64
-      installers on their supported build hosts, using release secrets rather
-      than credentials stored in the repository.
-- [ ] Verify the client, local runtime, web-shell artifact, and workspace image
-      have explicit build inputs and compatibility boundaries. Document the
-      client build/test/package entrypoints and any runtime or web artifact it
-      bundles so a future repository split does not depend on undocumented
-      source-tree coupling. Keep them in this monorepo unless independent
-      releases make extraction worthwhile.
+- [x] Build the unsigned macOS ARM64 package on Apple silicon. `bun run
+      desktop:build` produced both ZIP and DMG artifacts from the current
+      checkout.
+- [ ] Build the unsigned macOS x64 package on an Intel Mac. This produces ZIP
+      and DMG artifacts; validate that the packaged app launches.
+- [ ] Build the unsigned Windows x64 package on a Windows x64 machine. This
+      produces the NSIS EXE; validate that the packaged app launches. Code
+      signing and notarization are deferred to Phase 8.
+- [x] Verify the client, local runtime, web-shell artifact, and workspace image
+      have explicit build inputs and compatibility boundaries. Documented the
+      desktop build/test/package entrypoints, bundled inputs, current
+      source-tree coupling, and pinned image/runtime pairing in
+      `docs/development/dev-servers.md`. Keep them in this monorepo unless
+      independent releases make extraction worthwhile.
 - [x] Build the desktop web-shell artifact from the current checkout instead of
       replacing it with the latest published web bundle. The macOS ARM64
       packaging pipeline completed with this behavior.
-- [ ] Test install, launch, restart, repair, and uninstall. Uninstall and safe
-      cleanup must not silently delete project files; project deletion requires
-      an explicit, clearly scoped confirmation.
+- [ ] On disposable macOS and Windows user profiles, test install, launch,
+      restart, repair, uninstall, and reinstall. Verify the project and
+      editor/config state survive and reinstall adopts the existing workspace.
+      Windows uses the NSIS uninstaller; macOS removes the app bundle after
+      quitting. Record that uninstall currently leaves Docker workspace
+      resources in place and may leave the container running. Any later full
+      cleanup must be a separate, clearly scoped, explicit action that warns
+      before deleting student project data.
 - [ ] Test interrupted image pulls, failed startup, low disk, port conflicts,
       Docker unavailable, and recovery without losing project or editor state.
       Unit tests cover Docker unavailable, low disk, port selection, and failed
-      image-download retry with project preservation; on-device recovery
-      scenarios remain to be exercised.
+      image-download retry with project preservation (`bun test
+      apps/launcher/runtime/local-setup.test.ts`); on-device recovery scenarios
+      remain to be exercised.
 
 **Exit criteria:** A student can install and launch a local CodeRunner
 experience without manual environment configuration or Docker commands. The
 local shell supports the required hosted-browser runtime workflows, Docker and
 startup failures have actionable recovery, and restarting or uninstalling does
-not silently delete project data. Central sign-in, catalogs, assignments, and
+not silently delete project data. Unsigned packages may be used for the
+controlled pilot if participants can complete the OS warning flow and school
+device policy permits it. Central sign-in, catalogs, assignments, and
 submissions remain assigned to their later phases.
+
+Phase 3 implementation may proceed while unsigned package and on-device
+recovery validation continue. Do not begin the two-student pilot until install
+and recovery have been validated on macOS and Windows and the central account,
+pairing, and student workflows needed by the pilot are available.
 
 ### Phase 3: Central Account and Device Linking
 
@@ -362,10 +380,13 @@ correct centrally stored submission and its status.
 **Exit criteria:** Workspace image updates are observable and recoverable, do
 not erase projects, and do not unexpectedly interrupt active work.
 
-### Phase 7: Pilot, Migration, and Rollout
+### Phase 7: Pilot and Migration
 
-- [ ] Pilot with a small group on representative Windows/macOS laptops,
-      including students with parent-imposed installation restrictions.
+- [ ] Begin with a two-student pilot: one macOS device and one Windows device.
+      Use unsigned packages only with informed participants and after confirming
+      school/family device policy allows installation; expect OS publisher or
+      download warnings. Include students with parent-imposed installation
+      restrictions in later pilot expansion.
 - [ ] Test install, GitHub sign-in, roster rejection, pairing, lesson load,
       submit, update, uninstall, reinstall, and recovery from failed sync.
 - [ ] Provide a support/fallback path for devices where Docker cannot be
@@ -375,11 +396,28 @@ not erase projects, and do not unexpectedly interrupt active work.
       its server workspace.
 - [ ] Track setup completion, support burden, submission reliability, actual
       cloud resource reduction, and network/image-pull impact.
-- [ ] Roll out by class only after pilot exit criteria are met.
 
 **Exit criteria:** Students can complete the full workflow on supported
 personal devices, with a documented exception path and verified project
-migration.
+migration. This phase authorizes a limited pilot only; it does not authorize
+class-wide distribution.
+
+### Phase 8: Signed Release and General Rollout
+
+- [ ] Build and validate signed Windows x64 installers and signed/notarized
+      macOS arm64/x64 installers on their supported build hosts. Keep signing
+      credentials in the release secret store, never in the repository.
+- [ ] Confirm the signed artifacts install without unknown-publisher or
+      unnotarized-app warnings on clean supported devices.
+- [ ] Complete any school or platform distribution-policy review and publish
+      the supported install instructions.
+- [ ] Roll out by class only after the pilot exit criteria and signed-release
+      checks are met.
+
+Code signing is not generally a legal prerequisite for distributing desktop
+software, but operating systems and managed-device policies may warn or block
+unsigned apps. Signed releases are required here before broad classroom rollout
+to reduce installation friction and establish publisher identity.
 
 ## Release and Update Responsibilities
 

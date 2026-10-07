@@ -2,10 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DockerCommandResult } from "./containers";
 import {
 	assertSupportedLocalHost,
+	type DockerCommandResult,
 	findLocalControlPort,
+	findLocalDockerExecutable,
+	includeDockerDirectoryInPath,
 	LOCAL_CODE_IMAGE,
 	type LocalDockerRunner,
 	localDataDirectory,
@@ -28,6 +30,28 @@ function result(stdout = "", stderr = "", exitCode = 0): DockerCommandResult {
 }
 
 describe("local runtime setup", () => {
+	test("finds Docker Desktop CLI outside a Finder-launched PATH", () => {
+		const dockerInApp =
+			"/Applications/Docker.app/Contents/Resources/bin/docker";
+		expect(
+			findLocalDockerExecutable(
+				"darwin",
+				"/Users/student",
+				"/usr/bin:/bin",
+				(path) => path === dockerInApp,
+			),
+		).toBe(dockerInApp);
+	});
+
+	test("adds Docker Desktop's CLI directory for credential helper lookup", () => {
+		expect(
+			includeDockerDirectoryInPath(
+				"/Applications/Docker.app/Contents/Resources/bin/docker",
+				"/usr/bin:/bin",
+			),
+		).toBe("/Applications/Docker.app/Contents/Resources/bin:/usr/bin:/bin");
+	});
+
 	test("selects per-user data roots on macOS and Windows", () => {
 		expect(localDataDirectory("darwin", "/Users/student")).toBe(
 			"/Users/student/Library/Application Support/CodeRunner",
@@ -75,7 +99,8 @@ describe("local runtime setup", () => {
 		temporaryDirectories.push(dataDir);
 		let imagePresent = false;
 		const calls: string[][] = [];
-		const docker: LocalDockerRunner = async (args) => {
+		const progress: string[] = [];
+		const docker: LocalDockerRunner = async (args, onProgress) => {
 			calls.push(args);
 			if (args[0] === "version") return result("27.0.3\n");
 			if (args[0] === "info") {
@@ -85,6 +110,8 @@ describe("local runtime setup", () => {
 				return imagePresent ? result("image-id\n") : result("", "not found", 1);
 			}
 			if (args[0] === "pull") {
+				onProgress?.("0123456789ab: Pull complete");
+				onProgress?.("abcdef012345: Downloading 12MB/20MB");
 				imagePresent = true;
 				return result("pulled\n");
 			}
@@ -95,6 +122,7 @@ describe("local runtime setup", () => {
 			docker,
 			dataDir,
 			host: { platform: "darwin", arch: "arm64" },
+			onProgress: (message) => progress.push(message),
 		});
 		await setupLocalRuntime({
 			docker,
@@ -107,6 +135,9 @@ describe("local runtime setup", () => {
 		expect(
 			calls.some((args) => args[0] === "pull" && args[1] === LOCAL_CODE_IMAGE),
 		).toBe(true);
+		expect(progress).toContain(
+			"Downloading workspace image: 1 layer complete, 1 downloading or extracting (2 layers reported)",
+		);
 	});
 
 	test("allows a failed image download to be retried without changing projects", async () => {
@@ -140,7 +171,7 @@ describe("local runtime setup", () => {
 				dataDir,
 				host: { platform: "darwin", arch: "arm64" },
 			}),
-		).rejects.toThrow("Check the internet connection and retry");
+		).rejects.toThrow("Unable to download image, try again");
 		expect(await readFile(markerPath, "utf8")).toBe("keep this project\n");
 
 		failPull = false;
@@ -163,7 +194,7 @@ describe("local runtime setup", () => {
 				dataDir: "/tmp/coderunner-unused",
 				host: { platform: "darwin", arch: "arm64" },
 			}),
-		).rejects.toThrow("Open Docker Desktop");
+		).rejects.toThrow("Please start Docker and restart CodeRunner");
 
 		const noDiskDocker: LocalDockerRunner = async (args) => {
 			if (args[0] === "version") return result("27.0.3");
@@ -179,7 +210,7 @@ describe("local runtime setup", () => {
 				dataDir: "/tmp/coderunner-unused",
 				host: { platform: "darwin", arch: "arm64" },
 			}),
-		).rejects.toThrow("Free disk space in Docker Desktop");
+		).rejects.toThrow("Unable to download image, try again");
 	});
 
 	test("rejects a non-Docker-Desktop engine", async () => {
@@ -204,10 +235,15 @@ describe("local runtime setup", () => {
 			}
 			return result("image-id");
 		};
-		const report = await localDiagnostics(docker, {
-			platform: "darwin",
-			arch: "arm64",
-		});
+		const report = await localDiagnostics(
+			docker,
+			{
+				platform: "darwin",
+				arch: "arm64",
+			},
+			"2.0.2",
+		);
+		expect(report).toContain("CodeRunner version: 2.0.2");
 		expect(report).toContain("Docker engine: 27.0.3 (linux/arm64)");
 		expect(report).toContain("Docker Desktop: Docker Desktop");
 		expect(report).toContain("Project files, local paths, credentials");

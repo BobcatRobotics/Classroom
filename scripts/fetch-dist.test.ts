@@ -14,4 +14,10 @@ describe("fetch distribution artifacts", () => {
 			"web-dist.tar.gz",
 		]);
 	});
+
+	test("supports a separate distribution output directory", () => {
+		expect(
+			distArtifacts(true, "/tmp/launcher-dist").map(({ destDir }) => destDir),
+		).toEqual(["/tmp/launcher-dist/advantagescope"]);
+	});
 });
