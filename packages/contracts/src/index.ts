@@ -22,6 +22,21 @@ export const displayNameSchema = z
 	.min(1, "Display name is required.")
 	.max(80, "Display name must be 80 characters or fewer.");
 
+export const launcherIdentitySchema = z.object({
+	userId: userIdSchema,
+	displayName: displayNameSchema,
+	email: z.string().email(),
+	avatarUrl: z.string().url().nullable(),
+	role: z.enum(["student", "admin"]),
+});
+
+export const localUserIdentitySchema = z.object({
+	displayName: displayNameSchema,
+	email: z.string().email(),
+	avatarUrl: z.string().url().nullable(),
+	role: z.enum(["student", "admin"]),
+});
+
 export const workspaceRouteSchema = z.object({
 	workspaceSlug: workspaceSlugSchema,
 });
@@ -34,6 +49,8 @@ export type WorkspaceRoute = z.infer<typeof workspaceRouteSchema>;
 export type UserId = z.infer<typeof userIdSchema>;
 export type WorkspaceId = z.infer<typeof workspaceIdSchema>;
 export type WorkspaceSlug = z.infer<typeof workspaceSlugSchema>;
+export type LauncherIdentity = z.infer<typeof launcherIdentitySchema>;
+export type LocalUserIdentity = z.infer<typeof localUserIdentitySchema>;
 
 export const heartbeatRequestSchema = z.object({
 	closing: z.boolean().optional(),

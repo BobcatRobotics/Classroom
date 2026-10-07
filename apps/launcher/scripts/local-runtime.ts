@@ -1,5 +1,9 @@
 import { homedir } from "node:os";
 import {
+	launcherIdentitySchema,
+	localUserIdentitySchema,
+} from "@frc-coderunner/contracts";
+import {
 	type DockerCommandResult,
 	findLocalControlPort,
 	findLocalDockerExecutable,
@@ -79,6 +83,14 @@ async function setup(): Promise<void> {
 
 async function authorizePackagedStart(): Promise<void> {
 	if (Bun.env.CODERUNNER_DESKTOP !== "1") return;
+	if (
+		["1", "true", "yes", "on"].includes(
+			(Bun.env.CODERUNNER_DEMO_MODE ?? "").trim().toLowerCase(),
+		)
+	) {
+		delete Bun.env.FRC_LAUNCH_GRANT;
+		return;
+	}
 	const runtimeTicket = Bun.env.FRC_LAUNCH_GRANT?.trim();
 	const centralUrl = Bun.env.CODERUNNER_CENTRAL_URL?.trim();
 	if (!runtimeTicket || !centralUrl) {
@@ -106,6 +118,15 @@ async function authorizePackagedStart(): Promise<void> {
 			"CodeRunner launch authorization expired. Sign in and retry.",
 		);
 	}
+	const result = (await response.json()) as { identity?: unknown };
+	const centralIdentity = launcherIdentitySchema.parse(result.identity);
+	const localIdentity = localUserIdentitySchema.parse({
+		displayName: centralIdentity.displayName,
+		email: centralIdentity.email,
+		avatarUrl: centralIdentity.avatarUrl,
+		role: centralIdentity.role,
+	});
+	Bun.env.CODERUNNER_LOCAL_IDENTITY = JSON.stringify(localIdentity);
 	delete Bun.env.FRC_LAUNCH_GRANT;
 }
 

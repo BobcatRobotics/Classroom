@@ -27,8 +27,8 @@ export async function getSessionFromRequest(
 	};
 	session: { token: string };
 } | null> {
-	if (storage.config.demo) {
-		return getDemoSession();
+	if (storage.config.demo || storage.config.localIdentity) {
+		return getDemoSession(storage.config.localIdentity);
 	}
 	try {
 		const session = await storage.auth.api.getSession({

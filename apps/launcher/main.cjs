@@ -5,9 +5,11 @@ const {
 	dialog,
 	Menu,
 	shell,
+	safeStorage,
 } = require("electron");
 const { spawn } = require("node:child_process");
 const { createInterface } = require("node:readline");
+const { mkdir, readFile, rename, rm, writeFile } = require("node:fs/promises");
 const { createHash, randomBytes } = require("node:crypto");
 const { createServer } = require("node:http");
 const { homedir } = require("node:os");
@@ -26,10 +28,12 @@ let runtimeUrl = null;
 let activeLaunchTicket = null;
 const recentOutput = [];
 
-const runtimeDirectory = join(process.resourcesPath, "runtime");
+const runtimeDirectory = app.isPackaged
+	? join(process.resourcesPath, "runtime")
+	: join(__dirname, "dist", "resources");
 const runtimeBundle = join(runtimeDirectory, "local-runtime.js");
 // const defaultCentralUrl = "https://coderunner.bobcatrobotics.org";
-const defaultCentralUrl = "http://localhost:4000"
+const defaultCentralUrl = "http://localhost:4000";
 const bunExecutable = join(
 	runtimeDirectory,
 	"bin",
@@ -92,6 +96,80 @@ function getCentralOrigin() {
 	return centralUrl.origin;
 }
 
+function isDemoModeEnabled() {
+	return ["1", "true", "yes", "on"].includes(
+		String(process.env.CODERUNNER_DEMO_MODE || "")
+			.trim()
+			.toLowerCase(),
+	);
+}
+
+function launchGrantCachePath() {
+	return join(app.getPath("userData"), "launch-grant.enc");
+}
+
+async function clearCachedLaunchGrant() {
+	await rm(launchGrantCachePath(), { force: true }).catch(() => {});
+}
+
+async function readCachedLaunchGrant(centralOrigin) {
+	if (!safeStorage.isEncryptionAvailable()) return null;
+	try {
+		const encrypted = await readFile(launchGrantCachePath());
+		const cached = JSON.parse(safeStorage.decryptString(encrypted));
+		if (
+			cached.centralOrigin !== centralOrigin ||
+			typeof cached.runtimeTicket !== "string"
+		) {
+			await clearCachedLaunchGrant();
+			return null;
+		}
+		return cached.runtimeTicket;
+	} catch {
+		await clearCachedLaunchGrant();
+		return null;
+	}
+}
+
+async function cacheLaunchGrant(centralOrigin, runtimeTicket) {
+	if (!safeStorage.isEncryptionAvailable()) return;
+	const path = launchGrantCachePath();
+	const temporaryPath = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+	await mkdir(app.getPath("userData"), { recursive: true });
+	try {
+		await writeFile(
+			temporaryPath,
+			safeStorage.encryptString(
+				JSON.stringify({ centralOrigin, runtimeTicket }),
+			),
+			{ mode: 0o600 },
+		);
+		await rename(temporaryPath, path);
+	} catch (error) {
+		await rm(temporaryPath, { force: true });
+		throw error;
+	}
+}
+
+async function validateLaunchGrant(centralOrigin, runtimeTicket) {
+	const response = await fetch(
+		`${centralOrigin}/api/launcher/validate-launch`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ runtimeTicket }),
+		},
+	);
+	if (response.status === 401 || response.status === 403) return false;
+	if (!response.ok) {
+		throw new Error(
+			"Could not verify the saved CodeRunner sign-in. Try again.",
+		);
+	}
+	const result = await response.json();
+	return result?.ok === true;
+}
+
 function startAuthorizationCallback(state) {
 	let resolveCode;
 	let rejectCode;
@@ -136,7 +214,16 @@ function startAuthorizationCallback(state) {
 }
 
 async function authorizeLauncher() {
+	if (isDemoModeEnabled()) return null;
 	const centralOrigin = getCentralOrigin();
+	const cachedTicket = await readCachedLaunchGrant(centralOrigin);
+	if (cachedTicket) {
+		if (await validateLaunchGrant(centralOrigin, cachedTicket)) {
+			return cachedTicket;
+		}
+		await clearCachedLaunchGrant();
+	}
+
 	const codeVerifier = randomBytes(32).toString("base64url");
 	const codeChallenge = createHash("sha256")
 		.update(codeVerifier)
@@ -189,6 +276,14 @@ async function authorizeLauncher() {
 		if (result?.ok !== true || typeof result.runtimeTicket !== "string") {
 			throw new Error("CodeRunner returned an invalid launch authorization.");
 		}
+		await cacheLaunchGrant(centralOrigin, result.runtimeTicket).catch(
+			(error) => {
+				console.warn(
+					"Could not securely cache CodeRunner launch authorization; sign-in may be needed next launch.",
+					error instanceof Error ? error.message : String(error),
+				);
+			},
+		);
 		return result.runtimeTicket;
 	} finally {
 		if (timeout) clearTimeout(timeout);

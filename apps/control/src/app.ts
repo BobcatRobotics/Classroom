@@ -128,9 +128,14 @@ export async function createApp(
 	} = configInput;
 	const upstreamFetch = configuredUpstreamFetch ?? globalThis.fetch;
 	const storage = await createStorage(storageConfig);
-	if (storage.config.demo) {
-		await seedDemoUser(storage);
-		bootLog.info("demo user seeded", { slug: "demo" });
+	if (storage.config.demo || storage.config.localIdentity) {
+		await seedDemoUser(storage, storage.config.localIdentity);
+		bootLog.info(
+			storage.config.localIdentity ? "local user seeded" : "demo user seeded",
+			{
+				slug: "demo",
+			},
+		);
 	}
 	const runtimeProvider =
 		configuredRuntimeProvider ??
@@ -327,8 +332,13 @@ export async function createApp(
 
 		// --- Better Auth API routes ---
 		if (url.pathname.startsWith("/api/auth/")) {
-			if (storage.config.demo && url.pathname === "/api/auth/get-session") {
-				return jsonResponse(getDemoSessionResponseBody());
+			if (
+				(storage.config.demo || storage.config.localIdentity) &&
+				url.pathname === "/api/auth/get-session"
+			) {
+				return jsonResponse(
+					getDemoSessionResponseBody(storage.config.localIdentity),
+				);
 			}
 			return storage.auth.handler(request);
 		}

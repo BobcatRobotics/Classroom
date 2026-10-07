@@ -309,7 +309,10 @@ export async function handleWorkspaceRoute(
 			projectEmpty = true;
 		}
 		return jsonResponse(
-			sessionResponse(auth, { demo: storage.config.demo, projectEmpty }),
+			sessionResponse(auth, {
+				demo: storage.config.demo && !storage.config.localIdentity,
+				projectEmpty,
+			}),
 		);
 	}
 

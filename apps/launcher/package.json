@@ -1,7 +1,7 @@
 {
 	"name": "@frc-coderunner/launcher",
 	"private": true,
-	"version": "2.0.2",
+	"version": "2.0.3",
 	"license": "MIT",
 	"description": "CodeRunner desktop launcher.",
 	"type": "module",
@@ -19,6 +19,7 @@
 		"test": "bun test runtime scripts"
 	},
 	"devDependencies": {
+		"@frc-coderunner/contracts": "workspace:*",
 		"@electron/notarize": "^3.1.1",
 		"electron": "^44.5.1",
 		"electron-builder": "^26.15.3",

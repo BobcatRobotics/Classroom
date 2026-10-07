@@ -151,17 +151,31 @@ family support path.
 Packaged Electron launches authorize with central CodeRunner before starting the
 local runtime. The launcher opens the central site in the system browser and
 uses GitHub sign-in; an existing central browser session may avoid asking for
-GitHub credentials again, but each app launch receives fresh authorization.
+GitHub credentials again. After the first sign-in, the launcher caches the
+opaque launch grant using Electron's OS-backed secure storage and revalidates it
+online each time the app starts. The default grant lifetime is one hour; set
+`CODERUNNER_DESKTOP_LAUNCH_GRANT_TTL_MS` on the central control plane to change
+it (one minute to 24 hours). Expiration, account disablement, or revocation
+requires central sign-in again.
 The central GitHub OAuth callback remains unchanged. CodeRunner sends a
-short-lived PKCE-protected handoff through a loopback callback; the resulting
-launch ticket stays in memory and is checked online before the local runtime
-starts. No device credential or central workspace ID is stored with the local
-project.
+short-lived PKCE-protected, single-use handoff through a loopback callback.
+The resulting launch grant may be reused until it expires, but can be revoked
+centrally. The central user profile and role populate a device-local session;
+admins remain admins, students remain students. The local session uses the
+existing device-local workspace identity and never stores a central workspace
+ID with the project.
 
 The packaged app defaults to `https://coderunner.wiredcats5885.ca`. Developers
 can override the central origin with `CODERUNNER_CENTRAL_URL` for staging or a
 local control-plane deployment. Source-checkout `dev:local` remains a demo-mode
 prototype and does not perform central sign-in.
+
+The packaged app reads these values when it launches; `desktop:build` does not
+embed shell environment variables, and the app does not load the repository's
+`.env`. To test with a local central server, launch the app with
+`CODERUNNER_CENTRAL_URL=http://localhost:4000`. To deliberately bypass central
+sign-in for a local demo, launch with `CODERUNNER_DEMO_MODE=1`; this enables the
+local Demo admin session and should not be used for normal student testing.
 
 #### Desktop package builds
 

@@ -1,6 +1,11 @@
 import { LOCAL_CODE_IMAGE } from "./local-setup";
 
-Bun.env.CODERUNNER_DEMO_MODE = "1";
+if (
+	Bun.env.CODERUNNER_DESKTOP !== "1" &&
+	!Bun.env.CODERUNNER_DEMO_MODE?.trim()
+) {
+	Bun.env.CODERUNNER_DEMO_MODE = "1";
+}
 Bun.env.FRC_BIND_HOST = "127.0.0.1";
 Bun.env.FRC_DATA_DIR ??= "data/local-phase2";
 Bun.env.FRC_CONTAINER_NETWORK = "";

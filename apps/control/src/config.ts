@@ -1,5 +1,9 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	type LocalUserIdentity,
+	localUserIdentitySchema,
+} from "@frc-coderunner/contracts";
 import { defaultLogLevel, type LogLevel, parseLogLevelEnv } from "./logging";
 
 export type PortRange = {
@@ -43,6 +47,8 @@ export type ControlConfig = {
 	idleCheckIntervalMs: number;
 	adminToken: string | null;
 	maxActiveContainers: number;
+	desktopLaunchGrantTtlMs: number;
+	localIdentity: LocalUserIdentity | null;
 	demo: boolean;
 	adminEmails: string[];
 };
@@ -166,6 +172,23 @@ function parsePositiveInteger(
 		throw new Error(`${name} must be a positive integer.`);
 	}
 	return parsed;
+}
+
+function parseLocalIdentity(
+	value: string | undefined,
+): LocalUserIdentity | null {
+	if (!value?.trim()) return null;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(value);
+	} catch {
+		throw new Error("CODERUNNER_LOCAL_IDENTITY must contain valid JSON.");
+	}
+	const result = localUserIdentitySchema.safeParse(parsed);
+	if (!result.success) {
+		throw new Error("CODERUNNER_LOCAL_IDENTITY has an invalid identity shape.");
+	}
+	return result.data;
 }
 
 const DISABLED_DISK_LIMIT_VALUES = new Set(["0", "off", "none", "false"]);
@@ -398,9 +421,39 @@ export function loadControlConfig(
 			10,
 			"MAX_ACTIVE_CONTAINERS",
 		),
+		desktopLaunchGrantTtlMs: parseBoundedPositiveInteger(
+			input.desktopLaunchGrantTtlMs === undefined
+				? Bun.env.CODERUNNER_DESKTOP_LAUNCH_GRANT_TTL_MS
+				: String(input.desktopLaunchGrantTtlMs),
+			60 * 60 * 1000,
+			"CODERUNNER_DESKTOP_LAUNCH_GRANT_TTL_MS",
+			60 * 1000,
+			24 * 60 * 60 * 1000,
+		),
 		demo: parseBoolean(input.demo ?? Bun.env.CODERUNNER_DEMO_MODE, false),
+		localIdentity:
+			input.localIdentity === undefined
+				? parseLocalIdentity(Bun.env.CODERUNNER_LOCAL_IDENTITY)
+				: input.localIdentity,
 		adminEmails: parseAdminEmails(
 			input.adminEmails ?? Bun.env.CODERUNNER_ADMIN_EMAIL,
 		),
 	};
+}
+
+function parseBoundedPositiveInteger(
+	value: string | undefined,
+	fallback: number,
+	name: string,
+	minimum: number,
+	maximum: number,
+): number {
+	const parsed =
+		value === undefined || value.trim() === "" ? fallback : Number(value);
+	if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+		throw new Error(
+			`${name} must be an integer from ${minimum} through ${maximum}.`,
+		);
+	}
+	return parsed;
 }

@@ -66,8 +66,9 @@ See [OAuth credentials](../deploying/oauth-credentials.md) for step-by-step regi
 | `GITHUB_CLIENT_SECRET` | none | GitHub OAuth app client secret. |
 | `GOOGLE_CLIENT_ID` | none | Google OAuth client ID. |
 | `GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret. |
-| `CODERUNNER_DEMO_MODE` | `false` | When `1` or `true`, bypasses authentication entirely. All visitors share one admin session. Never expose a demo instance publicly. Also enabled with the `--demo` CLI flag on startup. |
+| `CODERUNNER_DEMO_MODE` | `false` | On a control-plane server, `1`/`true` bypasses authentication and gives all visitors one admin session; never expose that server publicly. On the desktop app, setting it in the app's launch environment skips central sign-in and runs the local Demo admin session. Unset/false keeps normal central sign-in. Also enabled with the server `--demo` CLI flag. |
 | `CODERUNNER_ADMIN_EMAIL` | none | Comma-separated email addresses to bootstrap as admins with zero exec steps. Each is added to the allowlist at startup and granted the admin role on first OAuth sign-in; an existing account with that email is promoted to admin at the next startup. See [OAuth credentials](../deploying/oauth-credentials.md#the-easy-path-coderunner_admin_email). |
+| `CODERUNNER_DESKTOP_LAUNCH_GRANT_TTL_MS` | `3600000` (1 hour) | Lifetime of centrally issued desktop launch grants. The launcher stores the opaque grant with Electron OS-backed encryption and revalidates it online on every app start. Valid range: 60,000 ms (1 minute) through 86,400,000 ms (24 hours). |
 
 ## Docker and Containers
 

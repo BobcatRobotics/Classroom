@@ -67,10 +67,12 @@ local runtime/toolchain.
 - Do not require students to configure environment variables or type Docker
   commands.
 - Do not put OAuth client secrets or shared credentials in the launcher or
-      workspace image. In Phase 3A, use central browser sign-in on each launcher
-      start and return only a short-lived, single-use authorization handoff; do
-      not persist a device credential. Persistent device registration is an
-      optional Phase 3B usability improvement.
+      workspace image. In Phase 3A, use central browser sign-in and a
+      single-use PKCE handoff to issue a short-lived launch grant. Cache that
+      grant encrypted with the operating system's secure storage and validate
+      it online at every app start; it expires or can be revoked centrally. Do
+      not add a persistent device credential. Persistent device registration
+      remains an optional Phase 3B usability improvement.
 - Local use and all central services require internet connectivity. The server
   can deny future launches or sync after account/device revocation; an already
   running local process cannot be remotely stopped while disconnected.
@@ -313,9 +315,15 @@ pairing, and student workflows needed by the pilot are available.
       shared or migrated.
 - [x] On each launcher start, open central CodeRunner sign-in in the system
       browser and use the existing GitHub OAuth flow. Return a short-lived,
-      single-use handoff to the launcher and keep any resulting authorization
-      grant in memory only. Do not require fresh GitHub credentials if the
-      central browser already has a valid session.
+      single-use PKCE handoff, then cache the reusable launch grant in OS-backed
+      secure storage and revalidate it online at each app start. The grant TTL
+      defaults to one hour and is configurable on the central control plane.
+      Do not require fresh GitHub credentials while the grant remains valid and
+      the central browser session is still available for renewal.
+- [x] Populate the local session with the centrally authenticated user's
+      display identity and role, mapping central admins to local admins and
+      students to local students. Keep local account/workspace IDs device-local;
+      do not expose or persist the central workspace ID locally.
 - [x] Require online authorization for normal launcher use and central API
       access. Do not add persistent device registration or a hardware-derived
       machine ID in this phase.

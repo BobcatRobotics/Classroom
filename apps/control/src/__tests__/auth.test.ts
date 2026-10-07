@@ -457,6 +457,7 @@ describe("launcher authorization handoff", () => {
 							body: JSON.stringify({ code, codeVerifier: verifier }),
 						}),
 					);
+				const grantRequestedAt = Date.now();
 				expect(
 					(await exchange(randomBytes(32).toString("base64url"))).status,
 				).toBe(400);
@@ -468,6 +469,20 @@ describe("launcher authorization handoff", () => {
 				};
 				expect(exchangeBody.ok).toBe(true);
 				expect(exchangeBody.runtimeTicket).toHaveLength(43);
+				const grantHash = createHash("sha256")
+					.update(exchangeBody.runtimeTicket)
+					.digest("base64url");
+				const grant = app.storage.db
+					.query(
+						"SELECT expires_at FROM launcher_runtime_grants WHERE token_hash = ?",
+					)
+					.get(grantHash) as { expires_at: string };
+				expect(Date.parse(grant.expires_at)).toBeGreaterThanOrEqual(
+					grantRequestedAt + 59_000,
+				);
+				expect(Date.parse(grant.expires_at)).toBeLessThanOrEqual(
+					grantRequestedAt + 61_000,
+				);
 				const validateTicket = () =>
 					app.fetch(
 						new Request("http://localhost/api/launcher/validate-launch", {
@@ -478,6 +493,26 @@ describe("launcher authorization handoff", () => {
 							}),
 						}),
 					);
+				const validatedTicket = await validateTicket();
+				expect(validatedTicket.status).toBe(200);
+				const validationBody = (await validatedTicket.json()) as {
+					ok: boolean;
+					identity: {
+						userId: string;
+						displayName: string;
+						email: string;
+						role: string;
+					};
+				};
+				expect(validationBody).toMatchObject({
+					ok: true,
+					identity: {
+						userId: user.id,
+						displayName: "alice",
+						email: "alice@test.local",
+						role: "student",
+					},
+				});
 				expect((await validateTicket()).status).toBe(200);
 				const disabledUser = app.storage.db
 					.query("SELECT id FROM user WHERE email = ?")
@@ -488,7 +523,11 @@ describe("launcher authorization handoff", () => {
 				expect((await validateTicket()).status).toBe(401);
 				expect((await exchange(codeVerifier)).status).toBe(400);
 			},
-			{ githubClientId: "client-id", githubClientSecret: "client-secret" },
+			{
+				githubClientId: "client-id",
+				githubClientSecret: "client-secret",
+				desktopLaunchGrantTtlMs: 60_000,
+			},
 		);
 	});
 

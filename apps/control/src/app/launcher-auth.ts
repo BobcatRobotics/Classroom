@@ -1,10 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { launcherIdentitySchema } from "@frc-coderunner/contracts";
 import { getSessionFromRequest } from "../auth/middleware";
 import type { AppStorage } from "../storage";
 import { jsonResponse } from "./responses";
 
 const CODE_TTL_MS = 2 * 60 * 1000;
-const RUNTIME_GRANT_TTL_MS = 30 * 60 * 1000;
 const BASE64URL_32_BYTE_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 
 function sha256Base64Url(value: string): string {
@@ -40,6 +40,13 @@ function invalidCode(): Response {
 	return jsonResponse(
 		{ error: "Authorization code is invalid, expired, or already used." },
 		{ status: 400, headers: { "Cache-Control": "no-store" } },
+	);
+}
+
+function invalidLaunchGrant(): Response {
+	return jsonResponse(
+		{ error: "Launch authorization is invalid or expired." },
+		{ status: 401, headers: { "Cache-Control": "no-store" } },
 	);
 }
 
@@ -185,7 +192,9 @@ export async function handleLauncherAuthRoute(
 			);
 		}
 		const runtimeTicket = randomBytes(32).toString("base64url");
-		const expiresAt = new Date(Date.now() + RUNTIME_GRANT_TTL_MS).toISOString();
+		const expiresAt = new Date(
+			Date.now() + storage.config.desktopLaunchGrantTtlMs,
+		).toISOString();
 		storage.db
 			.query(
 				"INSERT INTO launcher_runtime_grants (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
@@ -254,8 +263,26 @@ export async function handleLauncherAuthRoute(
 				},
 			);
 		}
+		const user = storage.db
+			.query("SELECT id, name, email, image, role FROM user WHERE id = ?")
+			.get(grant.user_id) as {
+			id: string;
+			name: string;
+			email: string;
+			image: string | null;
+			role: string | null;
+		} | null;
+		if (!user) return invalidLaunchGrant();
+		const identity = launcherIdentitySchema.safeParse({
+			userId: user.id,
+			displayName: user.name,
+			email: user.email,
+			avatarUrl: user.image,
+			role: user.role === "admin" ? "admin" : "student",
+		});
+		if (!identity.success) return invalidLaunchGrant();
 		return jsonResponse(
-			{ ok: true },
+			{ ok: true, identity: identity.data },
 			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}
