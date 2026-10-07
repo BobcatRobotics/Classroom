@@ -47,13 +47,28 @@ export function LoginPage() {
 	const [providers, setProviders] = useState<AuthProvider[] | null>(null);
 	const [providersError, setProvidersError] = useState<string | null>(null);
 	const [signInError, setSignInError] = useState<string | null>(null);
+	const returnTo = searchParams.get("returnTo");
+	const launcherSignIn = (() => {
+		if (!returnTo) return false;
+		try {
+			const parsed = new URL(returnTo, window.location.origin);
+			return (
+				parsed.origin === window.location.origin &&
+				parsed.pathname === "/launcher/authorize"
+			);
+		} catch {
+			return false;
+		}
+	})();
 
 	const rawError = searchParams.get("error");
 	const friendlyError =
 		rawError === "forbidden" || rawError?.toLowerCase().includes("roster")
 			? "You're not on the roster yet. Ask your coach to add you."
 			: (rawError?.replaceAll("_", " ") ?? null);
-	const availableProviders = providers ?? [];
+	const availableProviders = (providers ?? []).filter(
+		(provider) => !launcherSignIn || provider === "github",
+	);
 
 	useEffect(() => {
 		const controller = new AbortController();
@@ -94,10 +109,20 @@ export function LoginPage() {
 		setLoading(true);
 		setSignInError(null);
 		try {
+			let callbackURL = "/";
+			if (returnTo) {
+				const parsedReturnTo = new URL(returnTo, window.location.origin);
+				if (parsedReturnTo.origin === window.location.origin) {
+					callbackURL = `${parsedReturnTo.pathname}${parsedReturnTo.search}`;
+				}
+			}
 			await authClient.signIn.social({
 				provider,
-				callbackURL: "/",
-				errorCallbackURL: "/login",
+				callbackURL,
+				errorCallbackURL:
+					callbackURL === "/"
+						? "/login"
+						: `/login?returnTo=${encodeURIComponent(callbackURL)}`,
 			});
 		} catch (error) {
 			setLoading(false);

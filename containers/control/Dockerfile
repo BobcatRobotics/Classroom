@@ -22,6 +22,7 @@ WORKDIR /repo
 COPY package.json bun.lock tsconfig.json tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/control/package.json apps/control/package.json
+COPY apps/launcher/package.json apps/launcher/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 RUN bun install --frozen-lockfile
 
@@ -147,6 +148,7 @@ WORKDIR /app
 COPY package.json bun.lock tsconfig.json tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/control/package.json apps/control/package.json
+COPY apps/launcher/package.json apps/launcher/package.json
 COPY packages/ packages/
 RUN bun install --frozen-lockfile --production
 COPY apps/control/ apps/control/

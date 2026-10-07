@@ -782,6 +782,50 @@ describe("idle lifecycle and admin controls", () => {
 		});
 	});
 
+	test("admin can disable and re-enable a user account", async () => {
+		await withApp(async (app) => {
+			const admin = await login(app, "alice", { role: "admin" });
+			const adminCookie = cookieFrom(admin);
+			const bob = await login(app, "bob");
+			const bobCookie = cookieFrom(bob);
+			const user = app.storage.db
+				.query("SELECT id FROM user WHERE email = ?")
+				.get("bob@test.local") as { id: string };
+
+			const disable = await app.fetch(
+				new Request(`http://localhost/admin/users/${user.id}/disable`, {
+					method: "POST",
+					headers: { cookie: adminCookie },
+				}),
+			);
+			expect(disable.status).toBe(200);
+			const disabledWorkspace = await app.fetch(
+				new Request("http://localhost/u/bob/api/session", {
+					headers: { cookie: bobCookie },
+				}),
+			);
+			expect(disabledWorkspace.status).toBe(401);
+			expect(
+				app.storage.db
+					.query("SELECT token FROM session WHERE userId = ?")
+					.get(user.id),
+			).toBeNull();
+
+			const enable = await app.fetch(
+				new Request(`http://localhost/admin/users/${user.id}/enable`, {
+					method: "POST",
+					headers: { cookie: adminCookie },
+				}),
+			);
+			expect(enable.status).toBe(200);
+			expect(
+				app.storage.db
+					.query("SELECT disabledAt FROM user WHERE id = ?")
+					.get(user.id),
+			).toEqual({ disabledAt: null });
+		});
+	});
+
 	test("admin can delete a user and their workspace", async () => {
 		const fakeDocker = createFakeDocker();
 		await withApp(

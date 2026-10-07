@@ -146,6 +146,23 @@ the shell. This prototype does not install Docker Desktop or bypass device
 permissions; students who cannot install or start it need an approved school or
 family support path.
 
+#### Packaged desktop sign-in
+
+Packaged Electron launches authorize with central CodeRunner before starting the
+local runtime. The launcher opens the central site in the system browser and
+uses GitHub sign-in; an existing central browser session may avoid asking for
+GitHub credentials again, but each app launch receives fresh authorization.
+The central GitHub OAuth callback remains unchanged. CodeRunner sends a
+short-lived PKCE-protected handoff through a loopback callback; the resulting
+launch ticket stays in memory and is checked online before the local runtime
+starts. No device credential or central workspace ID is stored with the local
+project.
+
+The packaged app defaults to `https://coderunner.wiredcats5885.ca`. Developers
+can override the central origin with `CODERUNNER_CENTRAL_URL` for staging or a
+local control-plane deployment. Source-checkout `dev:local` remains a demo-mode
+prototype and does not perform central sign-in.
+
 #### Desktop package builds
 
 The Electron launcher packages a web shell and local runtime built from the

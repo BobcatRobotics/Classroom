@@ -136,6 +136,11 @@ export function createAuth(
 					defaultValue: "student",
 					input: false,
 				},
+				disabledAt: {
+					type: "string",
+					required: false,
+					input: false,
+				},
 				slug: {
 					type: "string",
 					required: false,
@@ -184,29 +189,32 @@ export function createAuth(
 		},
 		hooks: {
 			after: createAuthMiddleware(async (ctx) => {
-				// Enforce allowlist on returning users (OAuth callback)
+				// Enforce account disablement on returning users. The allowlist is
+				// checked when a user is created, not on every later sign-in.
 				if (ctx.path === "/callback/:id") {
 					const newSession = ctx.context.newSession;
-					if (newSession) {
-						await refreshAllowlistBeforeCheck();
-					}
-					if (newSession && !isEmailAllowed(newSession.user.email)) {
-						log.warn("oauth callback rejected: not on allowlist", {
-							email: newSession.user.email,
+					if (
+						newSession &&
+						(newSession.user as { disabledAt?: string | null }).disabledAt
+					) {
+						log.warn("oauth callback rejected: account disabled", {
+							userId: newSession.user.id,
 						});
 						// Revoke the session that was just created
 						await ctx.context.internalAdapter.deleteSession(
 							newSession.session.token,
 						);
 						throw new APIError("FORBIDDEN", {
-							message:
-								"Your email is not on the roster. Ask your coach to add you.",
+							message: "This CodeRunner account has been disabled.",
 						});
 					}
 
 					// Create workspace if this is the user's first login
 					if (newSession) {
-						const user = newSession.user as { id: string; slug?: string };
+						const user = newSession.user as {
+							id: string;
+							slug?: string;
+						};
 						const slug = user.slug ?? slugFromEmail(newSession.user.email);
 						log.info("oauth callback ok", {
 							userId: user.id,

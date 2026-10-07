@@ -292,6 +292,13 @@ export class AppStorage {
 		);
 	}
 
+	isAccountDisabled(userId: string): boolean {
+		const row = this.db
+			.query("SELECT disabledAt FROM user WHERE id = ?")
+			.get(userId) as { disabledAt: string | null } | null;
+		return !row || row.disabledAt !== null;
+	}
+
 	/** Create a workspace for a Better Auth user (called on first login). */
 	async ensureWorkspaceForUser(
 		userId: string,

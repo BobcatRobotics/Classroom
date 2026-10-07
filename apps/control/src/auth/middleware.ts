@@ -47,6 +47,10 @@ export async function getSessionFromRequest(
 			role?: string;
 			slug?: string;
 		};
+		if (storage.isAccountDisabled(user.id)) {
+			log.warn("disabled account session rejected", { userId: user.id });
+			return null;
+		}
 		log.trace("getSession: ok", { userId: user.id, role: user.role });
 		return {
 			user: {

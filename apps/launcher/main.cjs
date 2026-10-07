@@ -8,6 +8,8 @@ const {
 } = require("electron");
 const { spawn } = require("node:child_process");
 const { createInterface } = require("node:readline");
+const { createHash, randomBytes } = require("node:crypto");
+const { createServer } = require("node:http");
 const { homedir } = require("node:os");
 const { join } = require("node:path");
 
@@ -21,10 +23,13 @@ let mainWindow = null;
 let runtimeProcess = null;
 let quitting = false;
 let runtimeUrl = null;
+let activeLaunchTicket = null;
 const recentOutput = [];
 
 const runtimeDirectory = join(process.resourcesPath, "runtime");
 const runtimeBundle = join(runtimeDirectory, "local-runtime.js");
+// const defaultCentralUrl = "https://coderunner.bobcatrobotics.org";
+const defaultCentralUrl = "http://localhost:4000"
 const bunExecutable = join(
 	runtimeDirectory,
 	"bin",
@@ -42,7 +47,7 @@ function dataDirectory() {
 }
 
 function runtimeEnvironment() {
-	return {
+	const environment = {
 		...process.env,
 		CODERUNNER_DESKTOP: "1",
 		FRC_DATA_DIR: dataDirectory(),
@@ -51,10 +56,14 @@ function runtimeEnvironment() {
 		FRC_WEB_DIST_DIR: join(runtimeDirectory, "web"),
 		FRC_ASCOPE_DIST_DIR: join(runtimeDirectory, "advantagescope"),
 		FRC_PATHPLANNER_DIST_DIR: join(runtimeDirectory, "pathplanner"),
+		CODERUNNER_CENTRAL_URL:
+			process.env.CODERUNNER_CENTRAL_URL || defaultCentralUrl,
 		LESSONS_CATALOG_DIR: join(runtimeDirectory, "catalog"),
 		FRC_MIGRATIONS_DIR: join(runtimeDirectory, "migrations"),
 		CODERUNNER_VERSION: app.getVersion(),
 	};
+	delete environment.FRC_LAUNCH_GRANT;
+	return environment;
 }
 
 function setProgress(message) {
@@ -64,6 +73,154 @@ function setProgress(message) {
 			`document.getElementById("status").textContent = ${JSON.stringify(message)}`,
 		)
 		.catch(() => {});
+}
+
+function getCentralOrigin() {
+	const centralUrl = new URL(
+		process.env.CODERUNNER_CENTRAL_URL || defaultCentralUrl,
+	);
+	const isLocalHttp =
+		centralUrl.protocol === "http:" &&
+		["localhost", "127.0.0.1"].includes(centralUrl.hostname);
+	if (
+		(centralUrl.protocol !== "https:" && !isLocalHttp) ||
+		centralUrl.username ||
+		centralUrl.password
+	) {
+		throw new Error("CodeRunner sign-in requires a trusted HTTPS server URL.");
+	}
+	return centralUrl.origin;
+}
+
+function startAuthorizationCallback(state) {
+	let resolveCode;
+	let rejectCode;
+	const codePromise = new Promise((resolve, reject) => {
+		resolveCode = resolve;
+		rejectCode = reject;
+	});
+	const server = createServer((request, response) => {
+		let callbackUrl;
+		try {
+			callbackUrl = new URL(request.url || "/", "http://127.0.0.1");
+		} catch {
+			response.writeHead(400).end("Invalid authorization response.");
+			return;
+		}
+		const code = callbackUrl.searchParams.get("code") || "";
+		if (
+			request.method !== "GET" ||
+			callbackUrl.pathname !== "/callback" ||
+			callbackUrl.searchParams.get("state") !== state ||
+			!/^[A-Za-z0-9_-]{43}$/u.test(code)
+		) {
+			response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+			response.end(
+				"Authorization could not be completed. Return to CodeRunner and retry.",
+			);
+			return;
+		}
+		response.writeHead(200, {
+			"Content-Type": "text/html; charset=utf-8",
+			"Cache-Control": "no-store",
+			"Content-Security-Policy":
+				"default-src 'none'; style-src 'unsafe-inline'",
+		});
+		response.end(
+			"<!doctype html><meta charset=utf-8><title>CodeRunner</title><p>CodeRunner is authorized. You can close this tab.</p>",
+		);
+		resolveCode(code);
+	});
+	server.on("error", rejectCode);
+	return { server, codePromise };
+}
+
+async function authorizeLauncher() {
+	const centralOrigin = getCentralOrigin();
+	const codeVerifier = randomBytes(32).toString("base64url");
+	const codeChallenge = createHash("sha256")
+		.update(codeVerifier)
+		.digest("base64url");
+	const state = randomBytes(32).toString("base64url");
+	const callback = startAuthorizationCallback(state);
+	let timeout;
+
+	try {
+		await new Promise((resolve, reject) => {
+			callback.server.once("error", reject);
+			callback.server.listen(0, "127.0.0.1", resolve);
+		});
+		const address = callback.server.address();
+		if (!address || typeof address === "string") {
+			throw new Error("Could not start the local sign-in callback.");
+		}
+		const authorizeUrl = new URL("/launcher/authorize", centralOrigin);
+		authorizeUrl.searchParams.set(
+			"redirect_uri",
+			`http://127.0.0.1:${address.port}/callback`,
+		);
+		authorizeUrl.searchParams.set("state", state);
+		authorizeUrl.searchParams.set("code_challenge", codeChallenge);
+		setProgress("Complete CodeRunner sign-in in your browser...");
+		await shell.openExternal(authorizeUrl.toString());
+
+		const code = await Promise.race([
+			callback.codePromise,
+			new Promise((_, reject) => {
+				timeout = setTimeout(
+					() => reject(new Error("Sign-in timed out. Please try again.")),
+					5 * 60 * 1000,
+				);
+			}),
+		]);
+		const response = await fetch(`${centralOrigin}/api/launcher/exchange`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ code, codeVerifier }),
+		});
+		if (!response.ok) {
+			throw new Error(
+				response.status === 403
+					? "This CodeRunner account is disabled. Contact your coach."
+					: "CodeRunner could not verify sign-in. Please try again.",
+			);
+		}
+		const result = await response.json();
+		if (result?.ok !== true || typeof result.runtimeTicket !== "string") {
+			throw new Error("CodeRunner returned an invalid launch authorization.");
+		}
+		return result.runtimeTicket;
+	} finally {
+		if (timeout) clearTimeout(timeout);
+		callback.server.close();
+	}
+}
+
+async function startAfterAuthorization() {
+	while (!quitting) {
+		try {
+			const runtimeTicket = await authorizeLauncher();
+			if (!quitting) {
+				activeLaunchTicket = runtimeTicket;
+				startRuntime();
+			}
+			return;
+		} catch (error) {
+			const result = await dialog.showMessageBox(mainWindow, {
+				type: "warning",
+				title: "CodeRunner sign-in required",
+				message: "CodeRunner could not authorize this launch.",
+				detail: error instanceof Error ? error.message : String(error),
+				buttons: ["Try again", "Quit"],
+				defaultId: 0,
+				cancelId: 1,
+			});
+			if (result.response !== 0) {
+				app.quit();
+				return;
+			}
+		}
+	}
 }
 
 function appendOutput(line) {
@@ -223,7 +380,10 @@ function startRuntime() {
 	setProgress("Checking Docker Desktop...");
 	const child = spawn(bunExecutable, [runtimeBundle, "start"], {
 		cwd: runtimeDirectory,
-		env: runtimeEnvironment(),
+		env: {
+			...runtimeEnvironment(),
+			FRC_LAUNCH_GRANT: activeLaunchTicket ?? "",
+		},
 		windowsHide: true,
 		stdio: ["ignore", "pipe", "pipe"],
 	});
@@ -290,7 +450,7 @@ if (hasSingleInstance) {
 		}
 		installApplicationMenu();
 		createWindow();
-		startRuntime();
+		void startAfterAuthorization();
 	});
 
 	app.on("before-quit", () => {

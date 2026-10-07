@@ -8,6 +8,7 @@ import {
 	webAssetResponse,
 	webShellResponse,
 } from "./app/assets";
+import { handleLauncherAuthRoute } from "./app/launcher-auth";
 import { jsonResponse, notFound, redirect } from "./app/responses";
 import { openApiResponse } from "./app/status";
 import type {
@@ -317,6 +318,13 @@ export async function createApp(
 			} satisfies AuthProvidersResponse);
 		}
 
+		const launcherAuthResponse = await handleLauncherAuthRoute(
+			storage,
+			url,
+			request,
+		);
+		if (launcherAuthResponse) return launcherAuthResponse;
+
 		// --- Better Auth API routes ---
 		if (url.pathname.startsWith("/api/auth/")) {
 			if (storage.config.demo && url.pathname === "/api/auth/get-session") {
@@ -356,7 +364,7 @@ export async function createApp(
 		}
 
 		// --- Default-deny: everything below requires a session (or admin token). ---
-		// Public routes (healthz, scope, /pathplanner, /api/auth/providers, other api/auth routes, /, /login,
+		// Public routes (healthz, scope, /pathplanner, /api/auth/providers, launcher auth, other api/auth routes, /, /login,
 		// /coderunner-icon.png, /assets/*) are handled above.
 		// If we reach here without matching a gated route, we return 404.
 

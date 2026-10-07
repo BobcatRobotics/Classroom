@@ -529,6 +529,7 @@ export async function handleAdminRoute(
 				`
         SELECT
           u.id, u.name, u.email, u.role, u.slug, u.createdAt, u.updatedAt,
+					u.disabledAt,
           w.id AS workspaceId, w.last_accessed_at AS lastSeenAt
         FROM user u
         LEFT JOIN workspaces w ON w.user_id = u.id
@@ -541,12 +542,60 @@ export async function handleAdminRoute(
 			email: string;
 			role: string | null;
 			slug: string | null;
+			disabledAt: string | null;
 			createdAt: string;
 			updatedAt: string;
 			workspaceId: string | null;
 			lastSeenAt: string | null;
 		}>;
 		return jsonResponse({ ok: true, users });
+	}
+
+	const userStatusMatch = /^\/admin\/users\/([^/]+)\/(disable|enable)$/.exec(
+		url.pathname,
+	);
+	if (userStatusMatch && request.method === "POST") {
+		const userId = userStatusMatch[1] ?? "";
+		const action = userStatusMatch[2] as "disable" | "enable";
+		const user = storage.db
+			.query("SELECT id, email, role, disabledAt FROM user WHERE id = ?")
+			.get(userId) as {
+			id: string;
+			email: string;
+			role: string | null;
+			disabledAt: string | null;
+		} | null;
+		if (!user) {
+			return jsonResponse({ error: "User not found." }, { status: 404 });
+		}
+		if (action === "disable" && !user.disabledAt && user.role === "admin") {
+			const activeAdmins = storage.db
+				.query(
+					"SELECT COUNT(*) AS count FROM user WHERE role = 'admin' AND disabledAt IS NULL",
+				)
+				.get() as { count: number };
+			if (activeAdmins.count <= 1) {
+				return jsonResponse(
+					{ error: "Cannot disable the last active admin." },
+					{ status: 409 },
+				);
+			}
+		}
+
+		const disabledAt = action === "disable" ? new Date().toISOString() : null;
+		storage.db
+			.query("UPDATE user SET disabledAt = ?, updatedAt = ? WHERE id = ?")
+			.run(disabledAt, new Date().toISOString(), userId);
+		if (action === "disable") {
+			storage.db.query("DELETE FROM session WHERE userId = ?").run(userId);
+		}
+		recordAuditEvent(storage, {
+			actor: auditActor(adminResult),
+			action: action === "disable" ? "user.disable" : "user.enable",
+			target: { kind: "user", id: userId },
+			metadata: { email: user.email },
+		});
+		return jsonResponse({ ok: true, userId, disabledAt });
 	}
 
 	const userActionMatch = /^\/admin\/users\/([^/]+)\/(promote|demote)$/.exec(

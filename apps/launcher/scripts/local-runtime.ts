@@ -21,6 +21,7 @@ const dockerPath =
 	findLocalDockerExecutable(process.platform, homedir(), Bun.env.PATH);
 const dockerSearchPath = includeDockerDirectoryInPath(dockerPath, Bun.env.PATH);
 const dockerEnvironment = { ...process.env };
+delete dockerEnvironment.FRC_LAUNCH_GRANT;
 if (dockerSearchPath) dockerEnvironment.PATH = dockerSearchPath;
 Bun.env.FRC_DOCKER_PATH = dockerPath;
 
@@ -76,7 +77,40 @@ async function setup(): Promise<void> {
 	});
 }
 
+async function authorizePackagedStart(): Promise<void> {
+	if (Bun.env.CODERUNNER_DESKTOP !== "1") return;
+	const runtimeTicket = Bun.env.FRC_LAUNCH_GRANT?.trim();
+	const centralUrl = Bun.env.CODERUNNER_CENTRAL_URL?.trim();
+	if (!runtimeTicket || !centralUrl) {
+		throw new Error("Sign in to CodeRunner before starting the local runtime.");
+	}
+	let validateUrl: URL;
+	try {
+		validateUrl = new URL("/api/launcher/validate-launch", centralUrl);
+	} catch {
+		throw new Error("CodeRunner's central server URL is invalid.");
+	}
+	const isLoopbackHttp =
+		validateUrl.protocol === "http:" &&
+		["localhost", "127.0.0.1"].includes(validateUrl.hostname);
+	if (validateUrl.protocol !== "https:" && !isLoopbackHttp) {
+		throw new Error("CodeRunner sign-in requires a trusted HTTPS server URL.");
+	}
+	const response = await fetch(validateUrl, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ runtimeTicket }),
+	});
+	if (!response.ok) {
+		throw new Error(
+			"CodeRunner launch authorization expired. Sign in and retry.",
+		);
+	}
+	delete Bun.env.FRC_LAUNCH_GRANT;
+}
+
 async function start(): Promise<void> {
+	await authorizePackagedStart();
 	await setup();
 	const preferredPort = Number(Bun.env.PORT ?? 4000);
 	const port = await findLocalControlPort(preferredPort, portIsFree);
