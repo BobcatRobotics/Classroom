@@ -9,7 +9,7 @@ export type DockerCommandResult = {
 };
 
 export const LOCAL_CODE_IMAGE =
-	"docker.io/bobcatrobotics/coderunner-workspace@sha256:1e855cc6435445c14514541b1ce927bf51cc61a4f93fcf989853b7185fb64a25";
+	"docker.io/bobcatrobotics/coderunner-workspace:v2027.0.8";
 
 export type LocalHost = {
 	platform: string;
