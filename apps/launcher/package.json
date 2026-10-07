@@ -12,11 +12,11 @@
 		"local:repair": "bun scripts/local-runtime.ts repair",
 		"local:start": "bun scripts/local-runtime.ts start",
 		"local:diagnostics": "bun scripts/local-runtime.ts diagnostics",
-		"desktop:prepare": "bun run --cwd ../web build && bun ../../scripts/fetch-dist.ts --skip-web --dist-dir dist && bun scripts/build-desktop.ts",
+		"desktop:prepare": "bun run --cwd ../web build && bun scripts/build-ascope-dist.ts && bun scripts/build-desktop.ts",
 		"desktop:build": "bun run desktop:prepare && electron-builder --config electron-builder.yml",
 		"desktop:release": "bun run desktop:prepare && bun scripts/build-desktop.ts --check-signing && electron-builder --config electron-builder.yml",
 		"desktop:dev": "bun run desktop:prepare && electron .",
-		"test": "bun test runtime"
+		"test": "bun test runtime scripts"
 	},
 	"devDependencies": {
 		"@electron/notarize": "^3.1.1",

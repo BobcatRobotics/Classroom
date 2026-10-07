@@ -158,10 +158,10 @@ current checkout. The build inputs are:
 	build host. The packaged app does not need Bun installed separately.
 - The `apps/web` production build, AdvantageScope and PathPlanner distributions,
 	bundled catalog, and control-plane migrations, staged under the app's runtime
-	resources. AdvantageScope and PathPlanner are downloaded by `desktop:prepare`;
-	they default to the latest published release. Set `DEMO_RELEASE_TAG` and
-	`PATHPLANNER_RELEASE_TAG` to pin those external inputs for a reproducible
-	package build.
+	resources. AdvantageScope is built from the checked-out submodule through the
+	control image's Emscripten build stage; `ASCOPE_RELEASE_TAG` pins and validates
+	that source version. PathPlanner is downloaded by `desktop:prepare` and can be
+	pinned with `PATHPLANNER_RELEASE_TAG`.
 - The workspace image pinned by digest in `apps/launcher/runtime/local-setup.ts`.
 	It is pulled at runtime rather than embedded in the installer.
 
