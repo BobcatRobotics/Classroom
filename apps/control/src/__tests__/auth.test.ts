@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -400,6 +401,278 @@ describe("auth provider discovery", () => {
 				googleClientId: "",
 				googleClientSecret: "",
 			},
+		);
+	});
+});
+
+describe("launcher authorization handoff", () => {
+	test("exchanges a PKCE code once and rejects a wrong verifier", async () => {
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const cookie = cookieFrom(loginResponse);
+				const user = app.storage.db
+					.query("SELECT id FROM user WHERE email = ?")
+					.get("alice@test.local") as { id: string };
+				const now = new Date().toISOString();
+				app.storage.db
+					.query(
+						"INSERT INTO account (id, accountId, providerId, userId, createdAt, updatedAt) VALUES (?, ?, 'github', ?, ?, ?)",
+					)
+					.run(
+						randomBytes(16).toString("hex"),
+						"alice-github",
+						user.id,
+						now,
+						now,
+					);
+				const codeVerifier = randomBytes(32).toString("base64url");
+				const codeChallenge = createHash("sha256")
+					.update(codeVerifier)
+					.digest("base64url");
+				const state = randomBytes(32).toString("base64url");
+				const authorizeUrl = new URL("http://localhost/launcher/authorize");
+				authorizeUrl.searchParams.set(
+					"redirect_uri",
+					"http://127.0.0.1:49152/callback",
+				);
+				authorizeUrl.searchParams.set("state", state);
+				authorizeUrl.searchParams.set("code_challenge", codeChallenge);
+
+				const authorize = await app.fetch(
+					new Request(authorizeUrl, { headers: { cookie } }),
+				);
+				expect(authorize.status).toBe(303);
+				const callback = new URL(authorize.headers.get("location") ?? "");
+				expect(callback.origin).toBe("http://127.0.0.1:49152");
+				expect(callback.searchParams.get("state")).toBe(state);
+				const code = callback.searchParams.get("code");
+				expect(code).toBeTruthy();
+
+				const exchange = (verifier: string) =>
+					app.fetch(
+						new Request("http://localhost/api/launcher/exchange", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ code, codeVerifier: verifier }),
+						}),
+					);
+				const grantRequestedAt = Date.now();
+				expect(
+					(await exchange(randomBytes(32).toString("base64url"))).status,
+				).toBe(400);
+				const exchanged = await exchange(codeVerifier);
+				expect(exchanged.status).toBe(200);
+				const exchangeBody = (await exchanged.json()) as {
+					ok: boolean;
+					runtimeTicket: string;
+				};
+				expect(exchangeBody.ok).toBe(true);
+				expect(exchangeBody.runtimeTicket).toHaveLength(43);
+				const grantHash = createHash("sha256")
+					.update(exchangeBody.runtimeTicket)
+					.digest("base64url");
+				const grant = app.storage.db
+					.query(
+						"SELECT expires_at FROM launcher_runtime_grants WHERE token_hash = ?",
+					)
+					.get(grantHash) as { expires_at: string };
+				expect(Date.parse(grant.expires_at)).toBeGreaterThanOrEqual(
+					grantRequestedAt + 59_000,
+				);
+				expect(Date.parse(grant.expires_at)).toBeLessThanOrEqual(
+					grantRequestedAt + 61_000,
+				);
+				const validateTicket = () =>
+					app.fetch(
+						new Request("http://localhost/api/launcher/validate-launch", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({
+								runtimeTicket: exchangeBody.runtimeTicket,
+							}),
+						}),
+					);
+				const validatedTicket = await validateTicket();
+				expect(validatedTicket.status).toBe(200);
+				const validationBody = (await validatedTicket.json()) as {
+					ok: boolean;
+					identity: {
+						userId: string;
+						displayName: string;
+						email: string;
+						role: string;
+					};
+				};
+				expect(validationBody).toMatchObject({
+					ok: true,
+					identity: {
+						userId: user.id,
+						displayName: "alice",
+						email: "alice@test.local",
+						role: "student",
+					},
+				});
+				expect((await validateTicket()).status).toBe(200);
+				const disabledUser = app.storage.db
+					.query("SELECT id FROM user WHERE email = ?")
+					.get("alice@test.local") as { id: string };
+				app.storage.db
+					.query("UPDATE user SET disabledAt = ? WHERE id = ?")
+					.run(new Date().toISOString(), disabledUser.id);
+				expect((await validateTicket()).status).toBe(401);
+				expect((await exchange(codeVerifier)).status).toBe(400);
+			},
+			{
+				githubClientId: "client-id",
+				githubClientSecret: "client-secret",
+				desktopLaunchGrantTtlMs: 60_000,
+			},
+		);
+	});
+
+	test("rejects non-loopback callback targets", async () => {
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const cookie = cookieFrom(loginResponse);
+				const authorizeUrl = new URL("http://localhost/launcher/authorize");
+				authorizeUrl.searchParams.set(
+					"redirect_uri",
+					"https://example.com/callback",
+				);
+				authorizeUrl.searchParams.set(
+					"state",
+					randomBytes(32).toString("base64url"),
+				);
+				authorizeUrl.searchParams.set(
+					"code_challenge",
+					createHash("sha256")
+						.update(randomBytes(32).toString("base64url"))
+						.digest("base64url"),
+				);
+				const response = await app.fetch(
+					new Request(authorizeUrl, { headers: { cookie } }),
+				);
+				expect(response.status).toBe(400);
+			},
+			{ githubClientId: "client-id", githubClientSecret: "client-secret" },
+		);
+	});
+
+	test("expires an unused launcher authorization code", async () => {
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const cookie = cookieFrom(loginResponse);
+				const user = app.storage.db
+					.query("SELECT id FROM user WHERE email = ?")
+					.get("alice@test.local") as { id: string };
+				const now = new Date().toISOString();
+				app.storage.db
+					.query(
+						"INSERT INTO account (id, accountId, providerId, userId, createdAt, updatedAt) VALUES (?, ?, 'github', ?, ?, ?)",
+					)
+					.run(
+						randomBytes(16).toString("hex"),
+						"alice-github",
+						user.id,
+						now,
+						now,
+					);
+				const codeVerifier = randomBytes(32).toString("base64url");
+				const codeChallenge = createHash("sha256")
+					.update(codeVerifier)
+					.digest("base64url");
+				const authorizeUrl = new URL("http://localhost/launcher/authorize");
+				authorizeUrl.searchParams.set(
+					"redirect_uri",
+					"http://127.0.0.1:49153/callback",
+				);
+				authorizeUrl.searchParams.set(
+					"state",
+					randomBytes(32).toString("base64url"),
+				);
+				authorizeUrl.searchParams.set("code_challenge", codeChallenge);
+				const authorize = await app.fetch(
+					new Request(authorizeUrl, { headers: { cookie } }),
+				);
+				const callback = new URL(authorize.headers.get("location") ?? "");
+				const code = callback.searchParams.get("code") ?? "";
+				const codeHash = createHash("sha256").update(code).digest("base64url");
+				app.storage.db
+					.query(
+						"UPDATE launcher_auth_codes SET expires_at = ? WHERE code_hash = ?",
+					)
+					.run(new Date(Date.now() - 1000).toISOString(), codeHash);
+
+				const exchange = await app.fetch(
+					new Request("http://localhost/api/launcher/exchange", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ code, codeVerifier }),
+					}),
+				);
+				expect(exchange.status).toBe(400);
+			},
+			{ githubClientId: "client-id", githubClientSecret: "client-secret" },
+		);
+	});
+
+	test("requires a GitHub-linked account for launcher authorization", async () => {
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const authorizeUrl = new URL("http://localhost/launcher/authorize");
+				authorizeUrl.searchParams.set(
+					"redirect_uri",
+					"http://127.0.0.1:49152/callback",
+				);
+				authorizeUrl.searchParams.set(
+					"state",
+					randomBytes(32).toString("base64url"),
+				);
+				authorizeUrl.searchParams.set(
+					"code_challenge",
+					createHash("sha256")
+						.update(randomBytes(32).toString("base64url"))
+						.digest("base64url"),
+				);
+				const response = await app.fetch(
+					new Request(authorizeUrl, {
+						headers: { cookie: cookieFrom(loginResponse) },
+					}),
+				);
+				expect(response.status).toBe(303);
+				expect(response.headers.get("location")).toContain("/login?returnTo=");
+			},
+			{ githubClientId: "client-id", githubClientSecret: "client-secret" },
+		);
+	});
+
+	test("sends unauthenticated launchers through central login", async () => {
+		await withApp(
+			async (app) => {
+				const authorizeUrl = new URL("http://localhost/launcher/authorize");
+				authorizeUrl.searchParams.set(
+					"redirect_uri",
+					"http://127.0.0.1:49152/callback",
+				);
+				authorizeUrl.searchParams.set(
+					"state",
+					randomBytes(32).toString("base64url"),
+				);
+				authorizeUrl.searchParams.set(
+					"code_challenge",
+					createHash("sha256")
+						.update(randomBytes(32).toString("base64url"))
+						.digest("base64url"),
+				);
+				const response = await app.fetch(new Request(authorizeUrl));
+				expect(response.status).toBe(303);
+				expect(response.headers.get("location")).toContain("/login?returnTo=");
+			},
+			{ githubClientId: "client-id", githubClientSecret: "client-secret" },
 		);
 	});
 });

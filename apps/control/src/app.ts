@@ -8,6 +8,7 @@ import {
 	webAssetResponse,
 	webShellResponse,
 } from "./app/assets";
+import { handleLauncherAuthRoute } from "./app/launcher-auth";
 import { jsonResponse, notFound, redirect } from "./app/responses";
 import { openApiResponse } from "./app/status";
 import type {
@@ -27,6 +28,7 @@ import { GamepadSessions } from "./gamepad";
 import { HalSimBridge } from "./halsim";
 import { IdleManager } from "./idle";
 import { ImportManager } from "./imports";
+import { LessonCompletionSync } from "./lesson-completion-sync";
 import { getLogger } from "./logging";
 import {
 	httpRequestDuration,
@@ -127,9 +129,14 @@ export async function createApp(
 	} = configInput;
 	const upstreamFetch = configuredUpstreamFetch ?? globalThis.fetch;
 	const storage = await createStorage(storageConfig);
-	if (storage.config.demo) {
-		await seedDemoUser(storage);
-		bootLog.info("demo user seeded", { slug: "demo" });
+	if (storage.config.demo || storage.config.localIdentity) {
+		await seedDemoUser(storage, storage.config.localIdentity);
+		bootLog.info(
+			storage.config.localIdentity ? "local user seeded" : "demo user seeded",
+			{
+				slug: "demo",
+			},
+		);
 	}
 	const runtimeProvider =
 		configuredRuntimeProvider ??
@@ -162,6 +169,15 @@ export async function createApp(
 
 	const imports = new ImportManager(storage, runtimeProvider);
 	const catalogSource = createCatalogSource(storage.config);
+	const completionSync =
+		storage.config.centralUrl && storage.config.centralRuntimeTicket
+			? new LessonCompletionSync(
+					storage,
+					storage.config.centralRuntimeTicket,
+					storage.config.centralUrl,
+				)
+			: null;
+	completionSync?.start();
 	const idle = new IdleManager({
 		storage,
 		runtimeProvider,
@@ -317,10 +333,23 @@ export async function createApp(
 			} satisfies AuthProvidersResponse);
 		}
 
+		const launcherAuthResponse = await handleLauncherAuthRoute(
+			storage,
+			catalogSource,
+			url,
+			request,
+		);
+		if (launcherAuthResponse) return launcherAuthResponse;
+
 		// --- Better Auth API routes ---
 		if (url.pathname.startsWith("/api/auth/")) {
-			if (storage.config.demo && url.pathname === "/api/auth/get-session") {
-				return jsonResponse(getDemoSessionResponseBody());
+			if (
+				(storage.config.demo || storage.config.localIdentity) &&
+				url.pathname === "/api/auth/get-session"
+			) {
+				return jsonResponse(
+					getDemoSessionResponseBody(storage.config.localIdentity),
+				);
 			}
 			return storage.auth.handler(request);
 		}
@@ -356,7 +385,7 @@ export async function createApp(
 		}
 
 		// --- Default-deny: everything below requires a session (or admin token). ---
-		// Public routes (healthz, scope, /pathplanner, /api/auth/providers, other api/auth routes, /, /login,
+		// Public routes (healthz, scope, /pathplanner, /api/auth/providers, launcher auth, other api/auth routes, /, /login,
 		// /coderunner-icon.png, /assets/*) are handled above.
 		// If we reach here without matching a gated route, we return 404.
 
@@ -424,6 +453,7 @@ export async function createApp(
 		idle,
 		close() {
 			bootLog.info("shutting down");
+			completionSync?.stop();
 			idle.stop();
 			dockerStatsPoller.stop();
 			halsim.close();

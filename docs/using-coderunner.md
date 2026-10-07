@@ -38,7 +38,9 @@ want to compile and check your code.
 
 For a catalog robot lesson, **Start** also runs its tests. Once the robot has
 started and all tests pass, open **Projects** and choose **Mark lesson
-completed**.
+completed**. Desktop completions sync to the central mentor report when the
+launcher is online; the report labels them **Desktop-reported** because the
+central service cannot independently rerun tests performed on the laptop.
 
 ![The Driver Station ready to enable, with Comms and Robot Code green](../website/static/img/screenshots/using-coderunner-ready.png)
 

@@ -27,8 +27,8 @@ export async function getSessionFromRequest(
 	};
 	session: { token: string };
 } | null> {
-	if (storage.config.demo) {
-		return getDemoSession();
+	if (storage.config.demo || storage.config.localIdentity) {
+		return getDemoSession(storage.config.localIdentity);
 	}
 	try {
 		const session = await storage.auth.api.getSession({
@@ -47,6 +47,10 @@ export async function getSessionFromRequest(
 			role?: string;
 			slug?: string;
 		};
+		if (storage.isAccountDisabled(user.id)) {
+			log.warn("disabled account session rejected", { userId: user.id });
+			return null;
+		}
 		log.trace("getSession: ok", { userId: user.id, role: user.role });
 		return {
 			user: {

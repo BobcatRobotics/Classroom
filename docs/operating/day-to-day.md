@@ -77,9 +77,10 @@ without any student-visible data loss.
 
 ## Managing who can sign in
 
-Access is controlled by an allowlist of email addresses and domains. Sign-in
-is via OAuth (GitHub and/or Google), but only emails that match the allowlist
-are permitted through. An empty allowlist blocks everyone.
+The allowlist of email addresses and domains controls initial account creation.
+Sign-in is via OAuth (GitHub and/or Google); an empty allowlist blocks new
+accounts. Removing an allowlist entry does not disable an account that already
+exists. The desktop launcher specifically requires a GitHub-linked account.
 
 ### Viewing the allowlist
 
@@ -109,6 +110,15 @@ bun run allowlist:remove frcteam.org
 
 Changes take effect immediately; the running control plane watches
 `data/allowlist.json` and picks up edits without a restart.
+
+### Disabling an existing account
+
+To revoke an existing student's access, use **Admin > Users > Disable**. This
+revokes the account's central sessions and prevents new launcher authorization.
+Re-enabling an account allows the student to sign in again; it does not restore
+old sessions. A local runtime that was already running while disconnected
+cannot be remotely stopped, but it must obtain fresh online authorization on
+its next launcher start.
 
 ---
 

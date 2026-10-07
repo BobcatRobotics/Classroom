@@ -293,9 +293,9 @@ test.describe("real workspace Java tooling", () => {
 				"ps -eo args= | grep '[o]rg.eclipse.jdt.ls.core'",
 			]);
 			expect(jdtProcess.stdout).toMatch(
-				/\/usr\/lib\/jvm\/jdk-21(?:[.0-9+_-]+)?\/bin\/java/,
+				/\/usr\/lib\/jvm\/jdk-25(?:[.0-9+_-]+)?\/bin\/java/,
 			);
-			expect(jdtProcess.stdout).not.toContain("/usr/lib/jvm/jdk-25");
+			expect(jdtProcess.stdout).not.toContain("/usr/lib/jvm/jdk-21");
 			console.log("[java-smoke] Java ready; launching Run Main");
 			await page.keyboard.press("F5");
 			await waitFor(

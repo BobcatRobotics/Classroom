@@ -109,6 +109,76 @@ describe("idle lifecycle and admin controls", () => {
 		);
 	});
 
+	test("completion report distinguishes browser and desktop entries", async () => {
+		await withApp(async (app) => {
+			const adminResponse = await login(app, "coach", { role: "admin" });
+			const cookie = cookieFrom(adminResponse);
+			const workspace = workspaceBySlug(app, "coach");
+			const run = app.storage.createRunJob({
+				workspaceId: workspace.id,
+				moduleId: "robot-starter",
+				logPath: "/tmp/robot-starter.log",
+			});
+			app.storage.updateRunJob({
+				id: run.id,
+				state: "running",
+				started: true,
+			});
+			app.storage.setRunTestResults(run.id, {
+				total: 1,
+				passed: 1,
+				failed: 0,
+				skipped: 0,
+			});
+			app.storage.createLessonCompletion({
+				studentId: workspace.user_id as never,
+				workspaceId: workspace.id,
+				moduleId: "robot-starter",
+				lessonTitle: "Robot Starter",
+			});
+			app.storage.createDesktopLessonCompletion({
+				studentId: workspace.user_id as never,
+				eventId: `completion_${"d".repeat(32)}`,
+				moduleId: "robot-starter",
+				lessonTitle: "Robot Starter",
+				testsTotal: 1,
+				testsPassed: 1,
+				testsFailed: 0,
+				testsSkipped: 0,
+			});
+
+			const response = await app.fetch(
+				new Request(
+					"http://localhost/admin/lesson-completions?page=1&pageSize=20",
+					{ headers: { cookie } },
+				),
+			);
+			expect(response.status).toBe(200);
+			const body = (await response.json()) as {
+				rows: Array<{
+					source: string;
+					run_job_id: string | null;
+					log_url: string | null;
+				}>;
+			};
+			expect(body.rows).toHaveLength(2);
+			expect(body.rows).toContainEqual(
+				expect.objectContaining({
+					source: "browser",
+					run_job_id: run.id,
+					log_url: `/admin/run-logs/${run.id}`,
+				}),
+			);
+			expect(body.rows).toContainEqual(
+				expect.objectContaining({
+					source: "desktop",
+					run_job_id: null,
+					log_url: null,
+				}),
+			);
+		});
+	});
+
 	test("admin shell requires an admin session and serves assets from /admin/", async () => {
 		await withApp(async (app) => {
 			const student = await login(app, "student");
@@ -779,6 +849,50 @@ describe("idle lifecycle and admin controls", () => {
 			expect(demote.status).toBe(200);
 			const dBody = (await demote.json()) as { ok: boolean; role: string };
 			expect(dBody.role).toBe("student");
+		});
+	});
+
+	test("admin can disable and re-enable a user account", async () => {
+		await withApp(async (app) => {
+			const admin = await login(app, "alice", { role: "admin" });
+			const adminCookie = cookieFrom(admin);
+			const bob = await login(app, "bob");
+			const bobCookie = cookieFrom(bob);
+			const user = app.storage.db
+				.query("SELECT id FROM user WHERE email = ?")
+				.get("bob@test.local") as { id: string };
+
+			const disable = await app.fetch(
+				new Request(`http://localhost/admin/users/${user.id}/disable`, {
+					method: "POST",
+					headers: { cookie: adminCookie },
+				}),
+			);
+			expect(disable.status).toBe(200);
+			const disabledWorkspace = await app.fetch(
+				new Request("http://localhost/u/bob/api/session", {
+					headers: { cookie: bobCookie },
+				}),
+			);
+			expect(disabledWorkspace.status).toBe(401);
+			expect(
+				app.storage.db
+					.query("SELECT token FROM session WHERE userId = ?")
+					.get(user.id),
+			).toBeNull();
+
+			const enable = await app.fetch(
+				new Request(`http://localhost/admin/users/${user.id}/enable`, {
+					method: "POST",
+					headers: { cookie: adminCookie },
+				}),
+			);
+			expect(enable.status).toBe(200);
+			expect(
+				app.storage.db
+					.query("SELECT disabledAt FROM user WHERE id = ?")
+					.get(user.id),
+			).toEqual({ disabledAt: null });
 		});
 	});
 

@@ -51,6 +51,129 @@ describe("demo mode", () => {
 		);
 	});
 
+	test("uses central identity and role in the local session without changing local workspace identity", async () => {
+		await withApp(
+			async (app) => {
+				const workspace = app.storage.findWorkspaceByUserId(DEMO_USER_ID);
+				expect(workspace?.slug).toBe(DEMO_SLUG);
+				const seededUser = app.storage.db
+					.query("SELECT id, name, email, role FROM user WHERE id = ?")
+					.get(DEMO_USER_ID) as {
+					id: string;
+					name: string;
+					email: string;
+					role: string;
+				};
+				expect(seededUser).toEqual({
+					id: DEMO_USER_ID,
+					name: "Student Example",
+					email: "student@example.test",
+					role: "student",
+				});
+
+				const sessionResponse = await app.fetch(
+					new Request(`http://localhost/u/${DEMO_SLUG}/api/session`),
+				);
+				const body = (await sessionResponse.json()) as {
+					user: {
+						id: string;
+						displayName: string;
+						email: string;
+						avatarUrl: string | null;
+						slug: string;
+						role: string;
+					};
+					demo?: boolean;
+				};
+				expect(body.user).toEqual({
+					id: DEMO_USER_ID,
+					displayName: "Student Example",
+					email: "student@example.test",
+					avatarUrl: null,
+					slug: DEMO_SLUG,
+					role: "student",
+				});
+				expect(body.demo).toBeUndefined();
+				expect(
+					(await app.fetch(new Request("http://localhost/admin/status")))
+						.status,
+				).toBe(403);
+			},
+			{
+				demo: true,
+				adminEmails: [],
+				localIdentity: {
+					displayName: "Student Example",
+					email: "student@example.test",
+					avatarUrl: null,
+					role: "student",
+				},
+			},
+		);
+	});
+
+	test("maps a centrally authenticated admin to local admin mode", async () => {
+		await withApp(
+			async (app) => {
+				const sessionResponse = await app.fetch(
+					new Request(`http://localhost/u/${DEMO_SLUG}/api/session`),
+				);
+				const body = (await sessionResponse.json()) as {
+					user: { role: string };
+					demo?: boolean;
+				};
+				expect(body.user.role).toBe("admin");
+				expect(body.demo).toBeUndefined();
+				const adminResponse = await app.fetch(
+					new Request("http://localhost/admin/status"),
+				);
+				expect(adminResponse.status).toBe(200);
+			},
+			{
+				demo: true,
+				adminEmails: [],
+				localIdentity: {
+					displayName: "Coach Example",
+					email: "coach@example.test",
+					avatarUrl: null,
+					role: "admin",
+				},
+			},
+		);
+	});
+
+	test("uses central identity locally without enabling global demo mode", async () => {
+		await withApp(
+			async (app) => {
+				expect(app.storage.config.demo).toBe(false);
+				const response = await app.fetch(
+					new Request(`http://localhost/u/${DEMO_SLUG}/api/session`),
+				);
+				expect(response.status).toBe(200);
+				const body = (await response.json()) as {
+					user: { displayName: string; role: string };
+					demo?: boolean;
+				};
+				expect(body.user.displayName).toBe("Student Example");
+				expect(body.user.role).toBe("student");
+				expect(body.demo).toBeUndefined();
+				const adminResponse = await app.fetch(
+					new Request("http://localhost/admin/status"),
+				);
+				expect(adminResponse.status).toBe(403);
+			},
+			{
+				adminEmails: [],
+				localIdentity: {
+					displayName: "Student Example",
+					email: "student@example.test",
+					avatarUrl: null,
+					role: "student",
+				},
+			},
+		);
+	});
+
 	test("seeding is idempotent across reboots", async () => {
 		// First boot: seed.
 		await withApp(

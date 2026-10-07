@@ -56,6 +56,68 @@ describe("containerNetwork (via loadControlConfig)", () => {
 	});
 });
 
+describe("desktop launch grant TTL", () => {
+	test("defaults to one hour", () => {
+		expect(loadControlConfig({ adminEmails: [] }).desktopLaunchGrantTtlMs).toBe(
+			60 * 60 * 1000,
+		);
+	});
+
+	test("accepts a value from one minute through 24 hours", () => {
+		expect(
+			loadControlConfig({
+				adminEmails: [],
+				desktopLaunchGrantTtlMs: 2 * 60 * 60 * 1000,
+			}).desktopLaunchGrantTtlMs,
+		).toBe(2 * 60 * 60 * 1000);
+	});
+
+	test("rejects values outside the supported range", () => {
+		expect(() =>
+			loadControlConfig({ adminEmails: [], desktopLaunchGrantTtlMs: 30_000 }),
+		).toThrow("CODERUNNER_DESKTOP_LAUNCH_GRANT_TTL_MS");
+		expect(() =>
+			loadControlConfig({
+				adminEmails: [],
+				desktopLaunchGrantTtlMs: 25 * 60 * 60 * 1000,
+			}),
+		).toThrow("CODERUNNER_DESKTOP_LAUNCH_GRANT_TTL_MS");
+	});
+});
+
+describe("local desktop identity", () => {
+	const identity = {
+		displayName: "Student Example",
+		email: "student@example.test",
+		avatarUrl: null,
+		role: "student" as const,
+	};
+
+	test("defaults to no local identity", () => {
+		expect(loadControlConfig({ localIdentity: null }).localIdentity).toBeNull();
+	});
+
+	test("accepts a validated local identity", () => {
+		expect(
+			loadControlConfig({ localIdentity: identity }).localIdentity,
+		).toEqual(identity);
+	});
+
+	test("rejects a malformed local identity from the environment", () => {
+		const original = Bun.env.CODERUNNER_LOCAL_IDENTITY;
+		Bun.env.CODERUNNER_LOCAL_IDENTITY = "not-json";
+		try {
+			expect(() => loadControlConfig({ localIdentity: null })).not.toThrow();
+			expect(() => loadControlConfig({})).toThrow(
+				"CODERUNNER_LOCAL_IDENTITY must contain valid JSON.",
+			);
+		} finally {
+			if (original === undefined) delete Bun.env.CODERUNNER_LOCAL_IDENTITY;
+			else Bun.env.CODERUNNER_LOCAL_IDENTITY = original;
+		}
+	});
+});
+
 describe("adminEmails (via loadControlConfig)", () => {
 	test("unset input falls back to an empty list", () => {
 		expect(loadControlConfig({}).adminEmails).toEqual([]);

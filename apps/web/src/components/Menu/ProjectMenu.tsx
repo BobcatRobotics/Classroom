@@ -12,6 +12,7 @@ interface ProjectMenuProps {
 	onSwitchProject: () => void;
 	completion?: {
 		eligible: boolean;
+		completed: boolean;
 		loading: boolean;
 		marking: boolean;
 		message: string | null;
@@ -44,14 +45,20 @@ export function ProjectMenu({ onSwitchProject, completion }: ProjectMenuProps) {
 					<>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
-							disabled={!completion.eligible || completion.marking}
+							disabled={
+								!completion.eligible ||
+								completion.marking ||
+								completion.completed
+							}
 							onClick={completion.onMark}
 						>
 							<CheckCircle2 className="size-4" aria-hidden="true" />
 							<span>
-								{completion.marking
-									? "Marking lesson complete..."
-									: "Mark lesson completed"}
+								{completion.completed
+									? "Lesson marked completed"
+									: completion.marking
+										? "Marking lesson complete..."
+										: "Mark lesson completed"}
 							</span>
 						</DropdownMenuItem>
 						{!completion.eligible &&

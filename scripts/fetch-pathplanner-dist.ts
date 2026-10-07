@@ -24,8 +24,9 @@ const repo = Bun.env.PATHPLANNER_RELEASE_REPO ?? "mathewdunne/pathplanner-web";
 const tag = Bun.env.PATHPLANNER_RELEASE_TAG ?? "";
 
 export async function fetchPathPlannerDist(
-	options: { optional?: boolean } = {},
+	options: { optional?: boolean; distDir?: string } = {},
 ): Promise<boolean> {
+	const distDir = resolve(options.distDir ?? resolve(repoRoot, "dist"));
 	const base = `https://github.com/${repo}/releases`;
 	const url = tag
 		? `${base}/download/${tag}/pathplanner-dist.tar.gz`
@@ -36,7 +37,7 @@ export async function fetchPathPlannerDist(
 			{
 				asset: "pathplanner-dist.tar.gz",
 				url,
-				destDir: resolve(repoRoot, "dist/pathplanner"),
+				destDir: resolve(distDir, "pathplanner"),
 				optional: options.optional ?? false,
 				hint: `Check that release ${tag || "latest"} exists for ${repo} and includes this asset.`,
 			},

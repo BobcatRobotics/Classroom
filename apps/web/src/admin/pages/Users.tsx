@@ -9,6 +9,7 @@ type UserRow = {
 	email: string;
 	role: string | null;
 	slug: string | null;
+	disabledAt: string | null;
 	createdAt: string;
 	lastSeenAt: string | null;
 };
@@ -37,6 +38,33 @@ export function Users() {
 				credentials: "same-origin",
 			});
 			if (!response.ok) throw new Error(`${response.status}`);
+			await refetch();
+		} finally {
+			setBusy(null);
+		}
+	}
+
+	async function toggleAccount(user: UserRow) {
+		const disable = !user.disabledAt;
+		if (
+			disable &&
+			!confirm(`Disable ${user.email}? They will no longer be able to sign in.`)
+		) {
+			return;
+		}
+		setBusy(user.id);
+		try {
+			const response = await fetch(
+				`/admin/users/${user.id}/${disable ? "disable" : "enable"}`,
+				{ method: "POST", credentials: "same-origin" },
+			);
+			if (!response.ok) {
+				const body = (await response.json().catch(() => null)) as {
+					error?: string;
+				} | null;
+				alert(body?.error ?? `Account update failed (${response.status}).`);
+				return;
+			}
 			await refetch();
 		} finally {
 			setBusy(null);
@@ -82,6 +110,7 @@ export function Users() {
 									<th className="pb-2">Name</th>
 									<th className="pb-2">Role</th>
 									<th className="pb-2">Slug</th>
+									<th className="pb-2">Account</th>
 									<th className="pb-2">Last seen</th>
 									<th className="pb-2">Actions</th>
 								</tr>
@@ -103,6 +132,9 @@ export function Users() {
 											</span>
 										</td>
 										<td className="py-2 font-mono">{u.slug ?? "—"}</td>
+										<td className="py-2">
+											{u.disabledAt ? "Disabled" : "Active"}
+										</td>
 										<td className="py-2">
 											{u.lastSeenAt
 												? new Date(u.lastSeenAt).toLocaleString()
@@ -128,6 +160,14 @@ export function Users() {
 													Promote
 												</Button>
 											)}
+											<Button
+												variant="outline"
+												size="sm"
+												disabled={busy === u.id}
+												onClick={() => void toggleAccount(u)}
+											>
+												{u.disabledAt ? "Enable" : "Disable"}
+											</Button>
 											<Button
 												variant="destructive"
 												size="sm"

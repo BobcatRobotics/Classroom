@@ -22,6 +22,54 @@ export const displayNameSchema = z
 	.min(1, "Display name is required.")
 	.max(80, "Display name must be 80 characters or fewer.");
 
+export const launcherIdentitySchema = z.object({
+	userId: userIdSchema,
+	displayName: displayNameSchema,
+	email: z.string().email(),
+	avatarUrl: z.string().url().nullable(),
+	role: z.enum(["student", "admin"]),
+});
+
+export const launcherCatalogConfigResponseSchema = z
+	.object({
+		ok: z.literal(true),
+		catalogRepo: z.string().nullable(),
+		catalogBranch: z.string().nullable(),
+	})
+	.refine(
+		(config) =>
+			(config.catalogRepo === null) === (config.catalogBranch === null),
+		"Remote catalog repository and branch must be configured together.",
+	);
+
+export const desktopLessonCompletionSyncSchema = z
+	.object({
+		eventId: z.string().regex(/^completion_[a-f0-9]{32}$/u),
+		moduleId: z.string().min(1).max(120),
+		testsTotal: z.number().int().min(0).max(10_000),
+		testsPassed: z.number().int().min(0).max(10_000),
+		testsFailed: z.number().int().min(0).max(10_000),
+		testsSkipped: z.number().int().min(0).max(10_000),
+	})
+	.refine(
+		(result) =>
+			result.testsFailed === 0 &&
+			result.testsSkipped === 0 &&
+			result.testsPassed === result.testsTotal,
+		"A desktop completion requires every test to pass.",
+	);
+
+export type DesktopLessonCompletionSync = z.infer<
+	typeof desktopLessonCompletionSyncSchema
+>;
+
+export const localUserIdentitySchema = z.object({
+	displayName: displayNameSchema,
+	email: z.string().email(),
+	avatarUrl: z.string().url().nullable(),
+	role: z.enum(["student", "admin"]),
+});
+
 export const workspaceRouteSchema = z.object({
 	workspaceSlug: workspaceSlugSchema,
 });
@@ -34,6 +82,11 @@ export type WorkspaceRoute = z.infer<typeof workspaceRouteSchema>;
 export type UserId = z.infer<typeof userIdSchema>;
 export type WorkspaceId = z.infer<typeof workspaceIdSchema>;
 export type WorkspaceSlug = z.infer<typeof workspaceSlugSchema>;
+export type LauncherIdentity = z.infer<typeof launcherIdentitySchema>;
+export type LauncherCatalogConfigResponse = z.infer<
+	typeof launcherCatalogConfigResponseSchema
+>;
+export type LocalUserIdentity = z.infer<typeof localUserIdentitySchema>;
 
 export const heartbeatRequestSchema = z.object({
 	closing: z.boolean().optional(),

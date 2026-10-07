@@ -156,3 +156,131 @@ describe("/api/session reflects the loaded module", () => {
 		);
 	});
 });
+
+describe("GET /u/:slug/api/completion/status", () => {
+	test("requires a started robot run and the latest run to pass every test", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const cookie = cookieFrom(loginResponse);
+				const workspace = app.storage.db
+					.query("SELECT id FROM workspaces WHERE slug = ?")
+					.get("alice") as { id: string };
+				app.storage.setCurrentModule(
+					workspace.id as never,
+					"robot-starter",
+					"robot",
+				);
+
+				const getStatus = async () => {
+					const response = await app.fetch(
+						new Request("http://localhost/u/alice/api/completion/status", {
+							headers: { cookie },
+						}),
+					);
+					expect(response.status).toBe(200);
+					return (await response.json()) as { eligible: boolean };
+				};
+
+				expect(await getStatus()).toMatchObject({ eligible: false });
+
+				const run = app.storage.createRunJob({
+					workspaceId: workspace.id as never,
+					moduleId: "robot-starter",
+					logPath: "/tmp/robot-starter.log",
+				});
+				app.storage.updateRunJob({
+					id: run.id,
+					state: "running",
+					started: true,
+				});
+				app.storage.setRunTestResults(run.id, {
+					total: 2,
+					passed: 2,
+					failed: 0,
+					skipped: 0,
+				});
+				expect(await getStatus()).toMatchObject({ eligible: true });
+
+				const laterRun = app.storage.createRunJob({
+					workspaceId: workspace.id as never,
+					moduleId: "robot-starter",
+					logPath: "/tmp/robot-starter-later.log",
+				});
+				app.storage.updateRunJob({
+					id: laterRun.id,
+					state: "running",
+					started: true,
+				});
+				app.storage.setRunTestResults(laterRun.id, {
+					total: 2,
+					passed: 1,
+					failed: 1,
+					skipped: 0,
+				});
+				expect(await getStatus()).toMatchObject({ eligible: false });
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+
+	test("records each eligible mark as a separate completion", async () => {
+		const docker = createFakeDocker();
+		await withApp(
+			async (app) => {
+				const loginResponse = await login(app, "alice");
+				const cookie = cookieFrom(loginResponse);
+				const workspace = app.storage.db
+					.query("SELECT id FROM workspaces WHERE slug = ?")
+					.get("alice") as { id: string };
+				app.storage.config.centralRuntimeTicket = "a".repeat(43);
+				app.storage.setCurrentModule(
+					workspace.id as never,
+					"robot-starter",
+					"robot",
+				);
+				const run = app.storage.createRunJob({
+					workspaceId: workspace.id as never,
+					moduleId: "robot-starter",
+					logPath: "/tmp/robot-starter.log",
+				});
+				app.storage.updateRunJob({
+					id: run.id,
+					state: "running",
+					started: true,
+				});
+				app.storage.setRunTestResults(run.id, {
+					total: 1,
+					passed: 1,
+					failed: 0,
+					skipped: 0,
+				});
+
+				const mark = () =>
+					app.fetch(
+						new Request("http://localhost/u/alice/api/completion/mark", {
+							method: "POST",
+							headers: { cookie },
+						}),
+					);
+				const first = await mark();
+				const firstBody = (await first.json()) as {
+					completion: { id: string; completedAt: string };
+				};
+				const second = await mark();
+				const secondBody = (await second.json()) as {
+					completion: { id: string; completedAt: string };
+				};
+				expect(first.status).toBe(200);
+				expect(second.status).toBe(200);
+				expect(secondBody.completion.id).not.toBe(firstBody.completion.id);
+				expect(
+					secondBody.completion.completedAt > firstBody.completion.completedAt,
+				).toBe(true);
+				expect(app.storage.listPendingLessonCompletionSync()).toHaveLength(2);
+			},
+			{ dockerRunner: docker.runner },
+		);
+	});
+});

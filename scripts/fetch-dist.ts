@@ -26,13 +26,25 @@ const tag =
 		? Bun.argv[tagArgIndex + 1]
 		: (Bun.env.DEMO_RELEASE_TAG ?? "");
 
-const artifacts = [
-	{
-		asset: "ascope-dist.tar.gz",
-		destDir: resolve(repoRoot, "dist/advantagescope"),
-	},
-	{ asset: "web-dist.tar.gz", destDir: resolve(repoRoot, "apps/web/dist") },
-];
+export function distArtifacts(
+	skipWeb: boolean,
+	distDir = resolve(repoRoot, "dist"),
+) {
+	return [
+		{
+			asset: "ascope-dist.tar.gz",
+			destDir: resolve(distDir, "advantagescope"),
+		},
+		...(skipWeb
+			? []
+			: [
+					{
+						asset: "web-dist.tar.gz",
+						destDir: resolve(repoRoot, "apps/web/dist"),
+					},
+				]),
+	];
+}
 
 function downloadUrl(asset: string): string {
 	const base = `https://github.com/${repo}/releases`;
@@ -42,11 +54,22 @@ function downloadUrl(asset: string): string {
 }
 
 async function main(): Promise<void> {
+	const skipWeb = Bun.argv.includes("--skip-web");
+	const distDirIndex = Bun.argv.indexOf("--dist-dir");
+	const distDirArgument =
+		distDirIndex >= 0 ? Bun.argv[distDirIndex + 1] : undefined;
+	if (
+		distDirIndex >= 0 &&
+		(!distDirArgument || distDirArgument.startsWith("--"))
+	) {
+		throw new Error("--dist-dir requires a directory path.");
+	}
+	const distDir = resolve(distDirArgument ?? resolve(repoRoot, "dist"));
 	console.log(
 		`Fetching prebuilt dist artifacts from ${repo} (${tag || "latest release"}).`,
 	);
 	await withScratch(async (scratch) => {
-		for (const artifact of artifacts) {
+		for (const artifact of distArtifacts(skipWeb, distDir)) {
 			await downloadAndExtract(
 				{
 					asset: artifact.asset,
@@ -58,13 +81,15 @@ async function main(): Promise<void> {
 			);
 		}
 	});
-	await fetchPathPlannerDist({ optional: true });
-	console.log("\nPrebuilt web shell and AdvantageScope Lite assets are ready.");
+	await fetchPathPlannerDist({ optional: true, distDir });
+	console.log("\nPrebuilt distribution assets are ready.");
 }
 
-try {
-	await main();
-} catch (error) {
-	console.error(error instanceof Error ? error.message : String(error));
-	process.exit(1);
+if (import.meta.main) {
+	try {
+		await main();
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error));
+		process.exit(1);
+	}
 }
