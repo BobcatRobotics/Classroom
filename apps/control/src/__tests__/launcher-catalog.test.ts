@@ -59,3 +59,91 @@ describe("GET /api/launcher/catalog-config", () => {
 		});
 	});
 });
+
+describe("POST /api/launcher/lesson-completions", () => {
+	test("stores a desktop completion for the ticket owner and deduplicates retry", async () => {
+		await withApp(async (app) => {
+			const ticket = await issueLaunchTicket(app);
+			const request = () =>
+				app.fetch(
+					new Request("http://localhost/api/launcher/lesson-completions", {
+						method: "POST",
+						headers: {
+							authorization: `Bearer ${ticket}`,
+							"content-type": "application/json",
+						},
+						body: JSON.stringify({
+							eventId: `completion_${"b".repeat(32)}`,
+							moduleId: "robot-starter",
+							testsTotal: 3,
+							testsPassed: 3,
+							testsFailed: 0,
+							testsSkipped: 0,
+						}),
+					}),
+				);
+
+			const first = await request();
+			const firstBody = (await first.json()) as { completionId: string };
+			expect(first.status).toBe(200);
+			expect(first.headers.get("cache-control")).toBe("no-store");
+
+			const retry = await request();
+			const retryBody = (await retry.json()) as { completionId: string };
+			expect(retry.status).toBe(200);
+			expect(retryBody.completionId).toBe(firstBody.completionId);
+
+			const row = app.storage.db
+				.query(
+					"SELECT student_id, workspace_id, run_job_id, source FROM lesson_completions WHERE id = ?",
+				)
+				.get(firstBody.completionId) as {
+				student_id: string;
+				workspace_id: string | null;
+				run_job_id: string | null;
+				source: string;
+			};
+			expect(row).toMatchObject({
+				workspace_id: null,
+				run_job_id: null,
+				source: "desktop",
+			});
+			expect(
+				app.storage.db
+					.query("SELECT COUNT(*) AS count FROM lesson_completions")
+					.get(),
+			).toEqual({ count: 1 });
+			expect(row.student_id).toBe(
+				(
+					app.storage.db
+						.query("SELECT id FROM user WHERE email = ?")
+						.get("alice@test.local") as { id: string }
+				).id,
+			);
+		});
+	});
+
+	test("rejects a desktop completion for a plain Java lesson", async () => {
+		await withApp(async (app) => {
+			const ticket = await issueLaunchTicket(app);
+			const response = await app.fetch(
+				new Request("http://localhost/api/launcher/lesson-completions", {
+					method: "POST",
+					headers: {
+						authorization: `Bearer ${ticket}`,
+						"content-type": "application/json",
+					},
+					body: JSON.stringify({
+						eventId: `completion_${"c".repeat(32)}`,
+						moduleId: "hello-world",
+						testsTotal: 1,
+						testsPassed: 1,
+						testsFailed: 0,
+						testsSkipped: 0,
+					}),
+				}),
+			);
+			expect(response.status).toBe(409);
+		});
+	});
+});

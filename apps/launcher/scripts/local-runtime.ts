@@ -27,6 +27,7 @@ const dockerPath =
 const dockerSearchPath = includeDockerDirectoryInPath(dockerPath, Bun.env.PATH);
 const dockerEnvironment = { ...process.env };
 delete dockerEnvironment.FRC_LAUNCH_GRANT;
+delete dockerEnvironment.CODERUNNER_CENTRAL_SYNC_TICKET;
 if (dockerSearchPath) dockerEnvironment.PATH = dockerSearchPath;
 Bun.env.FRC_DOCKER_PATH = dockerPath;
 
@@ -129,6 +130,7 @@ async function authorizePackagedStart(): Promise<void> {
 		role: centralIdentity.role,
 	});
 	Bun.env.CODERUNNER_LOCAL_IDENTITY = JSON.stringify(localIdentity);
+	Bun.env.CODERUNNER_CENTRAL_SYNC_TICKET = runtimeTicket;
 	delete Bun.env.FRC_LAUNCH_GRANT;
 }
 

@@ -66,9 +66,9 @@ export type RunJobRow = {
 
 export type LessonCompletionRow = {
 	id: string;
-	run_job_id: string;
+	run_job_id: string | null;
 	student_id: UserId;
-	workspace_id: WorkspaceId;
+	workspace_id: WorkspaceId | null;
 	module_id: string;
 	lesson_title: string;
 	completed_at: string;
@@ -78,6 +78,19 @@ export type LessonCompletionRow = {
 	tests_passed: number;
 	tests_failed: number;
 	tests_skipped: number;
+	source: "browser" | "desktop";
+	source_event_id: string | null;
+};
+
+export type PendingLessonCompletionSync = {
+	id: string;
+	module_id: string;
+	lesson_title: string;
+	tests_total: number;
+	tests_passed: number;
+	tests_failed: number;
+	tests_skipped: number;
+	source_event_id: string;
 };
 
 /** Context returned by Better Auth session resolution + workspace lookup. */
@@ -851,21 +864,37 @@ export class AppStorage {
 			(this.db
 				.query(
 					`
-              SELECT r.*
-              FROM run_jobs r
-              LEFT JOIN lesson_completions c ON c.run_job_id = r.id
-              WHERE r.workspace_id = ? AND r.module_id = ?
-                AND r.build_succeeded = 1
-                AND r.tests_failed = 0 AND r.tests_skipped = 0
-                AND r.tests_passed = r.tests_total
-                AND r.state IN ('running', 'stopped')
-                AND c.id IS NULL
-              ORDER BY r.started_at DESC
-              LIMIT 1
+							WITH latest_run AS (
+								SELECT r.*
+								FROM run_jobs r
+								WHERE r.workspace_id = ? AND r.module_id = ?
+								ORDER BY r.requested_at DESC, r.rowid DESC
+								LIMIT 1
+							)
+							SELECT *
+							FROM latest_run
+							WHERE build_succeeded = 1
+								AND tests_failed = 0 AND tests_skipped = 0
+								AND tests_passed = tests_total
+								AND state IN ('running', 'stopped')
             `,
 				)
 				.get(input.workspaceId, input.moduleId) as RunJobRow | null) ?? null
 		);
+	}
+
+	private nextLessonCompletionTimestamp(
+		studentId: UserId,
+		moduleId: string,
+	): string {
+		const latest = this.db
+			.query(
+				"SELECT completed_at FROM lesson_completions WHERE student_id = ? AND module_id = ? ORDER BY completed_at DESC LIMIT 1",
+			)
+			.get(studentId, moduleId) as { completed_at: string } | null;
+		const now = Date.now();
+		const latestTime = latest ? Date.parse(latest.completed_at) : 0;
+		return new Date(Math.max(now, latestTime + 1)).toISOString();
 	}
 
 	createLessonCompletion(input: {
@@ -874,7 +903,6 @@ export class AppStorage {
 		moduleId: string;
 		lessonTitle: string;
 	}): LessonCompletionRow | null {
-		const completedAt = nowIso();
 		const create = this.db.transaction(() => {
 			const run = this.getLatestQualifyingRun({
 				workspaceId: input.workspaceId,
@@ -883,15 +911,21 @@ export class AppStorage {
 			if (!run) return null;
 
 			const id = randomId("completion");
+			const completedAt = this.nextLessonCompletionTimestamp(
+				input.studentId,
+				input.moduleId,
+			);
+			const source = this.config.centralRuntimeTicket ? "desktop" : "browser";
 			this.db
 				.query(
 					`
               INSERT INTO lesson_completions (
                 id, run_job_id, student_id, workspace_id, module_id,
                 lesson_title, completed_at, build_succeeded, test_passed,
-                tests_total, tests_passed, tests_failed, tests_skipped
+								tests_total, tests_passed, tests_failed, tests_skipped,
+								source, source_event_id
               )
-              VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?)
+							VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?)
             `,
 				)
 				.run(
@@ -906,12 +940,92 @@ export class AppStorage {
 					run.tests_passed,
 					run.tests_failed,
 					run.tests_skipped,
+					source,
+					source === "desktop" ? id : null,
 				);
+			if (source === "desktop") {
+				this.db
+					.query(
+						"INSERT INTO lesson_completion_sync_outbox (completion_id, created_at) VALUES (?, ?)",
+					)
+					.run(id, completedAt);
+			}
 			return this.db
 				.query("SELECT * FROM lesson_completions WHERE id = ?")
 				.get(id) as LessonCompletionRow;
 		});
 		return create();
+	}
+
+	createDesktopLessonCompletion(input: {
+		studentId: UserId;
+		eventId: string;
+		moduleId: string;
+		lessonTitle: string;
+		testsTotal: number;
+		testsPassed: number;
+		testsFailed: number;
+		testsSkipped: number;
+	}): LessonCompletionRow {
+		const create = this.db.transaction(() => {
+			const existing = this.db
+				.query(
+					"SELECT * FROM lesson_completions WHERE student_id = ? AND source = 'desktop' AND source_event_id = ?",
+				)
+				.get(input.studentId, input.eventId) as LessonCompletionRow | null;
+			if (existing) return existing;
+
+			const id = randomId("completion");
+			const completedAt = this.nextLessonCompletionTimestamp(
+				input.studentId,
+				input.moduleId,
+			);
+			const completion = this.db
+				.query(
+					`INSERT INTO lesson_completions (
+					id, student_id, module_id, lesson_title, completed_at,
+					build_succeeded, test_passed, tests_total, tests_passed,
+					tests_failed, tests_skipped, source, source_event_id
+					) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, 'desktop', ?)
+					RETURNING *`,
+				)
+				.get(
+					id,
+					input.studentId,
+					input.moduleId,
+					input.lessonTitle,
+					completedAt,
+					input.testsTotal,
+					input.testsPassed,
+					input.testsFailed,
+					input.testsSkipped,
+					input.eventId,
+				) as LessonCompletionRow | null;
+			if (!completion) throw new Error("Unable to store desktop completion.");
+			return completion;
+		});
+		return create();
+	}
+
+	listPendingLessonCompletionSync(): PendingLessonCompletionSync[] {
+		return this.db
+			.query(
+				`SELECT c.id, c.module_id, c.lesson_title, c.tests_total,
+					c.tests_passed, c.tests_failed, c.tests_skipped,
+					c.source_event_id
+				 FROM lesson_completion_sync_outbox o
+				 JOIN lesson_completions c ON c.id = o.completion_id
+				 ORDER BY o.created_at ASC LIMIT 50`,
+			)
+			.all() as PendingLessonCompletionSync[];
+	}
+
+	markLessonCompletionSynced(completionId: string): void {
+		this.db
+			.query(
+				"DELETE FROM lesson_completion_sync_outbox WHERE completion_id = ?",
+			)
+			.run(completionId);
 	}
 
 	// --- Runtime config ---

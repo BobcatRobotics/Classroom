@@ -28,6 +28,7 @@ export type AdminRouteContext = {
 };
 
 type LessonCompletionReportRow = {
+	completion_id: string;
 	student_id: string;
 	user_name: string;
 	user_slug: string | null;
@@ -39,8 +40,9 @@ type LessonCompletionReportRow = {
 	tests_passed: number;
 	tests_failed: number;
 	tests_skipped: number;
-	run_job_id: string;
+	run_job_id: string | null;
 	log_path: string | null;
+	source: "browser" | "desktop";
 };
 
 const reportSortColumns: Record<string, string> = {
@@ -55,6 +57,7 @@ const reportSortColumns: Record<string, string> = {
 	tests_failed: "c.tests_failed",
 	tests_skipped: "c.tests_skipped",
 	log_path: "r.log_path",
+	source: "c.source",
 };
 
 function isValidDateOnly(value: string): boolean {
@@ -118,10 +121,10 @@ const lessonCompletionReportSelect = `
 	SELECT c.student_id, u.name AS user_name, u.slug AS user_slug,
 		c.lesson_title, c.completed_at, c.build_succeeded, c.test_passed,
 		c.tests_total, c.tests_passed, c.tests_failed, c.tests_skipped,
-		r.id AS run_job_id, r.log_path
+		c.id AS completion_id, c.source, r.id AS run_job_id, r.log_path
 	FROM lesson_completions c
 	JOIN user u ON u.id = c.student_id
-	JOIN run_jobs r ON r.id = c.run_job_id
+	LEFT JOIN run_jobs r ON r.id = c.run_job_id
 `;
 
 export async function handleAdminRoute(
@@ -224,6 +227,7 @@ export async function handleAdminRoute(
 				"tests_passed",
 				"tests_failed",
 				"tests_skipped",
+				"source",
 				"log_path",
 			];
 			const lines = [headers.map((header) => csvCell(header)).join(",")];
@@ -240,7 +244,8 @@ export async function handleAdminRoute(
 						row.tests_passed,
 						row.tests_failed,
 						row.tests_skipped,
-						row.log_path
+						row.source,
+						row.log_path && row.run_job_id
 							? `/admin/run-logs/${encodeURIComponent(row.run_job_id)}`
 							: null,
 					]
@@ -289,9 +294,10 @@ export async function handleAdminRoute(
 			ok: true,
 			rows: rows.map((row) => ({
 				...row,
-				log_url: row.log_path
-					? `/admin/run-logs/${encodeURIComponent(row.run_job_id)}`
-					: null,
+				log_url:
+					row.log_path && row.run_job_id
+						? `/admin/run-logs/${encodeURIComponent(row.run_job_id)}`
+						: null,
 			})),
 			total: count.total,
 			page: rawPage,

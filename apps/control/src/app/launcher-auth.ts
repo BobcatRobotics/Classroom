@@ -1,9 +1,11 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import {
+	desktopLessonCompletionSyncSchema,
 	type LauncherIdentity,
 	launcherIdentitySchema,
 } from "@frc-coderunner/contracts";
 import { getSessionFromRequest } from "../auth/middleware";
+import type { CatalogSource } from "../catalog";
 import type { AppStorage } from "../storage";
 import { jsonResponse } from "./responses";
 
@@ -94,6 +96,7 @@ function launcherIdentityForTicket(
 
 export async function handleLauncherAuthRoute(
 	storage: AppStorage,
+	catalogSource: CatalogSource,
 	url: URL,
 	request: Request,
 ): Promise<Response | null> {
@@ -297,6 +300,63 @@ export async function handleLauncherAuthRoute(
 				catalogRepo: storage.config.catalogRepo,
 				catalogBranch: hasRemoteCatalog ? storage.config.catalogBranch : null,
 			},
+			{ headers: { "Cache-Control": "no-store" } },
+		);
+	}
+
+	if (
+		url.pathname === "/api/launcher/lesson-completions" &&
+		request.method === "POST"
+	) {
+		const authorization = request.headers.get("authorization") ?? "";
+		const match = /^Bearer\s+([A-Za-z0-9_-]{43})$/u.exec(authorization);
+		const identity = match
+			? launcherIdentityForTicket(storage, match[1] ?? "")
+			: null;
+		if (!identity) return invalidLaunchGrant();
+
+		let body: unknown;
+		try {
+			body = await request.json();
+		} catch {
+			return jsonResponse({ error: "Invalid JSON body." }, { status: 400 });
+		}
+		const parsed = desktopLessonCompletionSyncSchema.safeParse(body);
+		if (!parsed.success) {
+			return jsonResponse(
+				{ error: "Invalid desktop completion." },
+				{ status: 400 },
+			);
+		}
+
+		let module: Awaited<ReturnType<CatalogSource["resolveModule"]>>;
+		try {
+			module = await catalogSource.resolveModule(parsed.data.moduleId);
+		} catch {
+			return jsonResponse(
+				{ error: "The lesson is not available in the central catalog." },
+				{ status: 409 },
+			);
+		}
+		if (module.kind !== "robot") {
+			return jsonResponse(
+				{ error: "Only robot lessons can be marked complete." },
+				{ status: 409 },
+			);
+		}
+
+		const completion = storage.createDesktopLessonCompletion({
+			studentId: identity.userId as never,
+			eventId: parsed.data.eventId,
+			moduleId: module.id,
+			lessonTitle: module.title,
+			testsTotal: parsed.data.testsTotal,
+			testsPassed: parsed.data.testsPassed,
+			testsFailed: parsed.data.testsFailed,
+			testsSkipped: parsed.data.testsSkipped,
+		});
+		return jsonResponse(
+			{ ok: true, completionId: completion.id },
 			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}

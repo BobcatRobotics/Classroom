@@ -70,8 +70,10 @@ export function WorkspacePage() {
 	const autoChoosers = useAutoChoosers(simSlug);
 	const completion = useLessonCompletion(
 		workspaceSlug,
+		currentModule,
 		currentModuleKind === "robot",
-		`${reloadNonce}:${simulation.runStatus}`,
+		simulation.status?.run ?? null,
+		reloadNonce,
 	);
 	const editorUrl = workspaceSlug
 		? `/u/${workspaceSlug}/vscode/?folder=/workspace/project`
@@ -252,7 +254,8 @@ export function WorkspacePage() {
 				completion={
 					currentModuleKind === "robot"
 						? {
-								eligible: completion.status?.eligible ?? false,
+								eligible: completion.eligible,
+								completed: completion.completed,
 								loading: completion.loading,
 								marking: completion.marking,
 								message:

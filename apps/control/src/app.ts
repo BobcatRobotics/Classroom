@@ -28,6 +28,7 @@ import { GamepadSessions } from "./gamepad";
 import { HalSimBridge } from "./halsim";
 import { IdleManager } from "./idle";
 import { ImportManager } from "./imports";
+import { LessonCompletionSync } from "./lesson-completion-sync";
 import { getLogger } from "./logging";
 import {
 	httpRequestDuration,
@@ -168,6 +169,15 @@ export async function createApp(
 
 	const imports = new ImportManager(storage, runtimeProvider);
 	const catalogSource = createCatalogSource(storage.config);
+	const completionSync =
+		storage.config.centralUrl && storage.config.centralRuntimeTicket
+			? new LessonCompletionSync(
+					storage,
+					storage.config.centralRuntimeTicket,
+					storage.config.centralUrl,
+				)
+			: null;
+	completionSync?.start();
 	const idle = new IdleManager({
 		storage,
 		runtimeProvider,
@@ -325,6 +335,7 @@ export async function createApp(
 
 		const launcherAuthResponse = await handleLauncherAuthRoute(
 			storage,
+			catalogSource,
 			url,
 			request,
 		);
@@ -442,6 +453,7 @@ export async function createApp(
 		idle,
 		close() {
 			bootLog.info("shutting down");
+			completionSync?.stop();
 			idle.stop();
 			dockerStatsPoller.stop();
 			halsim.close();

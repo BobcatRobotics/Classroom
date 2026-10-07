@@ -171,6 +171,14 @@ catalog configuration. When the central control plane has
 `LESSONS_CATALOG_BRANCH` for its project list and lesson loads. Otherwise, it
 uses the catalog bundled with the desktop runtime.
 
+Desktop **Mark lesson completed** events are saved locally before sync and
+retried while the launcher is running. The central mentor report stores them as
+`desktop` source rows without a server workspace or run-job reference; these
+rows contain desktop-reported build/test results, not server-verified runs.
+Existing completion rows remain `browser` source rows, and repeated marks are
+kept as separate entries with the newest completion shown by the latest-only
+report filter.
+
 The packaged app defaults to `https://coderunner.wiredcats5885.ca`. Developers
 can override the central origin with `CODERUNNER_CENTRAL_URL` for staging or a
 local control-plane deployment. Source-checkout `dev:local` remains a demo-mode

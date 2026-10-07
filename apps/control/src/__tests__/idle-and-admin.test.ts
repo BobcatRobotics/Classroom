@@ -109,6 +109,76 @@ describe("idle lifecycle and admin controls", () => {
 		);
 	});
 
+	test("completion report distinguishes browser and desktop entries", async () => {
+		await withApp(async (app) => {
+			const adminResponse = await login(app, "coach", { role: "admin" });
+			const cookie = cookieFrom(adminResponse);
+			const workspace = workspaceBySlug(app, "coach");
+			const run = app.storage.createRunJob({
+				workspaceId: workspace.id,
+				moduleId: "robot-starter",
+				logPath: "/tmp/robot-starter.log",
+			});
+			app.storage.updateRunJob({
+				id: run.id,
+				state: "running",
+				started: true,
+			});
+			app.storage.setRunTestResults(run.id, {
+				total: 1,
+				passed: 1,
+				failed: 0,
+				skipped: 0,
+			});
+			app.storage.createLessonCompletion({
+				studentId: workspace.user_id as never,
+				workspaceId: workspace.id,
+				moduleId: "robot-starter",
+				lessonTitle: "Robot Starter",
+			});
+			app.storage.createDesktopLessonCompletion({
+				studentId: workspace.user_id as never,
+				eventId: `completion_${"d".repeat(32)}`,
+				moduleId: "robot-starter",
+				lessonTitle: "Robot Starter",
+				testsTotal: 1,
+				testsPassed: 1,
+				testsFailed: 0,
+				testsSkipped: 0,
+			});
+
+			const response = await app.fetch(
+				new Request(
+					"http://localhost/admin/lesson-completions?page=1&pageSize=20",
+					{ headers: { cookie } },
+				),
+			);
+			expect(response.status).toBe(200);
+			const body = (await response.json()) as {
+				rows: Array<{
+					source: string;
+					run_job_id: string | null;
+					log_url: string | null;
+				}>;
+			};
+			expect(body.rows).toHaveLength(2);
+			expect(body.rows).toContainEqual(
+				expect.objectContaining({
+					source: "browser",
+					run_job_id: run.id,
+					log_url: `/admin/run-logs/${run.id}`,
+				}),
+			);
+			expect(body.rows).toContainEqual(
+				expect.objectContaining({
+					source: "desktop",
+					run_job_id: null,
+					log_url: null,
+				}),
+			);
+		});
+	});
+
 	test("admin shell requires an admin session and serves assets from /admin/", async () => {
 		await withApp(async (app) => {
 			const student = await login(app, "student");

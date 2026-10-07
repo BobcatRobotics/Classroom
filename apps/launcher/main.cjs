@@ -32,8 +32,8 @@ const runtimeDirectory = app.isPackaged
 	? join(process.resourcesPath, "runtime")
 	: join(__dirname, "dist", "resources");
 const runtimeBundle = join(runtimeDirectory, "local-runtime.js");
-// const defaultCentralUrl = "https://coderunner.bobcatrobotics.org";
-const defaultCentralUrl = "http://localhost:4000";
+const defaultCentralUrl = "https://coderunner.bobcatrobotics.org";
+//const defaultCentralUrl = "http://localhost:4000";
 const bunExecutable = join(
 	runtimeDirectory,
 	"bin",

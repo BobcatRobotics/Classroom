@@ -42,6 +42,27 @@ export const launcherCatalogConfigResponseSchema = z
 		"Remote catalog repository and branch must be configured together.",
 	);
 
+export const desktopLessonCompletionSyncSchema = z
+	.object({
+		eventId: z.string().regex(/^completion_[a-f0-9]{32}$/u),
+		moduleId: z.string().min(1).max(120),
+		testsTotal: z.number().int().min(0).max(10_000),
+		testsPassed: z.number().int().min(0).max(10_000),
+		testsFailed: z.number().int().min(0).max(10_000),
+		testsSkipped: z.number().int().min(0).max(10_000),
+	})
+	.refine(
+		(result) =>
+			result.testsFailed === 0 &&
+			result.testsSkipped === 0 &&
+			result.testsPassed === result.testsTotal,
+		"A desktop completion requires every test to pass.",
+	);
+
+export type DesktopLessonCompletionSync = z.infer<
+	typeof desktopLessonCompletionSyncSchema
+>;
+
 export const localUserIdentitySchema = z.object({
 	displayName: displayNameSchema,
 	email: z.string().email(),

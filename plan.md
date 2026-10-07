@@ -364,10 +364,10 @@ changing local project data. This optional phase does not block Phase 4.
 
 ### Phase 5: Completion and Submission Sync
 
-- [ ] Mark Lesson Completed Menu option disabled until robot start and all test pass
-- [ ] On click on Mark Lesson Completed, an entry should be made to lesson_completions table. Locally and then sync back to server side.
-- [ ] I would like to if in lesson_completion if the lesson is completed using desktop app or browser so new column in lesson_completion to track this. There will be existing entries in table, so update the column with value browser based for existing entries.
-- [ ] Browser session and local has no relationship, if student complete same lesson from client and browser then we add 2 entries (that is the case today for browser as well on multiple lesson completion clicks) and in report, the last one wins.
+- [x] Mark Lesson Completed Menu option disabled until robot start and all test pass. The completion-status route is covered for no run, failed tests, and all tests passing.
+- [x] On click on Mark Lesson Completed, save an entry locally and sync it to the server. Local events use a durable retry queue and an idempotent launch-grant-authenticated endpoint; central rows do not reference a server workspace or run job.
+- [x] Track whether a completion came from the desktop app or browser. Migration 014 backfills existing entries as `browser`; the mentor report shows source and desktop results are explicitly reported, not server-verified.
+- [x] Keep browser and local sessions independent: desktop and browser marks create separate rows, repeated marks are preserved, and strictly increasing completion timestamps make the newest row win the latest-only report.
 
 **Exit criteria:** A student can submit reliably and mentors can inspect the
 correct centrally stored submission and its status.

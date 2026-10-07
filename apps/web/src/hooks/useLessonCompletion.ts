@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type LessonCompletionStatusResponse,
 	lessonCompletionResponseSchema,
 	lessonCompletionStatusResponseSchema,
+	type SimStatusResponse,
 } from "@/lib/contracts";
 
 type CompletionState = {
 	status: LessonCompletionStatusResponse | null;
+	eligible: boolean;
+	completed: boolean;
 	loading: boolean;
 	marking: boolean;
 	message: string | null;
@@ -15,8 +18,10 @@ type CompletionState = {
 
 export function useLessonCompletion(
 	workspaceSlug: string | null,
+	moduleId: string | null,
 	enabled: boolean,
-	refreshKey: unknown,
+	currentRun: SimStatusResponse["run"] | null,
+	sessionNonce: number,
 ): CompletionState {
 	const [status, setStatus] = useState<LessonCompletionStatusResponse | null>(
 		null,
@@ -24,6 +29,44 @@ export function useLessonCompletion(
 	const [loading, setLoading] = useState(false);
 	const [marking, setMarking] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
+	const [freshRun, setFreshRun] = useState<{
+		sessionKey: string;
+		runId: string;
+	} | null>(null);
+	const [markedSession, setMarkedSession] = useState<string | null>(null);
+	const lastSeenRun = useRef<{
+		sessionKey: string;
+		runId: string | null;
+	} | null>(null);
+	const sessionKey =
+		enabled && workspaceSlug && moduleId
+			? `${workspaceSlug}:${moduleId}:${sessionNonce}`
+			: null;
+	const runId = currentRun?.runId ?? null;
+	const runStatus = currentRun?.status ?? "idle";
+	const refreshKey = `${sessionKey ?? ""}:${runId ?? ""}:${runStatus}`;
+
+	useEffect(() => {
+		if (!sessionKey) {
+			lastSeenRun.current = null;
+			setFreshRun(null);
+			setMarkedSession(null);
+			return;
+		}
+		if (!currentRun) return;
+
+		if (lastSeenRun.current?.sessionKey !== sessionKey) {
+			lastSeenRun.current = { sessionKey, runId };
+			setFreshRun(null);
+			setMarkedSession(null);
+			return;
+		}
+
+		if (lastSeenRun.current.runId !== runId) {
+			lastSeenRun.current = { sessionKey, runId };
+			setFreshRun(runId ? { sessionKey, runId } : null);
+		}
+	}, [currentRun, runId, sessionKey]);
 
 	const load = useCallback(async () => {
 		if (!workspaceSlug || !enabled) {
@@ -55,8 +98,15 @@ export function useLessonCompletion(
 		void load();
 	}, [load, refreshKey]);
 
+	const eligible =
+		freshRun?.sessionKey === sessionKey &&
+		freshRun.runId === runId &&
+		status?.eligible === true &&
+		status.run?.id === freshRun.runId;
+	const completed = markedSession === sessionKey && sessionKey !== null;
+
 	const mark = useCallback(async () => {
-		if (!workspaceSlug || !status?.eligible) return;
+		if (!workspaceSlug || !sessionKey || !eligible || completed) return;
 		setMarking(true);
 		setMessage(null);
 		try {
@@ -71,8 +121,8 @@ export function useLessonCompletion(
 				throw new Error(body?.error ?? "Unable to mark lesson complete.");
 			}
 			lessonCompletionResponseSchema.parse(await response.json());
+			setMarkedSession(sessionKey);
 			setMessage("Lesson marked complete.");
-			await load();
 		} catch (error) {
 			setMessage(
 				error instanceof Error
@@ -82,7 +132,7 @@ export function useLessonCompletion(
 		} finally {
 			setMarking(false);
 		}
-	}, [load, status?.eligible, workspaceSlug]);
+	}, [completed, eligible, sessionKey, workspaceSlug]);
 
-	return { status, loading, marking, message, mark };
+	return { status, eligible, completed, loading, marking, message, mark };
 }

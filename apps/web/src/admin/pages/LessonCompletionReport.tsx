@@ -13,7 +13,9 @@ type ReportUser = { id: string; name: string; slug: string | null };
 type ReportLesson = { module_id: string; lesson_title: string };
 type ReportOptions = { users: ReportUser[]; lessons: ReportLesson[] };
 type CompletionRow = {
-	run_job_id: string;
+	completion_id: string;
+	run_job_id: string | null;
+	source: "browser" | "desktop";
 	user_name: string;
 	user_slug: string | null;
 	lesson_title: string;
@@ -43,6 +45,7 @@ type SortKey =
 	| "tests_passed"
 	| "tests_failed"
 	| "tests_skipped"
+	| "source"
 	| "log_path";
 type ReportQuery = {
 	studentId: string;
@@ -389,6 +392,13 @@ export function LessonCompletionReport() {
 										onSort={sortBy}
 									/>
 									<SortHeader
+										label="Source"
+										sort="source"
+										active={query.sort}
+										direction={query.direction}
+										onSort={sortBy}
+									/>
+									<SortHeader
 										label="Log Path"
 										sort="log_path"
 										active={query.sort}
@@ -399,7 +409,10 @@ export function LessonCompletionReport() {
 							</thead>
 							<tbody>
 								{report.rows.map((row) => (
-									<tr key={row.run_job_id} className="border-t border-zinc-800">
+									<tr
+										key={row.completion_id}
+										className="border-t border-zinc-800"
+									>
 										<td className="px-3 py-2">{row.user_name}</td>
 										<td className="px-3 py-2 font-mono text-xs">
 											{row.user_slug ?? "—"}
@@ -418,6 +431,11 @@ export function LessonCompletionReport() {
 										<td className="px-3 py-2">{row.tests_passed}</td>
 										<td className="px-3 py-2">{row.tests_failed}</td>
 										<td className="px-3 py-2">{row.tests_skipped}</td>
+										<td className="px-3 py-2">
+											{row.source === "desktop"
+												? "Desktop-reported"
+												: "Browser"}
+										</td>
 										<td className="px-3 py-2">
 											{row.log_url ? (
 												<a
@@ -438,7 +456,7 @@ export function LessonCompletionReport() {
 									<tr>
 										<td
 											className="px-3 py-8 text-center text-muted-foreground"
-											colSpan={11}
+											colSpan={12}
 										>
 											No lesson completions found.
 										</td>

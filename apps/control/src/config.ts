@@ -48,6 +48,8 @@ export type ControlConfig = {
 	adminToken: string | null;
 	maxActiveContainers: number;
 	desktopLaunchGrantTtlMs: number;
+	centralUrl: string | null;
+	centralRuntimeTicket: string | null;
 	localIdentity: LocalUserIdentity | null;
 	demo: boolean;
 	adminEmails: string[];
@@ -430,6 +432,11 @@ export function loadControlConfig(
 			60 * 1000,
 			24 * 60 * 60 * 1000,
 		),
+		centralUrl: input.centralUrl ?? Bun.env.CODERUNNER_CENTRAL_URL ?? null,
+		centralRuntimeTicket:
+			input.centralRuntimeTicket ??
+			Bun.env.CODERUNNER_CENTRAL_SYNC_TICKET ??
+			null,
 		demo: parseBoolean(input.demo ?? Bun.env.CODERUNNER_DEMO_MODE, false),
 		localIdentity:
 			input.localIdentity === undefined
