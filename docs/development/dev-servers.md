@@ -81,6 +81,97 @@ the prebuilt web bundle from `apps/web/dist/` alongside the API and WebSocket
 routes. If you only change backend code, this server plus a built web bundle is
 all you need.
 
+### Local CodeRunner prototype: `bun run dev:local`
+
+This starts the existing control plane and complete web shell against local
+Docker, using demo authentication and a separate `data/local-phase2` directory.
+It binds the control-plane UI/API to `127.0.0.1` and is intended only for the
+Phase 2 local-shell prototype. It is not the paired student launcher: demo mode
+bypasses authentication, central account linking is not implemented, and the
+workspace image still needs Docker Desktop. Do not expose this process to a LAN
+or the internet.
+
+Start it on an unused port and open the local workspace:
+
+```bash
+PORT=4010 bun run dev:local
+```
+
+Then open `http://127.0.0.1:4010/u/demo/`. The wrapper pins the workspace image
+by digest; set `FRC_LOCAL_CODE_IMAGE` to a different image reference only when
+intentionally testing another build or release. The local workspace memory cap
+defaults to `4096m` to accommodate the editor, Gradle, and simulation together;
+`FRC_LOCAL_CODE_MEMORY_LIMIT` overrides it for resource testing.
+
+The prototype uses the repository's built web, AdvantageScope, and PathPlanner
+assets. Run `bun run build:web` if the React shell has changed; the other assets
+are prepared by `bun run fetch:dist` or the normal build steps.
+
+#### Guided local runtime
+
+The source-checkout launcher prototype provides setup, start, repair, and
+diagnostics commands without requiring students to type Docker commands:
+
+```bash
+bun run local:setup       # check Docker Desktop, prepare storage, pull the pinned image
+bun run local:start       # set up if needed, start CodeRunner, wait for workspace readiness
+bun run local:repair      # repeat idempotent setup after correcting a problem
+bun run local:diagnostics # print a support report without project data or credentials
+```
+
+Setup supports macOS on Apple silicon or Intel, and Windows x64. Docker Desktop
+must be installed and running with its Linux container engine. Workspace project
+files live below the per-user CodeRunner data directory; editor/config state is
+kept separately in a Docker volume. The workspace image is pinned by digest.
+Docker pull layer output is shown while downloading. Errors for an unavailable
+engine, permissions, and low Docker disk space include a recovery action. If
+startup exceeds ten minutes, the service remains running so the student can
+inspect its output or collect diagnostics, then reopen the page at
+`http://127.0.0.1:<port>/u/demo/`.
+
+The launcher prefers port 4000 and chooses the next available loopback port if
+that port is busy. It searches up to 100 ports and reports an actionable error
+if none are available.
+
+Closing the terminal running `local:start` stops the local control service but
+leaves the workspace container and its data in place. Starting again adopts the
+existing container; normal container and simulator controls remain available in
+the shell. This prototype does not install Docker Desktop or bypass device
+permissions; students who cannot install or start it need an approved school or
+family support path.
+
+#### Desktop package builds
+
+The Electron launcher packages the locally built web shell, the local runtime,
+and its required assets. Build an unsigned package for the current supported
+host with `bun run desktop:build`; artifacts are written to
+`dist/desktop/installers/`. Supported build hosts are macOS arm64/x64 and
+Windows x64. macOS builds produce ZIP and DMG files; Windows builds produce an
+NSIS installer. Build on each target OS for release validation.
+
+Use `bun run desktop:release` for a signed release. It requires `CSC_LINK` and
+`CSC_KEY_PASSWORD`; macOS additionally requires `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` for notarization. Supply
+these only through the release environment or secret store, never source files.
+Uninstalling does not remove CodeRunner's per-user data directory; project
+deletion remains a separate explicit action.
+
+#### Local workflow parity
+
+| Hosted workflow | Local implementation | Validation / remaining work |
+| --- | --- | --- |
+| Edit files in VSCodium | Existing editor proxy and project bind mount | A file created and edited in the browser editor was present in the host project; confirmed replacement removed it. |
+| Build/run robot code and read logs | Existing run manager and workspace runtime APIs | Run path passed on the Mac prototype; WPILib editor-build evidence and Windows remain open. |
+| Driver Station and simulation | Existing HALSim controls and NT4 connection | Enable/disable passed; live AdvantageScope rendering still needs checking. |
+| AdvantageScope telemetry | Local NT4 endpoint through the shell | Robot sim and NT4 clients connected; rendered telemetry is blocked by the first-run beta acknowledgement, which requires user consent. |
+| PathPlanner file access | Existing local proxy and project file APIs | Pane startup read the project snapshot and wrote `navgrid.json`; confirmed on the host mount before project replacement. Direct path editing remains unverified. |
+| Project Preview | Existing local Preview routes and pane | Pane/routes loaded; rendered project content remains part of acceptance testing. |
+| Switch project | Existing lesson/import selector and project APIs | Verified discard warning, Back preserving the host marker, and Continue replacing files on disk. |
+| Sign-in, lessons, assignments, progress, submissions | Not supplied by demo-mode local shell | Deliberately remains central-account/device-linking work in Phase 3. |
+
+The local shell is the student experience for this prototype; opening the
+workspace editor directly does not provide the workflows above.
+
 #### Demo mode
 
 Demo mode bypasses authentication and seeds a single `demo` user, which is handy

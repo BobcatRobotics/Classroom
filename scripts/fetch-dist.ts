@@ -26,13 +26,22 @@ const tag =
 		? Bun.argv[tagArgIndex + 1]
 		: (Bun.env.DEMO_RELEASE_TAG ?? "");
 
-const artifacts = [
-	{
-		asset: "ascope-dist.tar.gz",
-		destDir: resolve(repoRoot, "dist/advantagescope"),
-	},
-	{ asset: "web-dist.tar.gz", destDir: resolve(repoRoot, "apps/web/dist") },
-];
+export function distArtifacts(skipWeb: boolean) {
+	return [
+		{
+			asset: "ascope-dist.tar.gz",
+			destDir: resolve(repoRoot, "dist/advantagescope"),
+		},
+		...(skipWeb
+			? []
+			: [
+					{
+						asset: "web-dist.tar.gz",
+						destDir: resolve(repoRoot, "apps/web/dist"),
+					},
+				]),
+	];
+}
 
 function downloadUrl(asset: string): string {
 	const base = `https://github.com/${repo}/releases`;
@@ -42,11 +51,12 @@ function downloadUrl(asset: string): string {
 }
 
 async function main(): Promise<void> {
+	const skipWeb = Bun.argv.includes("--skip-web");
 	console.log(
 		`Fetching prebuilt dist artifacts from ${repo} (${tag || "latest release"}).`,
 	);
 	await withScratch(async (scratch) => {
-		for (const artifact of artifacts) {
+		for (const artifact of distArtifacts(skipWeb)) {
 			await downloadAndExtract(
 				{
 					asset: artifact.asset,
@@ -59,12 +69,14 @@ async function main(): Promise<void> {
 		}
 	});
 	await fetchPathPlannerDist({ optional: true });
-	console.log("\nPrebuilt web shell and AdvantageScope Lite assets are ready.");
+	console.log("\nPrebuilt distribution assets are ready.");
 }
 
-try {
-	await main();
-} catch (error) {
-	console.error(error instanceof Error ? error.message : String(error));
-	process.exit(1);
+if (import.meta.main) {
+	try {
+		await main();
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error));
+		process.exit(1);
+	}
 }

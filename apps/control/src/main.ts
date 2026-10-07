@@ -20,6 +20,7 @@ const { createApp } = await import("./app");
 const demoFlag = Bun.argv.includes("--demo");
 
 const port = Number(Bun.env.PORT ?? 4000);
+const hostname = Bun.env.FRC_BIND_HOST?.trim() || "0.0.0.0";
 
 // Zero-config containerized mode: inside a container we inspect ourselves to
 // derive the host data path, workspace network, and data-dir owner. On the host
@@ -122,6 +123,7 @@ log.info("control plane configuration", {
 });
 
 const server = Bun.serve({
+	hostname,
 	port,
 	fetch: (request, server) => app.fetch(request, server),
 	websocket: app.websocket,
@@ -129,6 +131,6 @@ const server = Bun.serve({
 });
 
 log.info("listening", {
-	url: `http://localhost:${server.port}`,
+	url: `http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${server.port}`,
 	port: server.port,
 });

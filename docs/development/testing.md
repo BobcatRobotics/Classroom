@@ -95,7 +95,7 @@ bun run e2e:workspace-java
 
 Runs a targeted Playwright test against fresh containers from the real
 workspace image. It opens `hello-world` in real VSCodium, verifies that JDT LS
-uses Java 21, waits for `Java: Ready`, launches **Run Main** with F5, verifies
+uses Java 25, waits for `Java: Ready`, launches **Run Main** with F5, verifies
 `Hello, World!`, and
 asserts that JDT logs enumerate `vscode.java.resolveMainMethod` without any
 `No delegateCommandHandler` error. It then opens `robot-starter`, waits for
