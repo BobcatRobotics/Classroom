@@ -42,7 +42,7 @@ jobs:
 
       - name: Build AdvantageScope assets
         run: |
-          bun scripts/build-ascope-dist.ts
+          bun apps/launcher/scripts/build-ascope-dist.ts
           mkdir -p apps/launcher/dist/pathplanner
 
       - uses: actions/upload-artifact@v4
