@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       source_sha: ${{ steps.source.outputs.sha }}
+      package_version: ${{ steps.source.outputs.package_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +31,10 @@ jobs:
       - name: Record source commit
         id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Record launcher version
+        id: version
+        run: echo "version=$(node -p \"require('./apps/launcher/package.json').version\")" >> "$GITHUB_OUTPUT"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -89,11 +94,14 @@ jobs:
       - name: Build web app
         run: bun run build:web
 
+      - name: Ensure PathPlanner directory
+        if: matrix.target != 'windows-x64'
+        working-directory: apps/launcher
+        run: mkdir -p dist/pathplanner
+
       - name: Stage desktop resources
         working-directory: apps/launcher
-        run: |
-          mkdir -p dist/pathplanner
-          bun scripts/build-desktop.ts
+        run: bun scripts/build-desktop.ts
 
       - name: Package desktop app
         working-directory: apps/launcher
