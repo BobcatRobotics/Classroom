@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       source_sha: ${{ steps.source.outputs.sha }}
-      package_version: ${{ steps.source.outputs.package_version }}
+      package_version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,7 +34,9 @@ jobs:
 
       - name: Record launcher version
         id: version
-        run: echo "version=$(node -p \"require('./apps/launcher/package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -e 'console.log(require("./apps/launcher/package.json").version)')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -109,7 +111,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CodeRunner-${{ matrix.target }}-${{ needs.build-assets.outputs.source_sha }}
+          name: CodeRunner-${{ matrix.target }}-${{ needs.build-assets.outputs.package_version }}
           path: apps/launcher/dist/installers/*
           if-no-files-found: error
           retention-days: 14
