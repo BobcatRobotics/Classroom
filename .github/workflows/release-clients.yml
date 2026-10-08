@@ -1,0 +1,107 @@
+name: Build Desktop Clients
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag, or commit SHA to build
+        required: true
+        default: release/2027
+        type: string
+
+concurrency:
+  group: client-build-${{ inputs.source_ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-assets:
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          submodules: recursive
+
+      - name: Record source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build AdvantageScope assets
+        run: |
+          bun scripts/build-ascope-dist.ts
+          mkdir -p apps/launcher/dist/pathplanner
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-assets
+          path: |
+            apps/launcher/dist/advantagescope
+            apps/launcher/dist/pathplanner
+          if-no-files-found: error
+          retention-days: 1
+
+  build-client:
+    needs: build-assets
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-arm64
+            runner: macos-15
+          - target: macos-intel
+            runner: macos-15-intel
+          - target: windows-x64
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-assets.outputs.source_sha }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-assets
+          path: apps/launcher/dist
+
+      - name: Build web app
+        run: bun run build:web
+
+      - name: Stage desktop resources
+        working-directory: apps/launcher
+        run: |
+          mkdir -p dist/pathplanner
+          bun scripts/build-desktop.ts
+
+      - name: Package desktop app
+        working-directory: apps/launcher
+        run: bun run electron-builder --config electron-builder.yml --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CodeRunner-${{ matrix.target }}-${{ needs.build-assets.outputs.source_sha }}
+          path: apps/launcher/dist/installers/*
+          if-no-files-found: error
+          retention-days: 14
