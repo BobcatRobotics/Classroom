@@ -85,7 +85,7 @@ async function startDockerDesktop(): Promise<void> {
 			);
 		}
 		command = "cmd.exe";
-		args = ["/c", "start", "", executable];
+		args = ["/c", "start", "", "/min", executable];
 	} else {
 		throw new Error(
 			"CodeRunner can only start Docker Desktop automatically on macOS and Windows.",

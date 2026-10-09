@@ -1,7 +1,7 @@
 {
 	"name": "@frc-coderunner/launcher",
 	"private": true,
-	"version": "v2027.0.8",
+	"version": "2027.0.8",
 	"license": "MIT",
 	"description": "CodeRunner desktop launcher.",
 	"type": "module",
