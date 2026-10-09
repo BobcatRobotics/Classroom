@@ -439,13 +439,15 @@ async function handleStartupFailure(detail) {
 	if (quitting || !mainWindow || mainWindow.isDestroyed()) return;
 	const message = /Docker Desktop was not found|spawn .*ENOENT/iu.test(detail)
 		? "Docker Desktop was not found. Install Docker Desktop, then restart CodeRunner."
-		: /Please start Docker and restart CodeRunner|cannot connect to the Docker daemon|engine is unavailable/iu.test(
-					detail,
-				)
-			? "Please start Docker and restart CodeRunner."
-			: /Unable to download image/iu.test(detail)
-				? "Unable to download image, try again."
-				: "CodeRunner could not start. Check Docker Desktop or open Diagnostics for details.";
+		: /Docker Desktop did not become ready in time/iu.test(detail)
+			? "Docker Desktop did not start. Open Docker Desktop and retry."
+			: /Please start Docker and restart CodeRunner|cannot connect to the Docker daemon|engine is unavailable/iu.test(
+						detail,
+					)
+				? "Please start Docker and restart CodeRunner."
+				: /Unable to download image/iu.test(detail)
+					? "Unable to download image, try again."
+					: "CodeRunner could not start. Check Docker Desktop or open Diagnostics for details.";
 	const response = await dialog.showMessageBox(mainWindow, {
 		type: "error",
 		title: "CodeRunner could not start",

@@ -98,6 +98,7 @@ describe("local runtime setup", () => {
 		const dataDir = await mkdtemp(join(tmpdir(), "coderunner-local-setup-"));
 		temporaryDirectories.push(dataDir);
 		let imagePresent = false;
+		let startCount = 0;
 		const calls: string[][] = [];
 		const progress: string[] = [];
 		const docker: LocalDockerRunner = async (args, onProgress) => {
@@ -121,6 +122,9 @@ describe("local runtime setup", () => {
 		await setupLocalRuntime({
 			docker,
 			dataDir,
+			startDocker: async () => {
+				startCount += 1;
+			},
 			host: { platform: "darwin", arch: "arm64" },
 			onProgress: (message) => progress.push(message),
 		});
@@ -131,6 +135,7 @@ describe("local runtime setup", () => {
 		});
 
 		expect(calls.filter(([command]) => command === "pull")).toHaveLength(1);
+		expect(startCount).toBe(0);
 		expect(calls.some((args) => args.includes(LOCAL_CODE_IMAGE))).toBe(true);
 		expect(
 			calls.some((args) => args[0] === "pull" && args[1] === LOCAL_CODE_IMAGE),
@@ -211,6 +216,77 @@ describe("local runtime setup", () => {
 				host: { platform: "darwin", arch: "arm64" },
 			}),
 		).rejects.toThrow("Unable to download image, try again");
+	});
+
+	test("starts Docker Desktop and waits for its engine", async () => {
+		const dataDir = await mkdtemp(join(tmpdir(), "coderunner-docker-start-"));
+		temporaryDirectories.push(dataDir);
+		let infoChecks = 0;
+		let startCount = 0;
+		const progress: string[] = [];
+		const docker: LocalDockerRunner = async (args) => {
+			if (args[0] === "version") return result("27.0.3");
+			if (args[0] === "info") {
+				infoChecks += 1;
+				return infoChecks < 3
+					? result(
+							"",
+							"failed to connect to the docker API at unix:///tmp/docker.sock; check if the path is correct and if the daemon is running",
+							1,
+						)
+					: result("27.0.3|linux/arm64|Docker Desktop");
+			}
+			if (args[0] === "image") return result("image-id");
+			throw new Error(`Unexpected Docker command: ${args.join(" ")}`);
+		};
+
+		await setupLocalRuntime({
+			docker,
+			dataDir,
+			startDocker: async () => {
+				startCount += 1;
+			},
+			dockerPollIntervalMs: 0,
+			host: { platform: "darwin", arch: "arm64" },
+			onProgress: (message) => progress.push(message),
+		});
+
+		expect(startCount).toBe(1);
+		expect(infoChecks).toBe(3);
+		expect(progress).toContain("Starting Docker Desktop...");
+		expect(progress).toContain("Waiting for Docker Desktop to be ready...");
+	});
+
+	test("explains when Docker Desktop does not become ready", async () => {
+		const docker: LocalDockerRunner = async (args) =>
+			args[0] === "version"
+				? result("27.0.3")
+				: result("", "Cannot connect to the Docker daemon", 1);
+		await expect(
+			setupLocalRuntime({
+				docker,
+				dataDir: "/tmp/coderunner-unused",
+				startDocker: async () => {},
+				dockerStartupTimeoutMs: 0,
+				dockerPollIntervalMs: 0,
+				host: { platform: "darwin", arch: "arm64" },
+			}),
+		).rejects.toThrow("Docker Desktop did not become ready in time");
+	});
+
+	test("clearly reports when Docker is not installed", async () => {
+		const missingDocker: LocalDockerRunner = async () => {
+			throw new Error("Executable not found");
+		};
+		await expect(
+			setupLocalRuntime({
+				docker: missingDocker,
+				dataDir: "/tmp/coderunner-unused",
+				host: { platform: "darwin", arch: "arm64" },
+			}),
+		).rejects.toThrow(
+			"Docker Desktop was not found. Install Docker Desktop, then restart CodeRunner.",
+		);
 	});
 
 	test("rejects a non-Docker-Desktop engine", async () => {

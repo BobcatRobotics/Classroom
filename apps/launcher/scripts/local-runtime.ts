@@ -71,6 +71,54 @@ async function runDocker(
 	return { stdout, stderr, exitCode };
 }
 
+async function startDockerDesktop(): Promise<void> {
+	let command: string;
+	let args: string[];
+	if (process.platform === "darwin") {
+		command = "open";
+		args = ["-g", "-a", "Docker"];
+	} else if (process.platform === "win32") {
+		const executable = `${Bun.env.ProgramFiles || "C:\\Program Files"}\\Docker\\Docker\\Docker Desktop.exe`;
+		if (!(await Bun.file(executable).exists())) {
+			throw new Error(
+				"Docker Desktop was not found. Install Docker Desktop, then restart CodeRunner.",
+			);
+		}
+		command = "cmd.exe";
+		args = ["/c", "start", "", executable];
+	} else {
+		throw new Error(
+			"CodeRunner can only start Docker Desktop automatically on macOS and Windows.",
+		);
+	}
+
+	try {
+		const subprocess = Bun.spawn([command, ...args], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const [stdout, stderr, exitCode] = await Promise.all([
+			new Response(subprocess.stdout).text(),
+			new Response(subprocess.stderr).text(),
+			subprocess.exited,
+		]);
+		if (exitCode !== 0) {
+			const detail = stderr.trim() || stdout.trim();
+			throw new Error(detail || `start command exited with status ${exitCode}`);
+		}
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		if (
+			/unable to find application named docker\b|not found|enoent/i.test(detail)
+		) {
+			throw new Error(
+				"Docker Desktop was not found. Install Docker Desktop, then restart CodeRunner.",
+			);
+		}
+		throw new Error(`Could not start Docker Desktop: ${detail}`);
+	}
+}
+
 function printProgress(message: string): void {
 	console.log(message);
 }
@@ -79,6 +127,7 @@ async function setup(): Promise<void> {
 	await setupLocalRuntime({
 		docker: runDocker,
 		dataDir,
+		startDocker: startDockerDesktop,
 		onProgress: printProgress,
 	});
 }

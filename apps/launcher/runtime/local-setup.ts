@@ -24,6 +24,9 @@ export type LocalDockerRunner = (
 export type LocalSetupOptions = {
 	docker: LocalDockerRunner;
 	dataDir: string;
+	startDocker?: () => Promise<void>;
+	dockerStartupTimeoutMs?: number;
+	dockerPollIntervalMs?: number;
 	host?: LocalHost;
 	onProgress?: (message: string) => void;
 };
@@ -123,6 +126,8 @@ export async function findLocalControlPort(
 	);
 }
 
+class DockerDaemonUnavailableError extends Error {}
+
 function dockerFailure(result: DockerCommandResult, args: string[]): Error {
 	const details = result.stderr.trim() || result.stdout.trim();
 	if (/permission denied|access is denied|not authorized/i.test(details)) {
@@ -131,11 +136,13 @@ function dockerFailure(result: DockerCommandResult, args: string[]): Error {
 		);
 	}
 	if (
-		/cannot connect|daemon is not running|is the docker daemon running/i.test(
+		/cannot connect|daemon is not running|is the docker daemon running|error during connect|failed to connect to the docker (?:api|daemon)/i.test(
 			details,
 		)
 	) {
-		return new Error("Please start Docker and restart CodeRunner.");
+		return new DockerDaemonUnavailableError(
+			"Please start Docker and restart CodeRunner.",
+		);
 	}
 	if (args[0] === "pull") {
 		return new Error(
@@ -175,7 +182,9 @@ export async function inspectLocalDocker(
 			"{{.ServerVersion}}|{{.OSType}}/{{.Architecture}}|{{.OperatingSystem}}",
 		]);
 	} catch {
-		throw new Error("Please start Docker and restart CodeRunner.");
+		throw new DockerDaemonUnavailableError(
+			"Please start Docker and restart CodeRunner.",
+		);
 	}
 	if (server.exitCode !== 0) {
 		throw dockerFailure(server, ["info"]);
@@ -203,6 +212,37 @@ export async function inspectLocalDocker(
 	};
 }
 
+async function ensureLocalDocker(
+	options: LocalSetupOptions,
+	progress: (message: string) => void,
+): Promise<void> {
+	try {
+		await inspectLocalDocker(options.docker);
+		return;
+	} catch (error) {
+		if (!(error instanceof DockerDaemonUnavailableError)) throw error;
+		if (!options.startDocker) throw error;
+	}
+
+	progress("Starting Docker Desktop...");
+	await options.startDocker();
+	progress("Waiting for Docker Desktop to be ready...");
+	const deadline = Date.now() + (options.dockerStartupTimeoutMs ?? 120_000);
+	const pollIntervalMs = options.dockerPollIntervalMs ?? 2_000;
+	while (Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+		try {
+			await inspectLocalDocker(options.docker);
+			return;
+		} catch (error) {
+			if (!(error instanceof DockerDaemonUnavailableError)) throw error;
+		}
+	}
+	throw new Error(
+		"Docker Desktop did not become ready in time. Open Docker Desktop and retry.",
+	);
+}
+
 export async function setupLocalRuntime(
 	options: LocalSetupOptions,
 ): Promise<void> {
@@ -213,7 +253,7 @@ export async function setupLocalRuntime(
 	const progress = options.onProgress ?? (() => {});
 	assertSupportedLocalHost(host);
 	progress("Checking Docker Desktop...");
-	await inspectLocalDocker(options.docker);
+	await ensureLocalDocker(options, progress);
 
 	progress("Preparing persistent local workspace storage...");
 	await mkdir(options.dataDir, { recursive: true, mode: 0o700 });
